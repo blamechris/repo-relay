@@ -78,10 +78,10 @@ Add these secrets to your GitHub repository (Settings → Secrets and variables 
 
 ### 4. Add Workflow
 
-Create `.github/workflows/discord-bot.yml`:
+Create `.github/workflows/discord-notify.yml`:
 
 ```yaml
-name: Discord Bot Notifications
+name: Discord Notifications
 
 on:
   pull_request:
@@ -100,24 +100,73 @@ on:
 
 jobs:
   notify:
-    # Self-hosted recommended for persistent state
-    runs-on: self-hosted  # or ubuntu-latest
+    runs-on: self-hosted  # or ubuntu-latest (see State Storage below)
     permissions:
       pull-requests: read
       issues: read
       contents: read
-      statuses: read
-    # Skip workflow_run events without associated PRs
-    if: |
-      github.event_name != 'workflow_run' ||
-      github.event.workflow_run.pull_requests[0] != null
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.pull_requests[0] != null
+
+    steps:
+      - uses: blamechris/repo-relay@v1
+        with:
+          discord_bot_token: ${{ secrets.DISCORD_BOT_TOKEN }}
+          channel_prs: ${{ secrets.DISCORD_CHANNEL_PRS }}
+          channel_issues: ${{ secrets.DISCORD_CHANNEL_ISSUES }}
+          channel_releases: ${{ secrets.DISCORD_CHANNEL_RELEASES }}
+```
+
+That's it! The action handles Node.js setup, dependency installation, and execution automatically.
+
+### Action Inputs
+
+| Input | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `discord_bot_token` | Yes | - | Discord bot token |
+| `channel_prs` | Yes | - | Channel ID for PR notifications |
+| `channel_issues` | No | `channel_prs` | Channel ID for issue notifications |
+| `channel_releases` | No | `channel_prs` | Channel ID for release notifications |
+| `state_dir` | No | `~/.repo-relay` | Directory for SQLite state |
+| `github_token` | No | `github.token` | GitHub token for API access |
+
+<details>
+<summary><strong>Advanced: Manual Workflow Setup</strong></summary>
+
+If you need more control (custom Node.js version, additional steps, etc.), you can set up the workflow manually:
+
+```yaml
+name: Discord Notifications
+
+on:
+  pull_request:
+    types: [opened, synchronize, closed, reopened, edited, ready_for_review, converted_to_draft]
+  pull_request_review:
+    types: [submitted]
+  issue_comment:
+    types: [created]
+  issues:
+    types: [opened, closed]
+  release:
+    types: [published]
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+jobs:
+  notify:
+    runs-on: self-hosted
+    permissions:
+      pull-requests: read
+      issues: read
+      contents: read
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.pull_requests[0] != null
 
     steps:
       - name: Checkout repo-relay
         uses: actions/checkout@v4
         with:
           repository: blamechris/repo-relay
-          ref: v1.0.0
+          ref: v1
           path: .repo-relay
 
       - name: Setup Node.js
@@ -138,10 +187,7 @@ jobs:
           DISCORD_CHANNEL_PRS: ${{ secrets.DISCORD_CHANNEL_PRS }}
           DISCORD_CHANNEL_ISSUES: ${{ secrets.DISCORD_CHANNEL_ISSUES }}
           DISCORD_CHANNEL_RELEASES: ${{ secrets.DISCORD_CHANNEL_RELEASES }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_EVENT_NAME: ${{ github.event_name }}
-          GITHUB_EVENT_PATH: ${{ github.event_path }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ github.token }}
           STATE_DIR: ~/.repo-relay
         run: node dist/cli.js
 
@@ -149,6 +195,8 @@ jobs:
         if: always()
         run: rm -rf .repo-relay
 ```
+
+</details>
 
 ## State Storage
 
@@ -158,17 +206,6 @@ jobs:
 | **GitHub-hosted** | Workflow artifacts | Per-run (requires artifact upload/download) |
 
 For GitHub-hosted runners, you'll need to add artifact upload/download steps to persist state between runs.
-
-## Configuration
-
-| Environment Variable | Required | Description |
-|---------------------|----------|-------------|
-| `DISCORD_BOT_TOKEN` | Yes | Discord bot token |
-| `DISCORD_CHANNEL_PRS` | Yes | Channel for PR notifications |
-| `DISCORD_CHANNEL_ISSUES` | No | Channel for issue notifications |
-| `DISCORD_CHANNEL_RELEASES` | No | Channel for release notifications |
-| `GITHUB_TOKEN` | Yes | GitHub token for API access (review detection) |
-| `STATE_DIR` | No | Directory for SQLite state (default: `~/.repo-relay`) |
 
 ## Known Limitations
 
