@@ -38,7 +38,8 @@ gh run list --limit 3
 ## Git Workflow
 
 ### Branch Protection
-- `main` branch is protected - all changes require PRs
+- `main` branch is protected — all changes require PRs
+- CI (`npm test` + `npm run typecheck`) must pass before merge
 - Squash merge to main
 
 ### Branch Naming
