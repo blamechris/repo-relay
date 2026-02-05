@@ -21,6 +21,9 @@ export interface PrReviewPayload {
     };
     repository: {
         full_name: string;
+        owner: {
+            login: string;
+        };
     };
 }
 export declare function handleReviewEvent(client: Client, db: StateDb, channelConfig: ChannelConfig, payload: PrReviewPayload): Promise<void>;
