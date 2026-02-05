@@ -163,9 +163,7 @@ export class RepoRelay {
    * This is the "piggyback" approach - we check for reviews when other events fire
    */
   private async checkAndUpdateReviews(repo: string, prNumber: number): Promise<void> {
-    console.log(`[repo-relay] checkAndUpdateReviews called for PR #${prNumber}, token: ${!!this.config.githubToken}`);
     if (!this.db || !this.config.githubToken) {
-      console.log(`[repo-relay] Skipping review check: db=${!!this.db}, token=${!!this.config.githubToken}`);
       return;
     }
 

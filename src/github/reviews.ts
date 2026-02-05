@@ -112,37 +112,24 @@ export async function checkForReviews(
   // Check for agent-review comments
   try {
     const commentsUrl = `https://api.github.com/repos/${owner}/${repoName}/issues/${prNumber}/comments`;
-    console.log(`[repo-relay] Fetching comments from: ${commentsUrl}`);
     const commentsRes = await fetch(commentsUrl, { headers });
-    console.log(`[repo-relay] Comments API response: ${commentsRes.status}`);
 
     if (commentsRes.ok) {
       const comments = await commentsRes.json() as GitHubComment[];
-      console.log(`[repo-relay] Found ${comments.length} comments`);
 
       // Find the most recent agent-review comment
       const matchingComments = comments.filter(c => AGENT_REVIEW_PATTERNS.some(p => p.test(c.body)));
-      console.log(`[repo-relay] Found ${matchingComments.length} comments matching agent-review patterns`);
-      if (matchingComments.length === 0 && comments.length > 0) {
-        console.log(`[repo-relay] First comment preview: ${comments[0].body?.substring(0, 100)}...`);
-      }
       const agentReviewComment = matchingComments
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
 
       if (agentReviewComment) {
         let status: 'approved' | 'changes_requested' | 'pending' = 'pending';
 
-        const approvedMatch = APPROVED_PATTERNS.some(p => p.test(agentReviewComment.body));
-        const changesMatch = CHANGES_REQUESTED_PATTERNS.some(p => p.test(agentReviewComment.body));
-        console.log(`[repo-relay] Agent-review pattern check: approved=${approvedMatch}, changes=${changesMatch}`);
-
-        if (approvedMatch) {
+        if (APPROVED_PATTERNS.some(p => p.test(agentReviewComment.body))) {
           status = 'approved';
-        } else if (changesMatch) {
+        } else if (CHANGES_REQUESTED_PATTERNS.some(p => p.test(agentReviewComment.body))) {
           status = 'changes_requested';
         }
-
-        console.log(`[repo-relay] Agent-review status: ${status}, current: ${currentStatus?.agentReviewStatus}`);
 
         if (currentStatus?.agentReviewStatus !== status) {
           console.log(`[repo-relay] Detected agent-review (${status}) for PR #${prNumber}`);
