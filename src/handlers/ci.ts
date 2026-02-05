@@ -36,8 +36,11 @@ export async function handleCiEvent(
   const { workflow_run: run, repository } = payload;
   const repo = repository.full_name;
 
+  console.log(`[repo-relay] CI event: ${run.pull_requests.length} PRs associated, branch: ${run.head_branch}, sha: ${run.head_sha.substring(0, 7)}`);
+
   // Only notify for PRs we're tracking
   if (run.pull_requests.length === 0) {
+    console.log(`[repo-relay] No PRs in workflow_run event, skipping CI update`);
     return;
   }
 
