@@ -4,7 +4,7 @@
  * Entry point for the bot library.
  */
 
-import { Client, GatewayIntentBits, PermissionsBitField } from 'discord.js';
+import { Client, GatewayIntentBits, GuildChannel, PermissionsBitField } from 'discord.js';
 import { StateDb } from './db/state.js';
 import { getChannelConfig, type ChannelConfig } from './config/channels.js';
 import {
@@ -42,6 +42,14 @@ export type GitHubEventPayload =
   | { event: 'issues'; payload: IssueEventPayload }
   | { event: 'release'; payload: ReleaseEventPayload };
 
+const REQUIRED_PERMISSIONS = [
+  { flag: PermissionsBitField.Flags.SendMessages, name: 'Send Messages' },
+  { flag: PermissionsBitField.Flags.CreatePublicThreads, name: 'Create Public Threads' },
+  { flag: PermissionsBitField.Flags.SendMessagesInThreads, name: 'Send Messages in Threads' },
+  { flag: PermissionsBitField.Flags.EmbedLinks, name: 'Embed Links' },
+  { flag: PermissionsBitField.Flags.ReadMessageHistory, name: 'Read Message History' },
+];
+
 export class RepoRelay {
   private client: Client;
   private db: StateDb | null = null;
@@ -64,15 +72,7 @@ export class RepoRelay {
   }
 
   async validatePermissions(): Promise<void> {
-    const requiredPermissions = [
-      { flag: PermissionsBitField.Flags.SendMessages, name: 'Send Messages' },
-      { flag: PermissionsBitField.Flags.CreatePublicThreads, name: 'Create Public Threads' },
-      { flag: PermissionsBitField.Flags.SendMessagesInThreads, name: 'Send Messages in Threads' },
-      { flag: PermissionsBitField.Flags.EmbedLinks, name: 'Embed Links' },
-      { flag: PermissionsBitField.Flags.ReadMessageHistory, name: 'Read Message History' },
-    ];
-
-    const requiredNames = requiredPermissions.map((p) => p.name).join(', ');
+    const requiredNames = REQUIRED_PERMISSIONS.map((p) => p.name).join(', ');
 
     // Collect unique channel IDs
     const { prs, issues, releases } = this.config.channelConfig;
@@ -99,7 +99,7 @@ export class RepoRelay {
         continue;
       }
 
-      const guildChannel = channel as import('discord.js').GuildChannel;
+      const guildChannel = channel as GuildChannel;
       const me = guildChannel.guild.members.me;
       if (!me) {
         errors.push(
@@ -116,7 +116,7 @@ export class RepoRelay {
         continue;
       }
 
-      const missing = requiredPermissions
+      const missing = REQUIRED_PERMISSIONS
         .filter((p) => !permissions.has(p.flag))
         .map((p) => p.name);
 

@@ -11,6 +11,13 @@ import { buildEmbedWithStatus } from './handlers/pr.js';
 import { buildPrEmbed, buildReviewReply } from './embeds/builders.js';
 import { TextChannel } from 'discord.js';
 import { getChannelForEvent } from './config/channels.js';
+const REQUIRED_PERMISSIONS = [
+    { flag: PermissionsBitField.Flags.SendMessages, name: 'Send Messages' },
+    { flag: PermissionsBitField.Flags.CreatePublicThreads, name: 'Create Public Threads' },
+    { flag: PermissionsBitField.Flags.SendMessagesInThreads, name: 'Send Messages in Threads' },
+    { flag: PermissionsBitField.Flags.EmbedLinks, name: 'Embed Links' },
+    { flag: PermissionsBitField.Flags.ReadMessageHistory, name: 'Read Message History' },
+];
 export class RepoRelay {
     client;
     db = null;
@@ -30,14 +37,7 @@ export class RepoRelay {
         console.log(`[repo-relay] Connected to Discord as ${this.client.user?.tag}`);
     }
     async validatePermissions() {
-        const requiredPermissions = [
-            { flag: PermissionsBitField.Flags.SendMessages, name: 'Send Messages' },
-            { flag: PermissionsBitField.Flags.CreatePublicThreads, name: 'Create Public Threads' },
-            { flag: PermissionsBitField.Flags.SendMessagesInThreads, name: 'Send Messages in Threads' },
-            { flag: PermissionsBitField.Flags.EmbedLinks, name: 'Embed Links' },
-            { flag: PermissionsBitField.Flags.ReadMessageHistory, name: 'Read Message History' },
-        ];
-        const requiredNames = requiredPermissions.map((p) => p.name).join(', ');
+        const requiredNames = REQUIRED_PERMISSIONS.map((p) => p.name).join(', ');
         // Collect unique channel IDs
         const { prs, issues, releases } = this.config.channelConfig;
         const channelIds = [...new Set([prs, issues, releases].filter(Boolean))];
@@ -67,7 +67,7 @@ export class RepoRelay {
                 errors.push(`[repo-relay] ERROR: Could not resolve permissions for channel ${channelId}`);
                 continue;
             }
-            const missing = requiredPermissions
+            const missing = REQUIRED_PERMISSIONS
                 .filter((p) => !permissions.has(p.flag))
                 .map((p) => p.name);
             if (missing.length > 0) {
