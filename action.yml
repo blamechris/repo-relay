@@ -1,0 +1,70 @@
+name: 'Repo Relay'
+description: 'GitHub-Discord integration for PR, CI, issue, and release notifications'
+author: 'Christopher Pishaki'
+
+branding:
+  icon: 'message-circle'
+  color: 'purple'
+
+inputs:
+  discord_bot_token:
+    description: 'Discord bot token'
+    required: true
+  channel_prs:
+    description: 'Discord channel ID for PR notifications'
+    required: true
+  channel_issues:
+    description: 'Discord channel ID for issue notifications'
+    required: false
+  channel_releases:
+    description: 'Discord channel ID for release notifications'
+    required: false
+  github_token:
+    description: 'GitHub token for API access'
+    required: true
+    default: ${{ github.token }}
+  state_dir:
+    description: 'Directory for SQLite state storage'
+    required: false
+    default: '~/.repo-relay'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Checkout repo-relay
+      uses: actions/checkout@v4
+      with:
+        repository: blamechris/repo-relay
+        path: .repo-relay-action
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        cd .repo-relay-action
+        npm ci --production
+
+    - name: Run repo-relay
+      shell: bash
+      env:
+        DISCORD_BOT_TOKEN: ${{ inputs.discord_bot_token }}
+        DISCORD_CHANNEL_PRS: ${{ inputs.channel_prs }}
+        DISCORD_CHANNEL_ISSUES: ${{ inputs.channel_issues }}
+        DISCORD_CHANNEL_RELEASES: ${{ inputs.channel_releases }}
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+        STATE_DIR: ${{ inputs.state_dir }}
+        GITHUB_EVENT_NAME: ${{ github.event_name }}
+        GITHUB_EVENT_PATH: ${{ github.event_path }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+      run: |
+        cd .repo-relay-action
+        node dist/cli.js
+
+    - name: Cleanup
+      shell: bash
+      if: always()
+      run: rm -rf .repo-relay-action

@@ -1,0 +1,52 @@
+# Discord Notifications Workflow
+#
+# Copy this file to your project's .github/workflows/discord-notifications.yml
+# Then add the required secrets to your repository settings.
+#
+# Required secrets:
+#   DISCORD_BOT_TOKEN    - Your Discord bot token
+#   DISCORD_CHANNEL_PRS  - Channel ID for PR notifications
+#
+# Optional secrets:
+#   DISCORD_CHANNEL_ISSUES   - Channel ID for issue notifications (defaults to PRS channel)
+#   DISCORD_CHANNEL_RELEASES - Channel ID for release notifications (defaults to PRS channel)
+
+name: Discord Notifications
+
+on:
+  pull_request:
+    types: [opened, synchronize, closed, reopened, edited, ready_for_review, converted_to_draft]
+
+  pull_request_review:
+    types: [submitted]
+
+  issue_comment:
+    types: [created]
+
+  issues:
+    types: [opened, closed]
+
+  release:
+    types: [published]
+
+  workflow_run:
+    workflows: ["CI"]  # Change this to match your CI workflow name
+    types: [completed]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest  # Use self-hosted for persistent state
+    # Skip if this is a CI workflow run that wasn't for a PR
+    if: |
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.pull_requests[0] != null
+
+    steps:
+      - name: Discord Notification
+        uses: blamechris/repo-relay@v1
+        with:
+          discord_bot_token: ${{ secrets.DISCORD_BOT_TOKEN }}
+          channel_prs: ${{ secrets.DISCORD_CHANNEL_PRS }}
+          channel_issues: ${{ secrets.DISCORD_CHANNEL_ISSUES }}
+          channel_releases: ${{ secrets.DISCORD_CHANNEL_RELEASES }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}

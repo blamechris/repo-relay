@@ -1,0 +1,48 @@
+{
+  "name": "repo-relay",
+  "version": "1.0.0",
+  "description": "GitHub-Discord integration bot for development notifications",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "repo-relay": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli.ts",
+    "start": "node dist/cli.js",
+    "lint": "eslint src --ext .ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "github",
+    "discord",
+    "notifications",
+    "bot",
+    "ci",
+    "pull-request"
+  ],
+  "author": "Christopher Pishaki <ChrisPishaki@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blamechris/repo-relay.git"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "discord.js": "^14.16.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.12.0",
+    "eslint": "^9.19.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.4"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

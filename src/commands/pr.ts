@@ -1,0 +1,181 @@
+/**
+ * /pr slash command handler
+ *
+ * Note: Slash commands require a persistent bot process.
+ * This is scaffolding for Phase 5.
+ */
+
+import {
+  ChatInputCommandInteraction,
+  EmbedBuilder,
+  Colors,
+} from 'discord.js';
+
+interface GitHubPr {
+  number: number;
+  title: string;
+  html_url: string;
+  user: {
+    login: string;
+    avatar_url: string;
+    html_url: string;
+  };
+  head: {
+    ref: string;
+  };
+  base: {
+    ref: string;
+  };
+  additions: number;
+  deletions: number;
+  changed_files: number;
+  body: string | null;
+  state: 'open' | 'closed';
+  draft: boolean;
+  merged: boolean;
+}
+
+export async function handlePrCommand(
+  interaction: ChatInputCommandInteraction,
+  githubToken: string,
+  repo: string
+): Promise<void> {
+  const subcommand = interaction.options.getSubcommand();
+
+  switch (subcommand) {
+    case 'show':
+      await handlePrShow(interaction, githubToken, repo);
+      break;
+    case 'list':
+      await handlePrList(interaction, githubToken, repo);
+      break;
+  }
+}
+
+async function handlePrShow(
+  interaction: ChatInputCommandInteraction,
+  githubToken: string,
+  repo: string
+): Promise<void> {
+  const prNumber = interaction.options.getInteger('number', true);
+
+  await interaction.deferReply();
+
+  try {
+    const response = await fetch(
+      `https://api.github.com/repos/${repo}/pulls/${prNumber}`,
+      {
+        headers: {
+          Authorization: `Bearer ${githubToken}`,
+          Accept: 'application/vnd.github+json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        await interaction.editReply(`PR #${prNumber} not found`);
+        return;
+      }
+      throw new Error(`GitHub API error: ${response.status}`);
+    }
+
+    const pr = (await response.json()) as GitHubPr;
+
+    const stateEmoji = pr.merged ? '✅' : pr.state === 'open' ? '🔀' : '🚫';
+    const stateLabel = pr.merged
+      ? '[MERGED]'
+      : pr.state === 'closed'
+        ? '[CLOSED]'
+        : pr.draft
+          ? '[DRAFT]'
+          : '';
+
+    const embed = new EmbedBuilder()
+      .setColor(
+        pr.merged
+          ? Colors.Purple
+          : pr.state === 'open'
+            ? Colors.Green
+            : Colors.Red
+      )
+      .setTitle(`${stateEmoji} PR #${pr.number}: ${pr.title} ${stateLabel}`)
+      .setURL(pr.html_url)
+      .setAuthor({
+        name: pr.user.login,
+        iconURL: pr.user.avatar_url,
+        url: pr.user.html_url,
+      })
+      .addFields(
+        {
+          name: 'Branch',
+          value: `\`${pr.head.ref}\` → \`${pr.base.ref}\``,
+          inline: true,
+        },
+        {
+          name: 'Changes',
+          value: `${pr.changed_files} files (+${pr.additions}, -${pr.deletions})`,
+          inline: true,
+        }
+      );
+
+    if (pr.body) {
+      const truncated =
+        pr.body.length > 200 ? pr.body.substring(0, 197) + '...' : pr.body;
+      embed.setDescription(truncated);
+    }
+
+    await interaction.editReply({ embeds: [embed] });
+  } catch (error) {
+    console.error('[repo-relay] Error fetching PR:', error);
+    await interaction.editReply('Failed to fetch PR information');
+  }
+}
+
+async function handlePrList(
+  interaction: ChatInputCommandInteraction,
+  githubToken: string,
+  repo: string
+): Promise<void> {
+  await interaction.deferReply();
+
+  try {
+    const response = await fetch(
+      `https://api.github.com/repos/${repo}/pulls?state=open&per_page=10`,
+      {
+        headers: {
+          Authorization: `Bearer ${githubToken}`,
+          Accept: 'application/vnd.github+json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`GitHub API error: ${response.status}`);
+    }
+
+    const prs = (await response.json()) as GitHubPr[];
+
+    if (prs.length === 0) {
+      await interaction.editReply('No open PRs');
+      return;
+    }
+
+    const embed = new EmbedBuilder()
+      .setColor(Colors.Green)
+      .setTitle(`🔀 Open PRs (${prs.length})`)
+      .setDescription(
+        prs
+          .map((pr) => {
+            const draft = pr.draft ? ' (draft)' : '';
+            return `• **#${pr.number}** ${pr.title}${draft} - @${pr.user.login}`;
+          })
+          .join('\n')
+      );
+
+    await interaction.editReply({ embeds: [embed] });
+  } catch (error) {
+    console.error('[repo-relay] Error fetching PRs:', error);
+    await interaction.editReply('Failed to fetch PRs');
+  }
+}
