@@ -197,6 +197,8 @@ src/
 │   ├── comment.ts      # Issue comment events (including agent-review detection)
 │   ├── issue.ts        # Issue events
 │   └── release.ts      # Release events
+├── patterns/
+│   └── agent-review.ts # Shared agent-review detection patterns
 └── commands/           # Discord slash commands (not primary focus)
 ```
 
@@ -295,12 +297,10 @@ The bot detects agent-review comments by matching these patterns in comment bodi
 - `## Review Result`
 
 Status is determined by:
-- Approved: `verdict.*approved`, `✅.*approved`, `lgtm`, `looks good to me`
-- Changes requested: `changes.*requested`, `⚠️.*changes`, `needs.*changes`
+- Approved: `verdict.*approved`, `✅.*approved`, `lgtm`, `looks good to me`, `[x].*approve`
+- Changes requested: `changes.*requested`, `⚠️.*changes`, `needs.*changes`, `[x].*request changes`
 
-**Note:** Patterns are defined in two files that should stay in sync:
-- `src/handlers/comment.ts` - Webhook event handler
-- `src/github/reviews.ts` - Piggyback polling checker
+Patterns are defined in `src/patterns/agent-review.ts` and shared by both detection paths.
 
 ## Known Limitations
 

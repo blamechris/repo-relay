@@ -6,29 +6,11 @@
  */
 
 import { StateDb } from '../db/state.js';
-
-// Patterns to detect agent-review comments (same as comment.ts)
-const AGENT_REVIEW_PATTERNS = [
-  /## Code Review Summary/i,
-  /### Agent Review/i,
-  /## 🔍 Code Review/i,
-  /\*\*Verdict:\*\*/i,
-  /## Review Result/i,
-  /## Code Review: PR #\d+/i,
-];
-
-const APPROVED_PATTERNS = [
-  /verdict.*approved/i,
-  /✅.*approved/i,
-  /\[x\].*approve/i,
-];
-
-const CHANGES_REQUESTED_PATTERNS = [
-  /changes.*requested/i,
-  /⚠️.*changes/i,
-  /needs.*changes/i,
-  /\[x\].*request changes/i,
-];
+import {
+  AGENT_REVIEW_PATTERNS,
+  APPROVED_PATTERNS,
+  CHANGES_REQUESTED_PATTERNS,
+} from '../patterns/agent-review.js';
 
 interface GitHubReview {
   id: number;
