@@ -295,6 +295,7 @@ The bot detects agent-review comments by matching these patterns in comment bodi
 - `## 🔍 Code Review`
 - `**Verdict:**`
 - `## Review Result`
+- `## Code Review: PR #\d+`
 
 Status is determined by:
 - Approved: `verdict.*approved`, `✅.*approved`, `lgtm`, `looks good to me`, `[x].*approve`
