@@ -155,24 +155,30 @@ async function handlePrPush(
   pr: PrData,
   payload: PrEventPayload
 ): Promise<void> {
-  const existing = db.getPrMessage(repo, pr.number);
+  let existing = db.getPrMessage(repo, pr.number);
 
-  if (existing) {
-    const message = await channel.messages.fetch(existing.messageId);
-
-    // Count commits (if before/after available, otherwise assume 1)
-    const commitCount = 1; // GitHub doesn't provide commit count directly in synchronize
-
-    const replyText = buildPushReply(
-      commitCount,
-      payload.sender.login,
-      pr.branch,
-      `${pr.url}/commits`
-    );
-
-    await message.reply(replyText);
-    db.updatePrMessageTimestamp(repo, pr.number);
+  // If no message exists yet (PR opened before bot was set up), create one
+  if (!existing) {
+    const embed = buildPrEmbed(pr);
+    const message = await channel.send({ embeds: [embed] });
+    db.savePrMessage(repo, pr.number, channel.id, message.id);
+    existing = { repo, prNumber: pr.number, channelId: channel.id, messageId: message.id, createdAt: '', lastUpdated: '' };
   }
+
+  const message = await channel.messages.fetch(existing.messageId);
+
+  // Count commits (if before/after available, otherwise assume 1)
+  const commitCount = 1; // GitHub doesn't provide commit count directly in synchronize
+
+  const replyText = buildPushReply(
+    commitCount,
+    payload.sender.login,
+    pr.branch,
+    `${pr.url}/commits`
+  );
+
+  await message.reply(replyText);
+  db.updatePrMessageTimestamp(repo, pr.number);
 }
 
 async function handlePrUpdated(
@@ -188,5 +194,10 @@ async function handlePrUpdated(
     const embed = buildPrEmbed(pr);
     await message.edit({ embeds: [embed] });
     db.updatePrMessageTimestamp(repo, pr.number);
+  } else {
+    // No message exists yet (PR opened before bot was set up), create one
+    const embed = buildPrEmbed(pr);
+    const message = await channel.send({ embeds: [embed] });
+    db.savePrMessage(repo, pr.number, channel.id, message.id);
   }
 }
