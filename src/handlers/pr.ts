@@ -3,8 +3,8 @@
  */
 
 import { Client, TextChannel } from 'discord.js';
-import { StateDb } from '../db/state.js';
-import { buildPrEmbed, buildMergedReply, buildClosedReply, buildPushReply, PrData } from '../embeds/builders.js';
+import { StateDb, StoredPrData } from '../db/state.js';
+import { buildPrEmbed, buildMergedReply, buildClosedReply, buildPushReply, PrData, ReviewStatus, CiStatus } from '../embeds/builders.js';
 import { getChannelForEvent, ChannelConfig } from '../config/channels.js';
 
 export interface PrEventPayload {
@@ -117,6 +117,10 @@ async function handlePrOpened(
   const embed = buildPrEmbed(pr);
   const message = await channel.send({ embeds: [embed] });
   db.savePrMessage(repo, pr.number, channel.id, message.id);
+
+  // Save PR data for future embed rebuilding
+  savePrDataFromPrData(db, repo, pr);
+  db.savePrStatus(repo, pr.number);
 }
 
 async function handlePrClosed(
@@ -128,9 +132,13 @@ async function handlePrClosed(
   const existing = db.getPrMessage(repo, pr.number);
 
   if (existing) {
-    // Update the original embed
+    // Update the original embed with full status
     const message = await channel.messages.fetch(existing.messageId);
-    const embed = buildPrEmbed(pr);
+    savePrDataFromPrData(db, repo, pr);
+    const statusData = buildEmbedWithStatus(db, repo, pr.number);
+    const embed = statusData
+      ? buildPrEmbed(statusData.prData, statusData.ci, statusData.reviews)
+      : buildPrEmbed(pr);
     await message.edit({ embeds: [embed] });
 
     // Post a reply
@@ -145,6 +153,8 @@ async function handlePrClosed(
     const embed = buildPrEmbed(pr);
     const message = await channel.send({ embeds: [embed] });
     db.savePrMessage(repo, pr.number, channel.id, message.id);
+    savePrDataFromPrData(db, repo, pr);
+    db.savePrStatus(repo, pr.number);
   }
 }
 
@@ -162,7 +172,12 @@ async function handlePrPush(
     const embed = buildPrEmbed(pr);
     const message = await channel.send({ embeds: [embed] });
     db.savePrMessage(repo, pr.number, channel.id, message.id);
+    savePrDataFromPrData(db, repo, pr);
+    db.savePrStatus(repo, pr.number);
     existing = { repo, prNumber: pr.number, channelId: channel.id, messageId: message.id, createdAt: '', lastUpdated: '' };
+  } else {
+    // Update PR data for future rebuilds
+    savePrDataFromPrData(db, repo, pr);
   }
 
   const message = await channel.messages.fetch(existing.messageId);
@@ -194,10 +209,73 @@ async function handlePrUpdated(
     const embed = buildPrEmbed(pr);
     await message.edit({ embeds: [embed] });
     db.updatePrMessageTimestamp(repo, pr.number);
+    savePrDataFromPrData(db, repo, pr);
   } else {
     // No message exists yet (PR opened before bot was set up), create one
     const embed = buildPrEmbed(pr);
     const message = await channel.send({ embeds: [embed] });
     db.savePrMessage(repo, pr.number, channel.id, message.id);
+    savePrDataFromPrData(db, repo, pr);
+    db.savePrStatus(repo, pr.number);
   }
+}
+
+// Helper to save PR data from PrData interface
+function savePrDataFromPrData(db: StateDb, repo: string, pr: PrData): void {
+  db.savePrData({
+    repo,
+    prNumber: pr.number,
+    title: pr.title,
+    url: pr.url,
+    author: pr.author,
+    authorUrl: pr.authorUrl,
+    authorAvatar: pr.authorAvatar ?? null,
+    branch: pr.branch,
+    baseBranch: pr.baseBranch,
+    additions: pr.additions,
+    deletions: pr.deletions,
+    changedFiles: pr.changedFiles,
+    state: pr.state,
+    draft: pr.draft,
+    prCreatedAt: pr.createdAt,
+  });
+}
+
+// Helper to rebuild embed with current status from DB
+export function buildEmbedWithStatus(db: StateDb, repo: string, prNumber: number): { prData: PrData; reviews: ReviewStatus; ci: CiStatus } | null {
+  const stored = db.getPrData(repo, prNumber);
+  if (!stored) return null;
+
+  const status = db.getPrStatus(repo, prNumber);
+
+  const prData: PrData = {
+    number: stored.prNumber,
+    title: stored.title,
+    url: stored.url,
+    author: stored.author,
+    authorUrl: stored.authorUrl,
+    authorAvatar: stored.authorAvatar ?? undefined,
+    branch: stored.branch,
+    baseBranch: stored.baseBranch,
+    additions: stored.additions,
+    deletions: stored.deletions,
+    changedFiles: stored.changedFiles,
+    state: stored.state as 'open' | 'closed' | 'merged',
+    draft: stored.draft,
+    createdAt: stored.prCreatedAt,
+  };
+
+  const reviews: ReviewStatus = {
+    copilot: status?.copilotStatus ?? 'pending',
+    copilotComments: status?.copilotComments ?? 0,
+    agentReview: status?.agentReviewStatus ?? 'pending',
+  };
+
+  const ci: CiStatus = {
+    status: status?.ciStatus ?? 'pending',
+    workflowName: status?.ciWorkflowName ?? undefined,
+    url: status?.ciUrl ?? undefined,
+  };
+
+  return { prData, reviews, ci };
 }

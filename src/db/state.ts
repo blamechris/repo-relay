@@ -16,6 +16,35 @@ export interface PrMessage {
   lastUpdated: string;
 }
 
+export interface StoredPrData {
+  repo: string;
+  prNumber: number;
+  title: string;
+  url: string;
+  author: string;
+  authorUrl: string;
+  authorAvatar: string | null;
+  branch: string;
+  baseBranch: string;
+  additions: number;
+  deletions: number;
+  changedFiles: number;
+  state: string;
+  draft: boolean;
+  prCreatedAt: string;
+}
+
+export interface PrStatus {
+  repo: string;
+  prNumber: number;
+  copilotStatus: 'pending' | 'reviewed';
+  copilotComments: number;
+  agentReviewStatus: 'pending' | 'approved' | 'changes_requested' | 'none';
+  ciStatus: 'pending' | 'running' | 'success' | 'failure' | 'cancelled';
+  ciWorkflowName: string | null;
+  ciUrl: string | null;
+}
+
 export interface EventLogEntry {
   id: number;
   repo: string;
@@ -51,6 +80,37 @@ export class StateDb {
         message_id TEXT NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (repo, pr_number)
+      );
+
+      CREATE TABLE IF NOT EXISTS pr_status (
+        repo TEXT NOT NULL,
+        pr_number INTEGER NOT NULL,
+        copilot_status TEXT DEFAULT 'pending',
+        copilot_comments INTEGER DEFAULT 0,
+        agent_review_status TEXT DEFAULT 'pending',
+        ci_status TEXT DEFAULT 'pending',
+        ci_workflow_name TEXT,
+        ci_url TEXT,
+        PRIMARY KEY (repo, pr_number)
+      );
+
+      CREATE TABLE IF NOT EXISTS pr_data (
+        repo TEXT NOT NULL,
+        pr_number INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        url TEXT NOT NULL,
+        author TEXT NOT NULL,
+        author_url TEXT NOT NULL,
+        author_avatar TEXT,
+        branch TEXT NOT NULL,
+        base_branch TEXT NOT NULL,
+        additions INTEGER DEFAULT 0,
+        deletions INTEGER DEFAULT 0,
+        changed_files INTEGER DEFAULT 0,
+        state TEXT DEFAULT 'open',
+        draft INTEGER DEFAULT 0,
+        pr_created_at TEXT NOT NULL,
         PRIMARY KEY (repo, pr_number)
       );
 
@@ -111,6 +171,147 @@ export class StateDb {
       WHERE repo = ? AND pr_number = ?
     `);
     stmt.run(repo, prNumber);
+  }
+
+  getPrStatus(repo: string, prNumber: number): PrStatus | null {
+    const stmt = this.db.prepare(`
+      SELECT repo, pr_number as prNumber,
+             copilot_status as copilotStatus,
+             copilot_comments as copilotComments,
+             agent_review_status as agentReviewStatus,
+             ci_status as ciStatus,
+             ci_workflow_name as ciWorkflowName,
+             ci_url as ciUrl
+      FROM pr_status
+      WHERE repo = ? AND pr_number = ?
+    `);
+    return (stmt.get(repo, prNumber) as PrStatus) ?? null;
+  }
+
+  savePrStatus(repo: string, prNumber: number): void {
+    const stmt = this.db.prepare(`
+      INSERT INTO pr_status (repo, pr_number)
+      VALUES (?, ?)
+      ON CONFLICT(repo, pr_number) DO NOTHING
+    `);
+    stmt.run(repo, prNumber);
+  }
+
+  updateCopilotStatus(
+    repo: string,
+    prNumber: number,
+    status: 'pending' | 'reviewed',
+    comments: number
+  ): void {
+    this.savePrStatus(repo, prNumber);
+    const stmt = this.db.prepare(`
+      UPDATE pr_status
+      SET copilot_status = ?, copilot_comments = ?
+      WHERE repo = ? AND pr_number = ?
+    `);
+    stmt.run(status, comments, repo, prNumber);
+  }
+
+  updateAgentReviewStatus(
+    repo: string,
+    prNumber: number,
+    status: 'pending' | 'approved' | 'changes_requested' | 'none'
+  ): void {
+    this.savePrStatus(repo, prNumber);
+    const stmt = this.db.prepare(`
+      UPDATE pr_status
+      SET agent_review_status = ?
+      WHERE repo = ? AND pr_number = ?
+    `);
+    stmt.run(status, repo, prNumber);
+  }
+
+  updateCiStatus(
+    repo: string,
+    prNumber: number,
+    status: 'pending' | 'running' | 'success' | 'failure' | 'cancelled',
+    workflowName?: string,
+    url?: string
+  ): void {
+    this.savePrStatus(repo, prNumber);
+    const stmt = this.db.prepare(`
+      UPDATE pr_status
+      SET ci_status = ?, ci_workflow_name = ?, ci_url = ?
+      WHERE repo = ? AND pr_number = ?
+    `);
+    stmt.run(status, workflowName ?? null, url ?? null, repo, prNumber);
+  }
+
+  getPrData(repo: string, prNumber: number): StoredPrData | null {
+    const stmt = this.db.prepare(`
+      SELECT repo, pr_number as prNumber, title, url, author,
+             author_url as authorUrl, author_avatar as authorAvatar,
+             branch, base_branch as baseBranch, additions, deletions,
+             changed_files as changedFiles, state, draft,
+             pr_created_at as prCreatedAt
+      FROM pr_data
+      WHERE repo = ? AND pr_number = ?
+    `);
+    // SQLite returns draft as integer (0/1), need to convert to boolean
+    interface DbRow {
+      repo: string;
+      prNumber: number;
+      title: string;
+      url: string;
+      author: string;
+      authorUrl: string;
+      authorAvatar: string | null;
+      branch: string;
+      baseBranch: string;
+      additions: number;
+      deletions: number;
+      changedFiles: number;
+      state: string;
+      draft: number;
+      prCreatedAt: string;
+    }
+    const row = stmt.get(repo, prNumber) as DbRow | undefined;
+    if (!row) return null;
+    return {
+      repo: row.repo,
+      prNumber: row.prNumber,
+      title: row.title,
+      url: row.url,
+      author: row.author,
+      authorUrl: row.authorUrl,
+      authorAvatar: row.authorAvatar,
+      branch: row.branch,
+      baseBranch: row.baseBranch,
+      additions: row.additions,
+      deletions: row.deletions,
+      changedFiles: row.changedFiles,
+      state: row.state,
+      draft: Boolean(row.draft),
+      prCreatedAt: row.prCreatedAt,
+    };
+  }
+
+  savePrData(data: StoredPrData): void {
+    const stmt = this.db.prepare(`
+      INSERT INTO pr_data (repo, pr_number, title, url, author, author_url,
+                          author_avatar, branch, base_branch, additions,
+                          deletions, changed_files, state, draft, pr_created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(repo, pr_number) DO UPDATE SET
+        title = excluded.title,
+        url = excluded.url,
+        additions = excluded.additions,
+        deletions = excluded.deletions,
+        changed_files = excluded.changed_files,
+        state = excluded.state,
+        draft = excluded.draft
+    `);
+    stmt.run(
+      data.repo, data.prNumber, data.title, data.url, data.author,
+      data.authorUrl, data.authorAvatar, data.branch, data.baseBranch,
+      data.additions, data.deletions, data.changedFiles, data.state,
+      data.draft ? 1 : 0, data.prCreatedAt
+    );
   }
 
   logEvent(

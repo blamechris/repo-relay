@@ -2,8 +2,9 @@
  * CI/Workflow event handler
  */
 import { TextChannel } from 'discord.js';
-import { buildCiReply } from '../embeds/builders.js';
+import { buildCiReply, buildPrEmbed } from '../embeds/builders.js';
 import { getChannelForEvent } from '../config/channels.js';
+import { buildEmbedWithStatus } from './pr.js';
 export async function handleCiEvent(client, db, channelConfig, payload) {
     const { workflow_run: run, repository } = payload;
     const repo = repository.full_name;
@@ -28,9 +29,17 @@ export async function handleCiEvent(client, db, channelConfig, payload) {
             conclusion: run.conclusion ?? undefined,
             url: run.html_url,
         };
+        // Update CI status in DB
+        db.updateCiStatus(repo, pr.number, ciStatus.status, run.name, run.html_url);
+        const message = await channel.messages.fetch(existing.messageId);
+        // Rebuild and edit the embed with updated status
+        const statusData = buildEmbedWithStatus(db, repo, pr.number);
+        if (statusData) {
+            const embed = buildPrEmbed(statusData.prData, statusData.ci, statusData.reviews);
+            await message.edit({ embeds: [embed] });
+        }
         // Only post replies for completed runs
         if (payload.action === 'completed') {
-            const message = await channel.messages.fetch(existing.messageId);
             const reply = buildCiReply(ciStatus);
             await message.reply(reply);
             db.updatePrMessageTimestamp(repo, pr.number);

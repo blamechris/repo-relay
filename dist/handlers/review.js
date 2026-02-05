@@ -2,8 +2,9 @@
  * Review event handler (Copilot and agent-review detection)
  */
 import { TextChannel } from 'discord.js';
-import { buildReviewReply } from '../embeds/builders.js';
+import { buildReviewReply, buildPrEmbed } from '../embeds/builders.js';
 import { getChannelForEvent } from '../config/channels.js';
+import { buildEmbedWithStatus } from './pr.js';
 export async function handleReviewEvent(client, db, channelConfig, payload) {
     const { action, review, pull_request: pr, repository } = payload;
     const repo = repository.full_name;
@@ -25,7 +26,15 @@ export async function handleReviewEvent(client, db, channelConfig, payload) {
         review.user.login.toLowerCase().includes('copilot');
     if (isCopilot) {
         const message = await channel.messages.fetch(existing.messageId);
-        // Copilot typically posts comments, not approvals
+        // Update status in DB
+        db.updateCopilotStatus(repo, pr.number, 'reviewed', 0);
+        // Rebuild and edit the embed with updated status
+        const statusData = buildEmbedWithStatus(db, repo, pr.number);
+        if (statusData) {
+            const embed = buildPrEmbed(statusData.prData, statusData.ci, statusData.reviews);
+            await message.edit({ embeds: [embed] });
+        }
+        // Post a reply
         const reply = buildReviewReply('copilot', 'reviewed', undefined, review.html_url);
         await message.reply(reply);
         db.updatePrMessageTimestamp(repo, pr.number);

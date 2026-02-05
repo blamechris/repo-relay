@@ -3,6 +3,7 @@
  */
 import { Client } from 'discord.js';
 import { StateDb } from '../db/state.js';
+import { PrData, ReviewStatus, CiStatus } from '../embeds/builders.js';
 import { ChannelConfig } from '../config/channels.js';
 export interface PrEventPayload {
     action: 'opened' | 'closed' | 'reopened' | 'synchronize' | 'edited' | 'ready_for_review' | 'converted_to_draft';
@@ -45,4 +46,9 @@ export interface PrEventPayload {
     after?: string;
 }
 export declare function handlePrEvent(client: Client, db: StateDb, channelConfig: ChannelConfig, payload: PrEventPayload): Promise<void>;
+export declare function buildEmbedWithStatus(db: StateDb, repo: string, prNumber: number): {
+    prData: PrData;
+    reviews: ReviewStatus;
+    ci: CiStatus;
+} | null;
 //# sourceMappingURL=pr.d.ts.map

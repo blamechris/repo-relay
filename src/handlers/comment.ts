@@ -4,8 +4,9 @@
 
 import { Client, TextChannel } from 'discord.js';
 import { StateDb } from '../db/state.js';
-import { buildReviewReply } from '../embeds/builders.js';
+import { buildReviewReply, buildPrEmbed } from '../embeds/builders.js';
 import { getChannelForEvent, ChannelConfig } from '../config/channels.js';
+import { buildEmbedWithStatus } from './pr.js';
 
 export interface IssueCommentPayload {
   action: 'created' | 'edited' | 'deleted';
@@ -92,7 +93,7 @@ export async function handleCommentEvent(
   }
 
   // Determine verdict
-  let status = 'reviewed';
+  let status: 'approved' | 'changes_requested' | 'pending' | 'none' = 'pending';
   if (APPROVED_PATTERNS.some((pattern) => pattern.test(body))) {
     status = 'approved';
   } else if (CHANGES_REQUESTED_PATTERNS.some((pattern) => pattern.test(body))) {
@@ -100,6 +101,18 @@ export async function handleCommentEvent(
   }
 
   const message = await channel.messages.fetch(existing.messageId);
+
+  // Update status in DB
+  db.updateAgentReviewStatus(repo, prNumber, status);
+
+  // Rebuild and edit the embed with updated status
+  const statusData = buildEmbedWithStatus(db, repo, prNumber);
+  if (statusData) {
+    const embed = buildPrEmbed(statusData.prData, statusData.ci, statusData.reviews);
+    await message.edit({ embeds: [embed] });
+  }
+
+  // Post a reply
   const reply = buildReviewReply('agent', status, undefined, comment.html_url);
   await message.reply(reply);
   db.updatePrMessageTimestamp(repo, prNumber);
