@@ -79,6 +79,7 @@ async function main(): Promise<void> {
 
   try {
     await relay.connect();
+    await relay.validatePermissions();
     await relay.handleEvent(eventData);
     console.log('[repo-relay] Event processed successfully');
   } catch (error) {
