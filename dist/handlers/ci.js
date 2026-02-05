@@ -20,11 +20,14 @@ export async function handleCiEvent(client, db, channelConfig, payload) {
         throw new Error(`Channel ${channelId} not found or not a text channel`);
     }
     for (const pr of run.pull_requests) {
+        console.log(`[repo-relay] Processing CI for PR #${pr.number}`);
         db.logEvent(repo, pr.number, `ci.${payload.action}`, payload);
         const existing = db.getPrMessage(repo, pr.number);
         if (!existing) {
+            console.log(`[repo-relay] No message found for PR #${pr.number}, skipping`);
             continue;
         }
+        console.log(`[repo-relay] Found message ${existing.messageId} for PR #${pr.number}`);
         const ciStatus = {
             status: mapCiStatus(run.status, run.conclusion),
             workflowName: run.name,
@@ -33,17 +36,25 @@ export async function handleCiEvent(client, db, channelConfig, payload) {
         };
         // Update CI status in DB
         db.updateCiStatus(repo, pr.number, ciStatus.status, run.name, run.html_url);
+        console.log(`[repo-relay] Updated CI status to ${ciStatus.status}`);
         const message = await channel.messages.fetch(existing.messageId);
+        console.log(`[repo-relay] Fetched Discord message`);
         // Rebuild and edit the embed with updated status
         const statusData = buildEmbedWithStatus(db, repo, pr.number);
         if (statusData) {
+            console.log(`[repo-relay] Rebuilding embed with CI: ${statusData.ci.status}`);
             const embed = buildPrEmbed(statusData.prData, statusData.ci, statusData.reviews);
             await message.edit({ embeds: [embed] });
+            console.log(`[repo-relay] Embed updated successfully`);
+        }
+        else {
+            console.log(`[repo-relay] No PR data found, cannot rebuild embed`);
         }
         // Only post replies for completed runs
         if (payload.action === 'completed') {
             const reply = buildCiReply(ciStatus);
             await message.reply(reply);
+            console.log(`[repo-relay] Posted CI reply`);
             db.updatePrMessageTimestamp(repo, pr.number);
         }
     }
