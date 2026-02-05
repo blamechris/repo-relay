@@ -69,23 +69,38 @@ async function handlePrOpened(channel, db, repo, pr) {
 async function handlePrClosed(channel, db, repo, pr) {
     let existing = db.getPrMessage(repo, pr.number);
     if (existing) {
-        // Update the original embed with full status
-        const message = await channel.messages.fetch(existing.messageId);
-        savePrDataFromPrData(db, repo, pr);
-        const statusData = buildEmbedWithStatus(db, repo, pr.number);
-        const embed = statusData
-            ? buildPrEmbed(statusData.prData, statusData.ci, statusData.reviews)
-            : buildPrEmbed(pr);
-        await message.edit({ embeds: [embed] });
-        // Post to thread
-        const thread = await getOrCreateThread(channel, db, repo, pr, existing);
-        const reply = pr.state === 'merged'
-            ? buildMergedReply(pr.mergedBy)
-            : buildClosedReply();
-        await thread.send(reply);
-        db.updatePrMessageTimestamp(repo, pr.number);
+        try {
+            // Update the original embed with full status
+            const message = await channel.messages.fetch(existing.messageId);
+            savePrDataFromPrData(db, repo, pr);
+            const statusData = buildEmbedWithStatus(db, repo, pr.number);
+            const embed = statusData
+                ? buildPrEmbed(statusData.prData, statusData.ci, statusData.reviews)
+                : buildPrEmbed(pr);
+            await message.edit({ embeds: [embed] });
+            // Post to thread
+            const thread = await getOrCreateThread(channel, db, repo, pr, existing);
+            const reply = pr.state === 'merged'
+                ? buildMergedReply(pr.mergedBy)
+                : buildClosedReply();
+            await thread.send(reply);
+            db.updatePrMessageTimestamp(repo, pr.number);
+            return;
+        }
+        catch (error) {
+            // Message was deleted from Discord - clear stale DB entry
+            const errMsg = error instanceof Error ? error.message : String(error);
+            if (errMsg.includes('Unknown Message')) {
+                console.log(`[repo-relay] Stale message for PR #${pr.number}, creating new one`);
+                db.deletePrMessage(repo, pr.number);
+                existing = null;
+            }
+            else {
+                throw error;
+            }
+        }
     }
-    else {
+    if (!existing) {
         // No existing message, create one showing the final state
         const embed = buildPrEmbed(pr);
         const message = await channel.send({ embeds: [embed] });
@@ -101,6 +116,23 @@ async function handlePrClosed(channel, db, repo, pr) {
 }
 async function handlePrPush(channel, db, repo, pr, payload) {
     let existing = db.getPrMessage(repo, pr.number);
+    // Check if existing message is stale (deleted from Discord)
+    if (existing) {
+        try {
+            await channel.messages.fetch(existing.messageId);
+        }
+        catch (error) {
+            const errMsg = error instanceof Error ? error.message : String(error);
+            if (errMsg.includes('Unknown Message')) {
+                console.log(`[repo-relay] Stale message for PR #${pr.number}, creating new one`);
+                db.deletePrMessage(repo, pr.number);
+                existing = null;
+            }
+            else {
+                throw error;
+            }
+        }
+    }
     // If no message exists yet (PR opened before bot was set up), create one
     if (!existing) {
         const embed = buildPrEmbed(pr);
@@ -131,13 +163,27 @@ async function handlePrPush(channel, db, repo, pr, payload) {
 async function handlePrUpdated(channel, db, repo, pr) {
     let existing = db.getPrMessage(repo, pr.number);
     if (existing) {
-        const message = await channel.messages.fetch(existing.messageId);
-        const embed = buildPrEmbed(pr);
-        await message.edit({ embeds: [embed] });
-        db.updatePrMessageTimestamp(repo, pr.number);
-        savePrDataFromPrData(db, repo, pr);
+        try {
+            const message = await channel.messages.fetch(existing.messageId);
+            const embed = buildPrEmbed(pr);
+            await message.edit({ embeds: [embed] });
+            db.updatePrMessageTimestamp(repo, pr.number);
+            savePrDataFromPrData(db, repo, pr);
+            return;
+        }
+        catch (error) {
+            const errMsg = error instanceof Error ? error.message : String(error);
+            if (errMsg.includes('Unknown Message')) {
+                console.log(`[repo-relay] Stale message for PR #${pr.number}, creating new one`);
+                db.deletePrMessage(repo, pr.number);
+                existing = null;
+            }
+            else {
+                throw error;
+            }
+        }
     }
-    else {
+    if (!existing) {
         // No message exists yet (PR opened before bot was set up), create one
         const embed = buildPrEmbed(pr);
         const message = await channel.send({ embeds: [embed] });
