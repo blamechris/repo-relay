@@ -4,7 +4,7 @@
  * Entry point for the bot library.
  */
 
-import { Client, GatewayIntentBits } from 'discord.js';
+import { Client, GatewayIntentBits, GuildChannel, PermissionsBitField } from 'discord.js';
 import { StateDb } from './db/state.js';
 import { getChannelConfig, type ChannelConfig } from './config/channels.js';
 import {
@@ -42,6 +42,14 @@ export type GitHubEventPayload =
   | { event: 'issues'; payload: IssueEventPayload }
   | { event: 'release'; payload: ReleaseEventPayload };
 
+const REQUIRED_PERMISSIONS = [
+  { flag: PermissionsBitField.Flags.SendMessages, name: 'Send Messages' },
+  { flag: PermissionsBitField.Flags.CreatePublicThreads, name: 'Create Public Threads' },
+  { flag: PermissionsBitField.Flags.SendMessagesInThreads, name: 'Send Messages in Threads' },
+  { flag: PermissionsBitField.Flags.EmbedLinks, name: 'Embed Links' },
+  { flag: PermissionsBitField.Flags.ReadMessageHistory, name: 'Read Message History' },
+];
+
 export class RepoRelay {
   private client: Client;
   private db: StateDb | null = null;
@@ -61,6 +69,75 @@ export class RepoRelay {
   async connect(): Promise<void> {
     await this.client.login(this.config.discordToken);
     console.log(`[repo-relay] Connected to Discord as ${this.client.user?.tag}`);
+  }
+
+  async validatePermissions(): Promise<void> {
+    const requiredNames = REQUIRED_PERMISSIONS.map((p) => p.name).join(', ');
+
+    // Collect unique channel IDs
+    const { prs, issues, releases } = this.config.channelConfig;
+    const channelIds = [...new Set([prs, issues, releases].filter(Boolean) as string[])];
+
+    const errors: string[] = [];
+
+    for (const channelId of channelIds) {
+      let channel;
+      try {
+        channel = await this.client.channels.fetch(channelId);
+      } catch {
+        errors.push(
+          `[repo-relay] ERROR: Could not access channel ${channelId}\n` +
+          `  The channel may not exist or the bot may not have access to it.`
+        );
+        continue;
+      }
+
+      if (!channel || !('guild' in channel)) {
+        errors.push(
+          `[repo-relay] ERROR: Channel ${channelId} is not a guild text channel`
+        );
+        continue;
+      }
+
+      const guildChannel = channel as GuildChannel;
+      const me = guildChannel.guild.members.me;
+      if (!me) {
+        errors.push(
+          `[repo-relay] ERROR: Could not resolve bot member in guild for channel ${channelId}`
+        );
+        continue;
+      }
+
+      const permissions = guildChannel.permissionsFor(me);
+      if (!permissions) {
+        errors.push(
+          `[repo-relay] ERROR: Could not resolve permissions for channel ${channelId}`
+        );
+        continue;
+      }
+
+      const missing = REQUIRED_PERMISSIONS
+        .filter((p) => !permissions.has(p.flag))
+        .map((p) => p.name);
+
+      if (missing.length > 0) {
+        errors.push(
+          `[repo-relay] ERROR: Bot lacks permissions in channel ${channelId}\n` +
+          `  Missing: ${missing.join(', ')}\n` +
+          `  Required: ${requiredNames}`
+        );
+      }
+    }
+
+    if (errors.length > 0) {
+      const message = errors.join('\n');
+      console.error(message);
+      throw new Error(
+        `Missing Discord permissions in ${errors.length} channel(s). See logs above for details.`
+      );
+    }
+
+    console.log('[repo-relay] Permission check passed for all channels');
   }
 
   async disconnect(): Promise<void> {
