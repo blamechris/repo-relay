@@ -69,7 +69,6 @@ export async function checkForReviews(
   prNumber: number,
   githubToken: string
 ): Promise<ReviewCheckResult> {
-  console.log(`[repo-relay] checkForReviews: PR #${prNumber}, token length: ${githubToken.length}`);
   const [owner, repoName] = repo.split('/');
   const headers = {
     'Authorization': `Bearer ${githubToken}`,
@@ -89,18 +88,14 @@ export async function checkForReviews(
   // Check for Copilot reviews
   try {
     const reviewsUrl = `https://api.github.com/repos/${owner}/${repoName}/pulls/${prNumber}/reviews`;
-    console.log(`[repo-relay] Fetching reviews from: ${reviewsUrl}`);
     const reviewsRes = await fetch(reviewsUrl, { headers });
-    console.log(`[repo-relay] Reviews API response: ${reviewsRes.status}`);
 
     if (reviewsRes.ok) {
       const reviews = await reviewsRes.json() as GitHubReview[];
-      console.log(`[repo-relay] Found ${reviews.length} reviews, users: ${reviews.map(r => r.user?.login).join(', ')}`);
       const copilotReview = reviews.find(r =>
         r.user?.login?.toLowerCase().includes('copilot') ||
         r.user?.type === 'Bot' && r.user?.login?.toLowerCase().includes('copilot')
       );
-      console.log(`[repo-relay] Copilot review found: ${!!copilotReview}, current status: ${currentStatus?.copilotStatus}`);
 
       if (copilotReview && currentStatus?.copilotStatus !== 'reviewed') {
         console.log(`[repo-relay] Detected Copilot review for PR #${prNumber}`);
@@ -109,8 +104,6 @@ export async function checkForReviews(
         result.copilotUrl = copilotReview.html_url;
         changed = true;
       }
-    } else {
-      console.log(`[repo-relay] Reviews API error: ${await reviewsRes.text()}`);
     }
   } catch (error) {
     console.log(`[repo-relay] Warning: Failed to check Copilot reviews: ${error}`);
