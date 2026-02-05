@@ -7,6 +7,7 @@ import { type ChannelConfig } from './config/channels.js';
 import { type PrEventPayload, type WorkflowRunPayload, type PrReviewPayload, type IssueCommentPayload, type IssueEventPayload, type ReleaseEventPayload } from './handlers/index.js';
 export interface RepoRelayConfig {
     discordToken: string;
+    githubToken?: string;
     channelConfig: ChannelConfig;
     stateDir?: string;
 }
@@ -38,6 +39,11 @@ export declare class RepoRelay {
     connect(): Promise<void>;
     disconnect(): Promise<void>;
     handleEvent(eventData: GitHubEventPayload): Promise<void>;
+    /**
+     * Check GitHub API for reviews and update embed if status changed
+     * This is the "piggyback" approach - we check for reviews when other events fire
+     */
+    private checkAndUpdateReviews;
     private extractRepo;
 }
 export { StateDb } from './db/state.js';

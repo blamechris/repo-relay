@@ -50,9 +50,15 @@ async function main() {
         console.log(`[repo-relay] Event '${eventName}' not handled, skipping`);
         process.exit(0);
     }
+    // Get optional GitHub token for review detection
+    const githubToken = process.env.GITHUB_TOKEN;
+    if (!githubToken) {
+        console.log('[repo-relay] Note: GITHUB_TOKEN not set, review detection via piggyback disabled');
+    }
     // Initialize and run
     const relay = new RepoRelay({
         discordToken,
+        githubToken,
         channelConfig,
         stateDir: process.env.STATE_DIR,
     });
