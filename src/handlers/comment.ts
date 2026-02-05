@@ -7,6 +7,11 @@ import { StateDb } from '../db/state.js';
 import { buildReviewReply, buildPrEmbed } from '../embeds/builders.js';
 import { getChannelForEvent, ChannelConfig } from '../config/channels.js';
 import { buildEmbedWithStatus, getOrCreateThread } from './pr.js';
+import {
+  AGENT_REVIEW_PATTERNS,
+  APPROVED_PATTERNS,
+  CHANGES_REQUESTED_PATTERNS,
+} from '../patterns/agent-review.js';
 
 export interface IssueCommentPayload {
   action: 'created' | 'edited' | 'deleted';
@@ -31,27 +36,6 @@ export interface IssueCommentPayload {
   };
 }
 
-// Patterns to detect agent-review comments
-const AGENT_REVIEW_PATTERNS = [
-  /## Code Review Summary/i,
-  /### Agent Review/i,
-  /## 🔍 Code Review/i,
-  /\*\*Verdict:\*\*/i,
-  /## Review Result/i,
-];
-
-const APPROVED_PATTERNS = [
-  /verdict.*approved/i,
-  /✅.*approved/i,
-  /lgtm/i,
-  /looks good to me/i,
-];
-
-const CHANGES_REQUESTED_PATTERNS = [
-  /changes.*requested/i,
-  /⚠️.*changes/i,
-  /needs.*changes/i,
-];
 
 export async function handleCommentEvent(
   client: Client,
