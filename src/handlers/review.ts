@@ -29,9 +29,6 @@ export interface PrReviewPayload {
       login: string;
     };
   };
-  sender: {
-    login: string;
-  };
 }
 
 export async function handleReviewEvent(
