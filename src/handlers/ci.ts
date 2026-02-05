@@ -4,9 +4,9 @@
 
 import { Client, TextChannel } from 'discord.js';
 import { StateDb } from '../db/state.js';
-import { buildCiReply, CiStatus, buildPrEmbed } from '../embeds/builders.js';
+import { buildCiReply, CiStatus, buildPrEmbed, PrData } from '../embeds/builders.js';
 import { getChannelForEvent, ChannelConfig } from '../config/channels.js';
-import { buildEmbedWithStatus } from './pr.js';
+import { buildEmbedWithStatus, getOrCreateThread } from './pr.js';
 
 export interface WorkflowRunPayload {
   action: 'completed' | 'requested' | 'in_progress';
@@ -82,16 +82,17 @@ export async function handleCiEvent(
       const embed = buildPrEmbed(statusData.prData, statusData.ci, statusData.reviews);
       await message.edit({ embeds: [embed] });
       console.log(`[repo-relay] Embed updated successfully`);
+
+      // Only post to thread for completed runs
+      if (payload.action === 'completed') {
+        const thread = await getOrCreateThread(channel, db, repo, statusData.prData, existing);
+        const reply = buildCiReply(ciStatus);
+        await thread.send(reply);
+        console.log(`[repo-relay] Posted CI update to thread`);
+        db.updatePrMessageTimestamp(repo, pr.number);
+      }
     } else {
       console.log(`[repo-relay] No PR data found, cannot rebuild embed`);
-    }
-
-    // Only post replies for completed runs
-    if (payload.action === 'completed') {
-      const reply = buildCiReply(ciStatus);
-      await message.reply(reply);
-      console.log(`[repo-relay] Posted CI reply`);
-      db.updatePrMessageTimestamp(repo, pr.number);
     }
   }
 }

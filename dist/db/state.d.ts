@@ -6,6 +6,7 @@ export interface PrMessage {
     prNumber: number;
     channelId: string;
     messageId: string;
+    threadId: string | null;
     createdAt: string;
     lastUpdated: string;
 }
@@ -49,7 +50,8 @@ export declare class StateDb {
     constructor(repo: string, stateDir?: string);
     private initSchema;
     getPrMessage(repo: string, prNumber: number): PrMessage | null;
-    savePrMessage(repo: string, prNumber: number, channelId: string, messageId: string): void;
+    savePrMessage(repo: string, prNumber: number, channelId: string, messageId: string, threadId?: string): void;
+    updatePrThread(repo: string, prNumber: number, threadId: string): void;
     updatePrMessageTimestamp(repo: string, prNumber: number): void;
     deletePrMessage(repo: string, prNumber: number): void;
     getPrStatus(repo: string, prNumber: number): PrStatus | null;

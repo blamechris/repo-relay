@@ -4,7 +4,7 @@
 import { TextChannel } from 'discord.js';
 import { buildReviewReply, buildPrEmbed } from '../embeds/builders.js';
 import { getChannelForEvent } from '../config/channels.js';
-import { buildEmbedWithStatus } from './pr.js';
+import { buildEmbedWithStatus, getOrCreateThread } from './pr.js';
 export async function handleReviewEvent(client, db, channelConfig, payload) {
     const { action, review, pull_request: pr, repository } = payload;
     const repo = repository.full_name;
@@ -33,10 +33,11 @@ export async function handleReviewEvent(client, db, channelConfig, payload) {
         if (statusData) {
             const embed = buildPrEmbed(statusData.prData, statusData.ci, statusData.reviews);
             await message.edit({ embeds: [embed] });
+            // Post to thread
+            const thread = await getOrCreateThread(channel, db, repo, statusData.prData, existing);
+            const reply = buildReviewReply('copilot', 'reviewed', undefined, review.html_url);
+            await thread.send(reply);
         }
-        // Post a reply
-        const reply = buildReviewReply('copilot', 'reviewed', undefined, review.html_url);
-        await message.reply(reply);
         db.updatePrMessageTimestamp(repo, pr.number);
     }
 }

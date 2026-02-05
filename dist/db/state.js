@@ -30,6 +30,7 @@ export class StateDb {
         pr_number INTEGER NOT NULL,
         channel_id TEXT NOT NULL,
         message_id TEXT NOT NULL,
+        thread_id TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (repo, pr_number)
@@ -82,23 +83,32 @@ export class StateDb {
     getPrMessage(repo, prNumber) {
         const stmt = this.db.prepare(`
       SELECT repo, pr_number as prNumber, channel_id as channelId,
-             message_id as messageId, created_at as createdAt,
-             last_updated as lastUpdated
+             message_id as messageId, thread_id as threadId,
+             created_at as createdAt, last_updated as lastUpdated
       FROM pr_messages
       WHERE repo = ? AND pr_number = ?
     `);
         return stmt.get(repo, prNumber) ?? null;
     }
-    savePrMessage(repo, prNumber, channelId, messageId) {
+    savePrMessage(repo, prNumber, channelId, messageId, threadId) {
         const stmt = this.db.prepare(`
-      INSERT INTO pr_messages (repo, pr_number, channel_id, message_id)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO pr_messages (repo, pr_number, channel_id, message_id, thread_id)
+      VALUES (?, ?, ?, ?, ?)
       ON CONFLICT(repo, pr_number) DO UPDATE SET
         message_id = excluded.message_id,
         channel_id = excluded.channel_id,
+        thread_id = excluded.thread_id,
         last_updated = CURRENT_TIMESTAMP
     `);
-        stmt.run(repo, prNumber, channelId, messageId);
+        stmt.run(repo, prNumber, channelId, messageId, threadId ?? null);
+    }
+    updatePrThread(repo, prNumber, threadId) {
+        const stmt = this.db.prepare(`
+      UPDATE pr_messages
+      SET thread_id = ?, last_updated = CURRENT_TIMESTAMP
+      WHERE repo = ? AND pr_number = ?
+    `);
+        stmt.run(threadId, repo, prNumber);
     }
     updatePrMessageTimestamp(repo, prNumber) {
         const stmt = this.db.prepare(`

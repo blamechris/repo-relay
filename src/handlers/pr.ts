@@ -2,8 +2,8 @@
  * Pull Request event handler
  */
 
-import { Client, TextChannel } from 'discord.js';
-import { StateDb, StoredPrData } from '../db/state.js';
+import { Client, TextChannel, ThreadChannel, ChannelType } from 'discord.js';
+import { StateDb, StoredPrData, PrMessage } from '../db/state.js';
 import { buildPrEmbed, buildMergedReply, buildClosedReply, buildPushReply, PrData, ReviewStatus, CiStatus } from '../embeds/builders.js';
 import { getChannelForEvent, ChannelConfig } from '../config/channels.js';
 
@@ -116,11 +116,21 @@ async function handlePrOpened(
 ): Promise<void> {
   const embed = buildPrEmbed(pr);
   const message = await channel.send({ embeds: [embed] });
-  db.savePrMessage(repo, pr.number, channel.id, message.id);
+
+  // Create a thread for updates
+  const thread = await message.startThread({
+    name: `PR #${pr.number}: ${pr.title.substring(0, 90)}`,
+    autoArchiveDuration: 1440, // 24 hours
+  });
+
+  db.savePrMessage(repo, pr.number, channel.id, message.id, thread.id);
 
   // Save PR data for future embed rebuilding
   savePrDataFromPrData(db, repo, pr);
   db.savePrStatus(repo, pr.number);
+
+  // Post initial message in thread
+  await thread.send(`📋 Updates for PR #${pr.number} will appear here.`);
 }
 
 async function handlePrClosed(
@@ -129,7 +139,7 @@ async function handlePrClosed(
   repo: string,
   pr: PrData
 ): Promise<void> {
-  const existing = db.getPrMessage(repo, pr.number);
+  let existing = db.getPrMessage(repo, pr.number);
 
   if (existing) {
     // Update the original embed with full status
@@ -141,18 +151,26 @@ async function handlePrClosed(
       : buildPrEmbed(pr);
     await message.edit({ embeds: [embed] });
 
-    // Post a reply
+    // Post to thread
+    const thread = await getOrCreateThread(channel, db, repo, pr, existing);
     const reply = pr.state === 'merged'
       ? buildMergedReply(pr.mergedBy)
       : buildClosedReply();
 
-    await message.reply(reply);
+    await thread.send(reply);
     db.updatePrMessageTimestamp(repo, pr.number);
   } else {
     // No existing message, create one showing the final state
     const embed = buildPrEmbed(pr);
     const message = await channel.send({ embeds: [embed] });
-    db.savePrMessage(repo, pr.number, channel.id, message.id);
+
+    // Create a thread
+    const thread = await message.startThread({
+      name: `PR #${pr.number}: ${pr.title.substring(0, 90)}`,
+      autoArchiveDuration: 1440,
+    });
+
+    db.savePrMessage(repo, pr.number, channel.id, message.id, thread.id);
     savePrDataFromPrData(db, repo, pr);
     db.savePrStatus(repo, pr.number);
   }
@@ -171,16 +189,26 @@ async function handlePrPush(
   if (!existing) {
     const embed = buildPrEmbed(pr);
     const message = await channel.send({ embeds: [embed] });
-    db.savePrMessage(repo, pr.number, channel.id, message.id);
+
+    // Create a thread for updates
+    const thread = await message.startThread({
+      name: `PR #${pr.number}: ${pr.title.substring(0, 90)}`,
+      autoArchiveDuration: 1440,
+    });
+
+    db.savePrMessage(repo, pr.number, channel.id, message.id, thread.id);
     savePrDataFromPrData(db, repo, pr);
     db.savePrStatus(repo, pr.number);
-    existing = { repo, prNumber: pr.number, channelId: channel.id, messageId: message.id, createdAt: '', lastUpdated: '' };
+    existing = { repo, prNumber: pr.number, channelId: channel.id, messageId: message.id, threadId: thread.id, createdAt: '', lastUpdated: '' };
+
+    await thread.send(`📋 Updates for PR #${pr.number} will appear here.`);
   } else {
     // Update PR data for future rebuilds
     savePrDataFromPrData(db, repo, pr);
   }
 
-  const message = await channel.messages.fetch(existing.messageId);
+  // Get or create thread
+  const thread = await getOrCreateThread(channel, db, repo, pr, existing);
 
   // Count commits (if before/after available, otherwise assume 1)
   const commitCount = 1; // GitHub doesn't provide commit count directly in synchronize
@@ -192,7 +220,7 @@ async function handlePrPush(
     `${pr.url}/commits`
   );
 
-  await message.reply(replyText);
+  await thread.send(replyText);
   db.updatePrMessageTimestamp(repo, pr.number);
 }
 
@@ -202,7 +230,7 @@ async function handlePrUpdated(
   repo: string,
   pr: PrData
 ): Promise<void> {
-  const existing = db.getPrMessage(repo, pr.number);
+  let existing = db.getPrMessage(repo, pr.number);
 
   if (existing) {
     const message = await channel.messages.fetch(existing.messageId);
@@ -214,9 +242,18 @@ async function handlePrUpdated(
     // No message exists yet (PR opened before bot was set up), create one
     const embed = buildPrEmbed(pr);
     const message = await channel.send({ embeds: [embed] });
-    db.savePrMessage(repo, pr.number, channel.id, message.id);
+
+    // Create a thread for updates
+    const thread = await message.startThread({
+      name: `PR #${pr.number}: ${pr.title.substring(0, 90)}`,
+      autoArchiveDuration: 1440,
+    });
+
+    db.savePrMessage(repo, pr.number, channel.id, message.id, thread.id);
     savePrDataFromPrData(db, repo, pr);
     db.savePrStatus(repo, pr.number);
+
+    await thread.send(`📋 Updates for PR #${pr.number} will appear here.`);
   }
 }
 
@@ -278,4 +315,43 @@ export function buildEmbedWithStatus(db: StateDb, repo: string, prNumber: number
   };
 
   return { prData, reviews, ci };
+}
+
+// Helper to get existing thread or create one if it doesn't exist
+export async function getOrCreateThread(
+  channel: TextChannel,
+  db: StateDb,
+  repo: string,
+  pr: PrData,
+  existing: PrMessage
+): Promise<ThreadChannel> {
+  // If we have a thread ID, try to fetch it
+  if (existing.threadId) {
+    try {
+      const thread = await channel.threads.fetch(existing.threadId);
+      if (thread) {
+        // Unarchive if archived
+        if (thread.archived) {
+          await thread.setArchived(false);
+        }
+        return thread;
+      }
+    } catch {
+      // Thread doesn't exist or was deleted, create a new one
+    }
+  }
+
+  // Create a new thread on the message
+  const message = await channel.messages.fetch(existing.messageId);
+  const thread = await message.startThread({
+    name: `PR #${pr.number}: ${pr.title.substring(0, 90)}`,
+    autoArchiveDuration: 1440,
+  });
+
+  // Update the database with the new thread ID
+  db.updatePrThread(repo, pr.number, thread.id);
+
+  await thread.send(`📋 Updates for PR #${pr.number} will appear here.`);
+
+  return thread;
 }

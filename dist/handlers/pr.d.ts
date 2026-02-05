@@ -1,8 +1,8 @@
 /**
  * Pull Request event handler
  */
-import { Client } from 'discord.js';
-import { StateDb } from '../db/state.js';
+import { Client, TextChannel, ThreadChannel } from 'discord.js';
+import { StateDb, PrMessage } from '../db/state.js';
 import { PrData, ReviewStatus, CiStatus } from '../embeds/builders.js';
 import { ChannelConfig } from '../config/channels.js';
 export interface PrEventPayload {
@@ -51,4 +51,5 @@ export declare function buildEmbedWithStatus(db: StateDb, repo: string, prNumber
     reviews: ReviewStatus;
     ci: CiStatus;
 } | null;
+export declare function getOrCreateThread(channel: TextChannel, db: StateDb, repo: string, pr: PrData, existing: PrMessage): Promise<ThreadChannel>;
 //# sourceMappingURL=pr.d.ts.map
