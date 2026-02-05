@@ -26,7 +26,6 @@ inputs:
   github_token:
     description: 'GitHub token for API access (review detection). Defaults to github.token'
     required: false
-    default: ${{ github.token }}
 
 runs:
   using: 'composite'
@@ -51,6 +50,6 @@ runs:
         DISCORD_CHANNEL_PRS: ${{ inputs.channel_prs }}
         DISCORD_CHANNEL_ISSUES: ${{ inputs.channel_issues }}
         DISCORD_CHANNEL_RELEASES: ${{ inputs.channel_releases }}
-        GITHUB_TOKEN: ${{ inputs.github_token }}
+        GITHUB_TOKEN: ${{ inputs.github_token || github.token }}
         STATE_DIR: ${{ inputs.state_dir }}
       run: node dist/cli.js
