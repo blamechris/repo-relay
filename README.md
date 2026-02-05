@@ -50,6 +50,17 @@ GitHub Apps using `GITHUB_TOKEN` don't trigger workflows. To work around this:
 
 ## Quick Start
 
+The fastest way to get started:
+
+```bash
+npx blamechris/repo-relay init
+```
+
+This interactive wizard will guide you through setup and create the workflow file automatically.
+
+<details>
+<summary><strong>Manual Setup</strong></summary>
+
 ### 1. Create Discord Bot
 
 1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
@@ -117,6 +128,8 @@ jobs:
 ```
 
 That's it! The action handles Node.js setup, dependency installation, and execution automatically.
+
+</details>
 
 ### Action Inputs
 

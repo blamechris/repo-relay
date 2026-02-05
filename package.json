@@ -5,11 +5,13 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "repo-relay": "dist/cli.js"
+    "repo-relay": "dist/cli.js",
+    "repo-relay-init": "dist/setup.js"
   },
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/cli.ts",
+    "setup": "tsx src/setup.ts",
     "start": "node dist/cli.js",
     "lint": "eslint src --ext .ts",
     "test": "vitest run",
@@ -32,11 +34,13 @@
   },
   "dependencies": {
     "better-sqlite3": "^11.7.0",
-    "discord.js": "^14.16.3"
+    "discord.js": "^14.16.3",
+    "prompts": "^2.4.2"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.12.0",
+    "@types/prompts": "^2.4.9",
     "eslint": "^9.19.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
