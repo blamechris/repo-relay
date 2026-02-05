@@ -126,12 +126,24 @@ cat << 'EOF' | gh api repos/${REPO}/pulls/${PR_NUM}/reviews --method POST --inpu
 EOF
 ```
 
-### 5. Report to User
+### 5. Handle Findings
+
+For each finding (critical, suggestion, nitpick):
+- **Fix now** if quick (< 5 min) and low risk
+- **Create GitHub issue** for everything else (MANDATORY - nothing gets lost)
+- All issues MUST have `complexity:` and `testing:` labels
+- Post follow-up comment linking all created issues
+
+See the full issue creation workflow in `.claude/skills/agent-review/skill.md` sections 5-8.
+
+### 6. Report to User
 
 Output:
 - Review verdict
-- Critical issues count
-- Suggestions count
+- Critical issues count (with GitHub issue links)
+- Suggestions: X addressed, Y deferred to issues
+- Nitpicks: X addressed, Y deferred to issues
+- All created issue links
 - Link to posted review
 
 ## Agent Persona

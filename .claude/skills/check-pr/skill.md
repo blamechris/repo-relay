@@ -33,13 +33,14 @@ gh pr checks {pr_number} --watch
 **Detection and Wait Logic:**
 ```bash
 PR_NUM={pr_number}
+REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 MAX_WAIT=300  # 5 minutes
 POLL_INTERVAL=30
 ELAPSED=0
 
 while [ $ELAPSED -lt $MAX_WAIT ]; do
     # Check if review completed (handle API errors explicitly)
-    REVIEW_DONE=$(gh api repos/blamechris/repo-relay/pulls/${PR_NUM}/reviews \
+    REVIEW_DONE=$(gh api repos/${REPO}/pulls/${PR_NUM}/reviews \
       --jq '.[] | select(.user.login | ascii_downcase | contains("copilot")) | .user.login')
     API_EXIT=$?
 
@@ -56,7 +57,7 @@ while [ $ELAPSED -lt $MAX_WAIT ]; do
     fi
 
     # Check if review was requested (use --paginate for long timelines)
-    REVIEW_PENDING=$(gh api repos/blamechris/repo-relay/issues/${PR_NUM}/timeline --paginate \
+    REVIEW_PENDING=$(gh api repos/${REPO}/issues/${PR_NUM}/timeline --paginate \
       --jq '.[] | select(.event == "review_requested" and (.requested_reviewer.login // "" | ascii_downcase | contains("copilot"))) | "pending"')
     API_EXIT=$?
 
@@ -79,7 +80,7 @@ done
 
 # Final check in case review completed during the last wait interval
 if [ $ELAPSED -ge $MAX_WAIT ]; then
-    REVIEW_DONE=$(gh api repos/blamechris/repo-relay/pulls/${PR_NUM}/reviews \
+    REVIEW_DONE=$(gh api repos/${REPO}/pulls/${PR_NUM}/reviews \
       --jq '.[] | select(.user.login | ascii_downcase | contains("copilot")) | .user.login' 2>/dev/null)
 
     if [ -n "$REVIEW_DONE" ]; then
@@ -106,7 +107,7 @@ Get all review comments from the PR, including those from Copilot:
 
 ```bash
 # Get all review comments on a PR (MUST include .id for inline replies)
-gh api repos/blamechris/repo-relay/pulls/{pr_number}/comments \
+gh api repos/${REPO}/pulls/{pr_number}/comments \
   --jq '.[] | {id: .id, path: .path, line: .line, body: .body, user: .user.login}'
 ```
 
@@ -132,7 +133,7 @@ If the comment identifies a real problem:
 
 ```bash
 # Reply INLINE to a specific review comment (correct)
-gh api repos/blamechris/repo-relay/pulls/{pr_number}/comments/{comment_id}/replies \
+gh api repos/${REPO}/pulls/{pr_number}/comments/{comment_id}/replies \
   -F body="Fixed in \`{commit_hash}\`"
 
 # WRONG - This posts to Conversation tab, not inline:
@@ -219,12 +220,14 @@ Any future automation would need to call the GraphQL `resolveReviewThread` mutat
 
 ### Check for Copilot Review (Three-State Detection)
 ```bash
+REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+
 # Check if Copilot has submitted a review (COMPLETED)
-gh api repos/blamechris/repo-relay/pulls/{pr_number}/reviews \
+gh api repos/${REPO}/pulls/{pr_number}/reviews \
   --jq '.[] | select(.user.login | ascii_downcase | contains("copilot")) | .user.login'
 
 # If output is empty, check timeline for IN PROGRESS state
-gh api repos/blamechris/repo-relay/issues/{pr_number}/timeline \
+gh api repos/${REPO}/issues/{pr_number}/timeline \
   --jq '.[] | select(.event == "review_requested" and (.requested_reviewer.login // "" | ascii_downcase | contains("copilot"))) | "pending"'
 
 # Three possible states:
@@ -236,17 +239,17 @@ gh api repos/blamechris/repo-relay/issues/{pr_number}/timeline \
 ### Fetch PR Comments
 ```bash
 # Get review comments for PR #{pr_number} - ALWAYS include id!
-gh api repos/blamechris/repo-relay/pulls/{pr_number}/comments \
+gh api repos/${REPO}/pulls/{pr_number}/comments \
   --jq '.[] | {id: .id, path: .path, line: .line, body: .body, user: .user.login}'
 
 # Alternative: Fetch reviews
-gh api repos/blamechris/repo-relay/pulls/{pr_number}/reviews
+gh api repos/${REPO}/pulls/{pr_number}/reviews
 ```
 
 ### Reply Inline to Review Comment
 ```bash
 # CORRECT: Reply inline to a specific review comment
-gh api repos/blamechris/repo-relay/pulls/{pr_number}/comments/{comment_id}/replies \
+gh api repos/${REPO}/pulls/{pr_number}/comments/{comment_id}/replies \
   -F body="Fixed in \`{commit_hash}\`
 
 {Description of fix}"
@@ -271,7 +274,7 @@ gh api repos/blamechris/repo-relay/pulls/{pr_number}/comments/{comment_id}/repli
    - If TIMEOUT → Proceed with warning to check manually
 
 4. Fetch all review comments:
-   gh api repos/blamechris/repo-relay/pulls/{pr_number}/comments
+   gh api repos/${REPO}/pulls/{pr_number}/comments
 
 5. For each comment (PROCESS INDIVIDUALLY):
    a. Read and understand THIS SPECIFIC issue
@@ -321,7 +324,7 @@ User: "Check PR #13 for review comments"
    -> Copilot review found!
 
 3. Fetch comments:
-   gh api repos/blamechris/repo-relay/pulls/13/comments
+   gh api repos/${REPO}/pulls/13/comments
 
 4. Found 2 comments from Copilot:
    - Unnecessary serial await suggestion
@@ -335,7 +338,7 @@ User: "Check PR #13 for review comments"
    - Push: git push
 
 7. Reply INLINE to each comment:
-   gh api repos/blamechris/repo-relay/pulls/13/comments/{id}/replies \
+   gh api repos/${REPO}/pulls/13/comments/{id}/replies \
      -F body="Fixed in \`c57a796\`"
 
 8. Report to user:
@@ -482,10 +485,10 @@ Before completing check-pr:
 **Solution:**
 ```bash
 # Use the pulls endpoint for review comments
-gh api repos/blamechris/repo-relay/pulls/{pr_number}/comments
+gh api repos/${REPO}/pulls/{pr_number}/comments
 
 # Use the issues endpoint for conversation comments
-gh api repos/blamechris/repo-relay/issues/{pr_number}/comments
+gh api repos/${REPO}/issues/{pr_number}/comments
 ```
 
 ### "Comment reply failed with 404"
@@ -523,24 +526,26 @@ The skill now automatically waits up to 5 minutes for Copilot to complete:
 ## Commands Reference
 
 ```bash
+REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+
 # Wait for CI
 gh pr checks {pr_number} --watch
 
 # Check for Copilot review (three-state detection)
 # State 1: COMPLETED - Copilot has submitted a review
-gh api repos/blamechris/repo-relay/pulls/{pr_number}/reviews \
+gh api repos/${REPO}/pulls/{pr_number}/reviews \
   --jq '.[] | select(.user.login | ascii_downcase | contains("copilot")) | .user.login'
 
 # State 2: IN PROGRESS - Review requested but not yet submitted
-gh api repos/blamechris/repo-relay/issues/{pr_number}/timeline \
+gh api repos/${REPO}/issues/{pr_number}/timeline \
   --jq '.[] | select(.event == "review_requested" and (.requested_reviewer.login // "" | ascii_downcase | contains("copilot"))) | "pending"'
 
 # Fetch all review comments (ALWAYS include id for replies!)
-gh api repos/blamechris/repo-relay/pulls/{pr_number}/comments \
+gh api repos/${REPO}/pulls/{pr_number}/comments \
   --jq '.[] | {id: .id, path: .path, line: .line, body: .body, user: .user.login}'
 
 # Reply INLINE to a review comment (correct approach)
-gh api repos/blamechris/repo-relay/pulls/{pr_number}/comments/{comment_id}/replies \
+gh api repos/${REPO}/pulls/{pr_number}/comments/{comment_id}/replies \
   -F body="Reply text here"
 
 # Check latest commit hash

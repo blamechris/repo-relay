@@ -8,6 +8,18 @@ Address all PR review comments systematically and respond inline.
 
 ## Instructions
 
+### 0. Wait for CI and Copilot Review
+
+**IMPORTANT:** Before processing comments, wait for CI to pass and Copilot review to complete (or timeout after 5 minutes). See `.claude/skills/check-pr/skill.md` section 0 for the full three-state Copilot detection and polling loop.
+
+```bash
+# Wait for CI to pass
+gh pr checks ${PR_NUM} --watch
+
+# Then check Copilot review status (COMPLETED / IN PROGRESS / NOT REQUESTED)
+# If IN PROGRESS, poll every 30s up to 5 minutes
+```
+
 ### 1. Fetch PR Info
 
 ```bash
