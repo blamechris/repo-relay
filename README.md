@@ -116,10 +116,8 @@ jobs:
       pull-requests: read
       issues: read
       contents: read
-    # Skip workflow_run events without PRs, and skip owner review replies (prevents cascades)
-    if: |
-      (github.event_name != 'workflow_run' || github.event.workflow_run.pull_requests[0] != null)
-      && (github.event_name != 'pull_request_review' || github.event.review.user.login != github.repository_owner)
+    # Skip workflow_run events without PRs
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.pull_requests[0] != null
 
     steps:
       - uses: blamechris/repo-relay@v1
@@ -175,9 +173,7 @@ jobs:
       pull-requests: read
       issues: read
       contents: read
-    if: |
-      (github.event_name != 'workflow_run' || github.event.workflow_run.pull_requests[0] != null)
-      && (github.event_name != 'pull_request_review' || github.event.review.user.login != github.repository_owner)
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.pull_requests[0] != null
 
     steps:
       - name: Checkout repo-relay
@@ -271,14 +267,7 @@ For GitHub-hosted runners, you'll need to add artifact upload/download steps to 
 
 **Symptom:** Replying to Copilot review comments triggers more notifications.
 
-**Fix:** Add the cascade filter to your workflow's `if` condition:
-```yaml
-if: |
-  (github.event_name != 'workflow_run' || github.event.workflow_run.pull_requests[0] != null)
-  && (github.event_name != 'pull_request_review' || github.event.review.user.login != github.repository_owner)
-```
-
-This skips notifications when the repo owner replies to review comments.
+**Fix:** This is handled automatically since v1. The review handler filters out `pull_request_review` events where the reviewer is the repo owner and the review state is `commented`. No workflow-level filter needed.
 
 ### First PR Shows Red X
 
