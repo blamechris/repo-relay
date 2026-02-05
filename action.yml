@@ -1,5 +1,5 @@
 name: 'Repo Relay'
-description: 'GitHub-Discord integration for PR, CI, issue, and release notifications'
+description: 'GitHub-Discord integration bot that tracks PRs, CI, issues, and releases with threaded updates'
 author: 'Christopher Pishaki'
 
 branding:
@@ -14,19 +14,19 @@ inputs:
     description: 'Discord channel ID for PR notifications'
     required: true
   channel_issues:
-    description: 'Discord channel ID for issue notifications'
+    description: 'Discord channel ID for issue notifications (defaults to channel_prs)'
     required: false
   channel_releases:
-    description: 'Discord channel ID for release notifications'
+    description: 'Discord channel ID for release notifications (defaults to channel_prs)'
     required: false
-  github_token:
-    description: 'GitHub token for API access'
-    required: true
-    default: ${{ github.token }}
   state_dir:
-    description: 'Directory for SQLite state storage'
+    description: 'Directory for SQLite state persistence (default: ~/.repo-relay)'
     required: false
     default: '~/.repo-relay'
+  github_token:
+    description: 'GitHub token for API access (review detection). Defaults to github.token'
+    required: false
+    default: ${{ github.token }}
 
 runs:
   using: 'composite'
@@ -35,21 +35,17 @@ runs:
       uses: actions/setup-node@v4
       with:
         node-version: '20'
-
-    - name: Checkout repo-relay
-      uses: actions/checkout@v4
-      with:
-        repository: blamechris/repo-relay
-        path: .repo-relay-action
+        cache: 'npm'
+        cache-dependency-path: ${{ github.action_path }}/package-lock.json
 
     - name: Install dependencies
       shell: bash
-      run: |
-        cd .repo-relay-action
-        npm ci --production
+      working-directory: ${{ github.action_path }}
+      run: npm ci --omit=dev
 
     - name: Run repo-relay
       shell: bash
+      working-directory: ${{ github.action_path }}
       env:
         DISCORD_BOT_TOKEN: ${{ inputs.discord_bot_token }}
         DISCORD_CHANNEL_PRS: ${{ inputs.channel_prs }}
@@ -57,14 +53,4 @@ runs:
         DISCORD_CHANNEL_RELEASES: ${{ inputs.channel_releases }}
         GITHUB_TOKEN: ${{ inputs.github_token }}
         STATE_DIR: ${{ inputs.state_dir }}
-        GITHUB_EVENT_NAME: ${{ github.event_name }}
-        GITHUB_EVENT_PATH: ${{ github.event_path }}
-        GITHUB_REPOSITORY: ${{ github.repository }}
-      run: |
-        cd .repo-relay-action
-        node dist/cli.js
-
-    - name: Cleanup
-      shell: bash
-      if: always()
-      run: rm -rf .repo-relay-action
+      run: node dist/cli.js
