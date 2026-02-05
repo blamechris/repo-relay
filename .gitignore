@@ -1,8 +1,8 @@
 # Dependencies
 node_modules/
 
-# Build output
-dist/
+# Build output is committed for GitHub Action use
+# dist/
 
 # Environment
 .env
