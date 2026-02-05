@@ -322,3 +322,41 @@ Status is determined by:
 GitHub-hosted runners don't persist state between workflow runs. The SQLite database at `~/.repo-relay/{repo}/state.db` is lost after each run unless you add artifact upload/download steps.
 
 **Recommendation:** Use self-hosted runners for persistent state, or implement artifact-based state persistence for GitHub-hosted runners.
+
+## Onboarding Learnings
+
+Lessons learned from integrating repo-relay into exodus-loop and archery-apprentice.
+
+### Common Issues
+
+1. **"Missing Access" error** - Bot connects but can't post. Usually missing Discord permissions at channel level. See [#12](https://github.com/blamechris/repo-relay/issues/12).
+
+2. **Review reply cascade** - Owner replies to Copilot comments trigger more notifications. Requires workflow `if` filter. See [#13](https://github.com/blamechris/repo-relay/issues/13).
+
+3. **First-run failure** - Expected if secrets aren't configured. Users should configure secrets, then re-run.
+
+4. **Self-hosted queue blocking** - Discord job waits behind long CI jobs. Consider `ubuntu-latest` or separate runner labels.
+
+### Tag Management
+
+When making changes, update the `v1` tag so consumers get the latest:
+
+```bash
+git tag -d v1
+git tag v1 main
+git push origin :refs/tags/v1
+git push origin v1
+```
+
+Consumers reference `uses: blamechris/repo-relay@v1` which resolves to this tag.
+
+### Key Files for Debugging
+
+| File | Purpose |
+|------|---------|
+| `src/index.ts` | Entry point, RepoRelay class, event routing |
+| `src/github/reviews.ts` | Piggyback review detection |
+| `src/handlers/pr.ts` | PR event handling, embed building |
+| `src/embeds/builders.ts` | Discord embed construction |
+| `src/db/state.ts` | SQLite state management |
+| `action.yml` | GitHub Action composite definition |

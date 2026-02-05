@@ -68,7 +68,7 @@ This interactive wizard will guide you through setup and create the workflow fil
 3. Enable intents: **Message Content Intent**, **Server Members Intent**
 4. Generate invite URL (OAuth2 → URL Generator):
    - Scopes: `bot`
-   - Permissions: `Send Messages`, `Create Public Threads`, `Send Messages in Threads`, `Embed Links`, `Read Message History`
+   - Permissions: See [Required Discord Permissions](#required-discord-permissions) below
 5. Invite bot to your server
 
 ### 2. Get Channel IDs
@@ -116,7 +116,10 @@ jobs:
       pull-requests: read
       issues: read
       contents: read
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.pull_requests[0] != null
+    # Skip workflow_run events without PRs, and skip owner review replies (prevents cascades)
+    if: |
+      (github.event_name != 'workflow_run' || github.event.workflow_run.pull_requests[0] != null)
+      && (github.event_name != 'pull_request_review' || github.event.review.user.login != github.repository_owner)
 
     steps:
       - uses: blamechris/repo-relay@v1
@@ -172,7 +175,9 @@ jobs:
       pull-requests: read
       issues: read
       contents: read
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.pull_requests[0] != null
+    if: |
+      (github.event_name != 'workflow_run' || github.event.workflow_run.pull_requests[0] != null)
+      && (github.event_name != 'pull_request_review' || github.event.review.user.login != github.repository_owner)
 
     steps:
       - name: Checkout repo-relay
@@ -211,6 +216,37 @@ jobs:
 
 </details>
 
+## Required Discord Permissions
+
+When generating the bot invite URL, ensure these permissions are enabled:
+
+| Permission | Why It's Needed |
+|------------|-----------------|
+| **Send Messages** | Post PR/issue/release embeds |
+| **Create Public Threads** | Create threads for PR updates |
+| **Send Messages in Threads** | Post updates to PR threads |
+| **Embed Links** | Render rich embeds with PR info |
+| **Read Message History** | Find existing PR messages to update |
+
+**Invite URL scopes:** `bot`
+
+If the bot connects but can't post, check the channel-level permissions. The bot needs these permissions in each channel it posts to.
+
+## Self-Hosted vs GitHub-Hosted Runners
+
+| Aspect | Self-Hosted | GitHub-Hosted |
+|--------|-------------|---------------|
+| **State Persistence** | ✅ SQLite persists in `~/.repo-relay/` | ❌ Lost after each run |
+| **Setup** | Requires runner installation | Zero setup |
+| **Cost** | Your hardware | GitHub Actions minutes |
+| **Speed** | Fast (no cold start) | ~30s cold start |
+| **Availability** | Depends on your uptime | Always available |
+| **Queue Blocking** | Can block behind long CI jobs | Isolated from other workflows |
+
+**Recommendation:**
+- **Self-hosted** if you have existing runners and want persistent PR tracking
+- **GitHub-hosted** (`ubuntu-latest`) if you don't need state persistence or want guaranteed availability
+
 ## State Storage
 
 | Runner Type | Storage Location | Persistence |
@@ -219,6 +255,44 @@ jobs:
 | **GitHub-hosted** | Workflow artifacts | Per-run (requires artifact upload/download) |
 
 For GitHub-hosted runners, you'll need to add artifact upload/download steps to persist state between runs.
+
+## Troubleshooting
+
+### "Missing Access" Error
+
+**Symptom:** Bot connects but fails to send messages with "Missing Access" error.
+
+**Fix:** The bot lacks permissions in the target channel. Check:
+1. Bot has the [required permissions](#required-discord-permissions) at the server level
+2. Channel-specific permissions don't override/block the bot
+3. The channel ID is correct (right-click channel → Copy ID with Developer Mode enabled)
+
+### Notification Cascades (Too Many Messages)
+
+**Symptom:** Replying to Copilot review comments triggers more notifications.
+
+**Fix:** Add the cascade filter to your workflow's `if` condition:
+```yaml
+if: |
+  (github.event_name != 'workflow_run' || github.event.workflow_run.pull_requests[0] != null)
+  && (github.event_name != 'pull_request_review' || github.event.review.user.login != github.repository_owner)
+```
+
+This skips notifications when the repo owner replies to review comments.
+
+### First PR Shows Red X
+
+**Symptom:** First PR fails before secrets are configured.
+
+**Fix:** This is expected - configure the secrets, then re-run the failed workflow. Future PRs will work.
+
+### Job Queued Behind Long CI
+
+**Symptom:** Discord notification waits in queue while long-running CI jobs complete.
+
+**Fix:**
+- Use `ubuntu-latest` instead of self-hosted runner (isolates from other jobs)
+- Or configure runner labels to separate notification jobs from build jobs
 
 ## Known Limitations
 
