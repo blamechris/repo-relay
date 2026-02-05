@@ -25,6 +25,12 @@ export interface PrReviewPayload {
   };
   repository: {
     full_name: string;
+    owner: {
+      login: string;
+    };
+  };
+  sender: {
+    login: string;
   };
 }
 
@@ -38,6 +44,16 @@ export async function handleReviewEvent(
   const repo = repository.full_name;
 
   if (action !== 'submitted') {
+    return;
+  }
+
+  // Skip owner comment replies to prevent notification cascades (#13)
+  // When an owner replies to Copilot review comments, GitHub fires another
+  // pull_request_review event with state 'commented'. These are noise.
+  const isOwnerComment =
+    review.user.login === repository.owner.login &&
+    review.state === 'commented';
+  if (isOwnerComment) {
     return;
   }
 
