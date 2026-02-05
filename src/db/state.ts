@@ -75,6 +75,17 @@ export class StateDb {
     this.db = new Database(dbPath);
     this.db.pragma('journal_mode = WAL');
     this.initSchema();
+    this.runMigrations();
+  }
+
+  private runMigrations(): void {
+    // Migration: Add thread_id column if it doesn't exist
+    const columns = this.db.prepare("PRAGMA table_info(pr_messages)").all() as Array<{ name: string }>;
+    const hasThreadId = columns.some(col => col.name === 'thread_id');
+    if (!hasThreadId) {
+      console.log('[repo-relay] Running migration: Adding thread_id column to pr_messages');
+      this.db.exec("ALTER TABLE pr_messages ADD COLUMN thread_id TEXT");
+    }
   }
 
   private initSchema(): void {

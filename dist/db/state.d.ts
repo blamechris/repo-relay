@@ -48,6 +48,7 @@ export interface EventLogEntry {
 export declare class StateDb {
     private db;
     constructor(repo: string, stateDir?: string);
+    private runMigrations;
     private initSchema;
     getPrMessage(repo: string, prNumber: number): PrMessage | null;
     savePrMessage(repo: string, prNumber: number, channelId: string, messageId: string, threadId?: string): void;
