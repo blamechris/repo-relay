@@ -8,8 +8,13 @@ import { homedir } from 'os';
 export class StateDb {
     db;
     constructor(repo, stateDir) {
-        const baseDir = stateDir ?? join(homedir(), '.repo-relay');
+        // Expand ~ to actual home directory (GitHub Actions doesn't expand ~)
+        let baseDir = stateDir ?? join(homedir(), '.repo-relay');
+        if (baseDir.startsWith('~')) {
+            baseDir = baseDir.replace('~', homedir());
+        }
         const repoDir = join(baseDir, repo.replace('/', '-'));
+        console.log(`[repo-relay] Using state directory: ${repoDir}`);
         if (!existsSync(repoDir)) {
             mkdirSync(repoDir, { recursive: true });
         }
