@@ -17,6 +17,24 @@
 - NEVER mention AI assistance in commit messages, PR descriptions, or code comments
 - Commit messages should be clean and professional
 
+## Session Start Protocol
+
+**When starting a new session or resuming work:**
+
+```bash
+# 1. Check current state
+git status && git log --oneline -5
+
+# 2. Review any open PRs
+gh pr list
+
+# 3. Check open issues
+gh issue list
+
+# 4. If on a feature branch, check CI status
+gh run list --limit 3
+```
+
 ## Git Workflow
 
 ### Branch Protection
@@ -280,3 +298,24 @@ The bot detects agent-review comments by matching these patterns in comment bodi
 Status is determined by:
 - Approved: `verdict.*approved`, `✅.*approved`, `[x].*approve`
 - Changes requested: `changes.*requested`, `⚠️.*changes`, `needs.*changes`
+
+## Known Limitations
+
+### Review Detection Delay (Piggyback Approach)
+
+**Current behavior:** Reviews from Copilot and agent-review are not detected immediately. They are only discovered when the next PR event fires (push, CI completion, etc.).
+
+**Why:** GitHub Apps using `GITHUB_TOKEN` don't trigger `pull_request_review` workflow events. The bot works around this by checking the GitHub API for reviews whenever other events occur.
+
+**Impact:**
+- Review status in embeds may be stale until the next event
+- Thread updates for reviews are delayed
+- If no further events occur on a PR, reviews may never be reflected
+
+**Future improvement:** See [#4](https://github.com/blamechris/repo-relay/issues/4) for investigating active polling or webhook-based solutions to eliminate this delay.
+
+### Self-Hosted Runners Recommended
+
+GitHub-hosted runners don't persist state between workflow runs. The SQLite database at `~/.repo-relay/{repo}/state.db` is lost after each run unless you add artifact upload/download steps.
+
+**Recommendation:** Use self-hosted runners for persistent state, or implement artifact-based state persistence for GitHub-hosted runners.
