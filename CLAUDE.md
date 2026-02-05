@@ -293,11 +293,14 @@ The bot detects agent-review comments by matching these patterns in comment bodi
 - `## 🔍 Code Review`
 - `**Verdict:**`
 - `## Review Result`
-- `## Code Review: PR #\d+`
 
 Status is determined by:
-- Approved: `verdict.*approved`, `✅.*approved`, `[x].*approve`
+- Approved: `verdict.*approved`, `✅.*approved`, `lgtm`, `looks good to me`
 - Changes requested: `changes.*requested`, `⚠️.*changes`, `needs.*changes`
+
+**Note:** Patterns are defined in two files that should stay in sync:
+- `src/handlers/comment.ts` - Webhook event handler
+- `src/github/reviews.ts` - Piggyback polling checker
 
 ## Known Limitations
 
