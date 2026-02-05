@@ -8,7 +8,15 @@ Address all PR review comments systematically and respond inline.
 
 ## Instructions
 
-### 0. Wait for CI and Copilot Review
+### 0. Fetch PR Info and Wait for CI/Copilot
+
+```bash
+# Get PR number for current branch (or use provided arg)
+PR_NUM=${1:-$(gh pr view --json number -q .number)}
+
+# Get repo info
+REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+```
 
 **IMPORTANT:** Before processing comments, wait for CI to pass and Copilot review to complete (or timeout after 5 minutes). See `.claude/skills/check-pr/skill.md` section 0 for the full three-state Copilot detection and polling loop.
 
@@ -20,15 +28,9 @@ gh pr checks ${PR_NUM} --watch
 # If IN PROGRESS, poll every 30s up to 5 minutes
 ```
 
-### 1. Fetch PR Info
+### 1. Fetch Review Comments
 
 ```bash
-# Get PR number for current branch (or use provided arg)
-PR_NUM=${1:-$(gh pr view --json number -q .number)}
-
-# Get repo info
-REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
-
 # Fetch all review comments
 gh api repos/${REPO}/pulls/${PR_NUM}/comments
 gh api repos/${REPO}/pulls/${PR_NUM}/reviews
