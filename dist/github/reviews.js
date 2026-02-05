@@ -4,26 +4,7 @@
  * Used to detect Copilot and agent-review status by piggybacking on other events,
  * since GitHub Apps using GITHUB_TOKEN don't trigger workflows.
  */
-// Patterns to detect agent-review comments (same as comment.ts)
-const AGENT_REVIEW_PATTERNS = [
-    /## Code Review Summary/i,
-    /### Agent Review/i,
-    /## 🔍 Code Review/i,
-    /\*\*Verdict:\*\*/i,
-    /## Review Result/i,
-    /## Code Review: PR #\d+/i,
-];
-const APPROVED_PATTERNS = [
-    /verdict.*approved/i,
-    /✅.*approved/i,
-    /\[x\].*approve/i,
-];
-const CHANGES_REQUESTED_PATTERNS = [
-    /changes.*requested/i,
-    /⚠️.*changes/i,
-    /needs.*changes/i,
-    /\[x\].*request changes/i,
-];
+import { AGENT_REVIEW_PATTERNS, APPROVED_PATTERNS, CHANGES_REQUESTED_PATTERNS, } from '../patterns/agent-review.js';
 /**
  * Check GitHub API for Copilot reviews and agent-review comments
  * Returns whether any status changed (for deciding whether to update embed)
@@ -65,32 +46,21 @@ export async function checkForReviews(db, repo, prNumber, githubToken) {
     // Check for agent-review comments
     try {
         const commentsUrl = `https://api.github.com/repos/${owner}/${repoName}/issues/${prNumber}/comments`;
-        console.log(`[repo-relay] Fetching comments from: ${commentsUrl}`);
         const commentsRes = await fetch(commentsUrl, { headers });
-        console.log(`[repo-relay] Comments API response: ${commentsRes.status}`);
         if (commentsRes.ok) {
             const comments = await commentsRes.json();
-            console.log(`[repo-relay] Found ${comments.length} comments`);
             // Find the most recent agent-review comment
             const matchingComments = comments.filter(c => AGENT_REVIEW_PATTERNS.some(p => p.test(c.body)));
-            console.log(`[repo-relay] Found ${matchingComments.length} comments matching agent-review patterns`);
-            if (matchingComments.length === 0 && comments.length > 0) {
-                console.log(`[repo-relay] First comment preview: ${comments[0].body?.substring(0, 100)}...`);
-            }
             const agentReviewComment = matchingComments
                 .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
             if (agentReviewComment) {
                 let status = 'pending';
-                const approvedMatch = APPROVED_PATTERNS.some(p => p.test(agentReviewComment.body));
-                const changesMatch = CHANGES_REQUESTED_PATTERNS.some(p => p.test(agentReviewComment.body));
-                console.log(`[repo-relay] Agent-review pattern check: approved=${approvedMatch}, changes=${changesMatch}`);
-                if (approvedMatch) {
+                if (APPROVED_PATTERNS.some(p => p.test(agentReviewComment.body))) {
                     status = 'approved';
                 }
-                else if (changesMatch) {
+                else if (CHANGES_REQUESTED_PATTERNS.some(p => p.test(agentReviewComment.body))) {
                     status = 'changes_requested';
                 }
-                console.log(`[repo-relay] Agent-review status: ${status}, current: ${currentStatus?.agentReviewStatus}`);
                 if (currentStatus?.agentReviewStatus !== status) {
                     console.log(`[repo-relay] Detected agent-review (${status}) for PR #${prNumber}`);
                     db.updateAgentReviewStatus(repo, prNumber, status);

@@ -11,6 +11,14 @@ export async function handleReviewEvent(client, db, channelConfig, payload) {
     if (action !== 'submitted') {
         return;
     }
+    // Skip owner comment replies to prevent notification cascades (#13)
+    // When an owner replies to Copilot review comments, GitHub fires another
+    // pull_request_review event with state 'commented'. These are noise.
+    const isOwnerComment = review.user.login === repository.owner.login &&
+        review.state === 'commented';
+    if (isOwnerComment) {
+        return;
+    }
     const channelId = getChannelForEvent(channelConfig, 'review');
     const channel = await client.channels.fetch(channelId);
     if (!channel || !(channel instanceof TextChannel)) {
