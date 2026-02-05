@@ -65,12 +65,19 @@ export async function checkForReviews(db, repo, prNumber, githubToken) {
     // Check for agent-review comments
     try {
         const commentsUrl = `https://api.github.com/repos/${owner}/${repoName}/issues/${prNumber}/comments`;
+        console.log(`[repo-relay] Fetching comments from: ${commentsUrl}`);
         const commentsRes = await fetch(commentsUrl, { headers });
+        console.log(`[repo-relay] Comments API response: ${commentsRes.status}`);
         if (commentsRes.ok) {
             const comments = await commentsRes.json();
+            console.log(`[repo-relay] Found ${comments.length} comments`);
             // Find the most recent agent-review comment
-            const agentReviewComment = comments
-                .filter(c => AGENT_REVIEW_PATTERNS.some(p => p.test(c.body)))
+            const matchingComments = comments.filter(c => AGENT_REVIEW_PATTERNS.some(p => p.test(c.body)));
+            console.log(`[repo-relay] Found ${matchingComments.length} comments matching agent-review patterns`);
+            if (matchingComments.length === 0 && comments.length > 0) {
+                console.log(`[repo-relay] First comment preview: ${comments[0].body?.substring(0, 100)}...`);
+            }
+            const agentReviewComment = matchingComments
                 .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
             if (agentReviewComment) {
                 let status = 'pending';
