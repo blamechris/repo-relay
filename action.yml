@@ -34,13 +34,28 @@ runs:
       uses: actions/setup-node@v4
       with:
         node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: ${{ github.action_path }}/package-lock.json
 
     - name: Install dependencies
       shell: bash
       working-directory: ${{ github.action_path }}
-      run: npm ci --omit=dev
+      run: npm ci --omit=dev 2>/dev/null || npm ci --production
+
+    - name: Validate inputs
+      shell: bash
+      run: |
+        if [ -z "${{ inputs.discord_bot_token }}" ]; then
+          echo "::error::discord_bot_token is required but was not provided"
+          exit 1
+        fi
+        if [ -z "${{ inputs.channel_prs }}" ]; then
+          echo "::error::channel_prs is required but was not provided"
+          exit 1
+        fi
+        if ! [[ "${{ inputs.channel_prs }}" =~ ^[0-9]+$ ]]; then
+          echo "::error::channel_prs must be a numeric Discord channel ID, got: ${{ inputs.channel_prs }}"
+          exit 1
+        fi
+        echo "Inputs validated successfully"
 
     - name: Run repo-relay
       shell: bash
