@@ -81,12 +81,16 @@ export async function checkForReviews(db, repo, prNumber, githubToken) {
                 .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
             if (agentReviewComment) {
                 let status = 'pending';
-                if (APPROVED_PATTERNS.some(p => p.test(agentReviewComment.body))) {
+                const approvedMatch = APPROVED_PATTERNS.some(p => p.test(agentReviewComment.body));
+                const changesMatch = CHANGES_REQUESTED_PATTERNS.some(p => p.test(agentReviewComment.body));
+                console.log(`[repo-relay] Agent-review pattern check: approved=${approvedMatch}, changes=${changesMatch}`);
+                if (approvedMatch) {
                     status = 'approved';
                 }
-                else if (CHANGES_REQUESTED_PATTERNS.some(p => p.test(agentReviewComment.body))) {
+                else if (changesMatch) {
                     status = 'changes_requested';
                 }
+                console.log(`[repo-relay] Agent-review status: ${status}, current: ${currentStatus?.agentReviewStatus}`);
                 if (currentStatus?.agentReviewStatus !== status) {
                     console.log(`[repo-relay] Detected agent-review (${status}) for PR #${prNumber}`);
                     db.updateAgentReviewStatus(repo, prNumber, status);
