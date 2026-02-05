@@ -29,6 +29,7 @@ const CHANGES_REQUESTED_PATTERNS = [
  * Returns whether any status changed (for deciding whether to update embed)
  */
 export async function checkForReviews(db, repo, prNumber, githubToken) {
+    console.log(`[repo-relay] checkForReviews: PR #${prNumber}, token length: ${githubToken.length}`);
     const [owner, repoName] = repo.split('/');
     const headers = {
         'Authorization': `Bearer ${githubToken}`,

@@ -54,7 +54,11 @@ export class RepoRelay {
                 await handlePrEvent(this.client, db, this.config.channelConfig, eventData.payload);
                 // Piggyback: check for reviews that may have been posted
                 if (this.config.githubToken) {
+                    console.log(`[repo-relay] Checking for reviews on PR #${eventData.payload.pull_request.number}...`);
                     await this.checkAndUpdateReviews(repo, eventData.payload.pull_request.number);
+                }
+                else {
+                    console.log('[repo-relay] No GitHub token, skipping review check');
                 }
                 break;
             case 'workflow_run':
@@ -87,8 +91,10 @@ export class RepoRelay {
      * This is the "piggyback" approach - we check for reviews when other events fire
      */
     async checkAndUpdateReviews(repo, prNumber) {
-        if (!this.db || !this.config.githubToken)
+        if (!this.db || !this.config.githubToken) {
+            console.log(`[repo-relay] Cannot check reviews: db=${!!this.db}, token=${!!this.config.githubToken}`);
             return;
+        }
         const result = await checkForReviews(this.db, repo, prNumber, this.config.githubToken);
         // If status changed, update the embed
         if (result.changed) {

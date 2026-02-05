@@ -98,7 +98,10 @@ export class RepoRelay {
         );
         // Piggyback: check for reviews that may have been posted
         if (this.config.githubToken) {
+          console.log(`[repo-relay] Checking for reviews on PR #${eventData.payload.pull_request.number}...`);
           await this.checkAndUpdateReviews(repo, eventData.payload.pull_request.number);
+        } else {
+          console.log('[repo-relay] No GitHub token, skipping review check');
         }
         break;
 
@@ -163,7 +166,10 @@ export class RepoRelay {
    * This is the "piggyback" approach - we check for reviews when other events fire
    */
   private async checkAndUpdateReviews(repo: string, prNumber: number): Promise<void> {
-    if (!this.db || !this.config.githubToken) return;
+    if (!this.db || !this.config.githubToken) {
+      console.log(`[repo-relay] Cannot check reviews: db=${!!this.db}, token=${!!this.config.githubToken}`);
+      return;
+    }
 
     const result = await checkForReviews(
       this.db,
