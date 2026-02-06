@@ -37,6 +37,11 @@ function buildWorkflowTemplate(ciWorkflowName, features) {
     if (features.releases) {
         channelSecrets.push('          channel_releases: ${{ secrets.DISCORD_CHANNEL_RELEASES }}');
     }
+    const permissionLines = ['      pull-requests: read'];
+    if (features.issues) {
+        permissionLines.push('      issues: read');
+    }
+    permissionLines.push('      contents: read');
     return `name: Discord Notifications
 
 on:
@@ -46,9 +51,7 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     permissions:
-      pull-requests: read
-      issues: read
-      contents: read
+${permissionLines.join('\n')}
     if: github.event_name != 'workflow_run' || github.event.workflow_run.pull_requests[0] != null
 
     steps:
@@ -112,9 +115,9 @@ async function main() {
         name: 'projectType',
         message: 'Project type:',
         choices: [
-            { title: 'Library / Package', description: 'PRs, CI, issues, releases', value: 'library' },
-            { title: 'Web App / Backend', description: 'PRs, CI, issues (no releases)', value: 'webapp' },
-            { title: 'Minimal', description: 'PRs and CI only', value: 'minimal' },
+            { title: 'Library / Package', description: 'PRs, CI, reviews, issues, releases', value: 'library' },
+            { title: 'Web App / Backend', description: 'PRs, CI, reviews, issues', value: 'webapp' },
+            { title: 'Minimal', description: 'PRs, CI, reviews only', value: 'minimal' },
             { title: 'Custom', description: 'Choose individual features', value: 'custom' },
         ],
     });
@@ -129,6 +132,7 @@ async function main() {
             type: 'multiselect',
             name: 'customFeatures',
             message: 'Select additional features:',
+            // Issues pre-selected: most projects benefit from issue tracking
             choices: [
                 { title: 'Issue notifications', value: 'issues', selected: true },
                 { title: 'Release notifications', value: 'releases' },
@@ -190,6 +194,9 @@ async function main() {
         name: 'ciWorkflow',
         message: 'Name of your CI workflow:',
         initial: 'CI',
+        validate: (value) => /["\\]|\n|\r/.test(value)
+            ? 'Workflow name cannot contain quotes, backslashes, or newlines'
+            : true,
     });
     // Create workflow file
     const workflowDir = join(process.cwd(), '.github', 'workflows');
