@@ -11,7 +11,7 @@ import {
   Colors,
 } from 'discord.js';
 import { safeErrorMessage } from '../utils/errors.js';
-import { REPO_NAME_PATTERN } from '../index.js';
+import { REPO_NAME_PATTERN } from '../utils/validation.js';
 
 interface GitHubIssue {
   number: number;
@@ -36,7 +36,7 @@ export async function handleIssueCommand(
   repo: string
 ): Promise<void> {
   if (!REPO_NAME_PATTERN.test(repo)) {
-    await interaction.reply('Invalid repository format');
+    await interaction.reply({ content: 'Invalid repository format', ephemeral: true });
     return;
   }
 

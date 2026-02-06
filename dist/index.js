@@ -7,10 +7,13 @@ import { Client, GatewayIntentBits, PermissionsBitField } from 'discord.js';
 import { StateDb } from './db/state.js';
 import { handlePrEvent, handleCiEvent, handleReviewEvent, handleCommentEvent, handleIssueEvent, handleReleaseEvent, } from './handlers/index.js';
 import { checkForReviews } from './github/reviews.js';
+import { safeErrorMessage } from './utils/errors.js';
+import { REPO_NAME_PATTERN } from './utils/validation.js';
 import { buildEmbedWithStatus } from './handlers/pr.js';
 import { buildPrEmbed, buildReviewReply } from './embeds/builders.js';
 import { TextChannel } from 'discord.js';
 import { getChannelForEvent } from './config/channels.js';
+export { REPO_NAME_PATTERN };
 const REQUIRED_PERMISSIONS = [
     { flag: PermissionsBitField.Flags.SendMessages, name: 'Send Messages' },
     { flag: PermissionsBitField.Flags.CreatePublicThreads, name: 'Create Public Threads' },
@@ -183,11 +186,12 @@ export class RepoRelay {
                 }
             }
             catch (error) {
-                console.log(`[repo-relay] Warning: Failed to update embed for detected reviews: ${error}`);
+                console.log(`[repo-relay] Warning: Failed to update embed for detected reviews: ${safeErrorMessage(error)}`);
             }
         }
     }
     extractRepo(eventData) {
+        let repo = null;
         switch (eventData.event) {
             case 'pull_request':
             case 'workflow_run':
@@ -195,10 +199,15 @@ export class RepoRelay {
             case 'issue_comment':
             case 'issues':
             case 'release':
-                return eventData.payload.repository.full_name;
+                repo = eventData.payload.repository.full_name;
+                break;
             default:
                 return null;
         }
+        if (!repo || !REPO_NAME_PATTERN.test(repo)) {
+            return null;
+        }
+        return repo;
     }
 }
 // Re-export types and utilities

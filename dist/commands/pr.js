@@ -5,7 +5,13 @@
  * This is scaffolding for Phase 5.
  */
 import { EmbedBuilder, Colors, } from 'discord.js';
+import { safeErrorMessage } from '../utils/errors.js';
+import { REPO_NAME_PATTERN } from '../utils/validation.js';
 export async function handlePrCommand(interaction, githubToken, repo) {
+    if (!REPO_NAME_PATTERN.test(repo)) {
+        await interaction.reply({ content: 'Invalid repository format', ephemeral: true });
+        return;
+    }
     const subcommand = interaction.options.getSubcommand();
     switch (subcommand) {
         case 'show':
@@ -71,7 +77,7 @@ async function handlePrShow(interaction, githubToken, repo) {
         await interaction.editReply({ embeds: [embed] });
     }
     catch (error) {
-        console.error('[repo-relay] Error fetching PR:', error);
+        console.error('[repo-relay] Error fetching PR:', safeErrorMessage(error));
         await interaction.editReply('Failed to fetch PR information');
     }
 }
@@ -104,7 +110,7 @@ async function handlePrList(interaction, githubToken, repo) {
         await interaction.editReply({ embeds: [embed] });
     }
     catch (error) {
-        console.error('[repo-relay] Error fetching PRs:', error);
+        console.error('[repo-relay] Error fetching PRs:', safeErrorMessage(error));
         await interaction.editReply('Failed to fetch PRs');
     }
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { REPO_NAME_PATTERN } from '../index.js';
+import { REPO_NAME_PATTERN } from '../utils/validation.js';
 
 describe('REPO_NAME_PATTERN', () => {
   const valid = [

@@ -23,6 +23,7 @@ import {
 } from './handlers/index.js';
 import { checkForReviews } from './github/reviews.js';
 import { safeErrorMessage } from './utils/errors.js';
+import { REPO_NAME_PATTERN } from './utils/validation.js';
 import { buildEmbedWithStatus } from './handlers/pr.js';
 import { buildPrEmbed, buildReviewReply } from './embeds/builders.js';
 import { TextChannel } from 'discord.js';
@@ -43,7 +44,8 @@ export type GitHubEventPayload =
   | { event: 'issues'; payload: IssueEventPayload }
   | { event: 'release'; payload: ReleaseEventPayload };
 
-export const REPO_NAME_PATTERN = /^[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+$/;
+
+export { REPO_NAME_PATTERN };
 
 const REQUIRED_PERMISSIONS = [
   { flag: PermissionsBitField.Flags.SendMessages, name: 'Send Messages' },

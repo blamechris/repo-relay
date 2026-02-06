@@ -5,7 +5,13 @@
  * This is scaffolding for Phase 5.
  */
 import { EmbedBuilder, Colors, } from 'discord.js';
+import { safeErrorMessage } from '../utils/errors.js';
+import { REPO_NAME_PATTERN } from '../utils/validation.js';
 export async function handleIssueCommand(interaction, githubToken, repo) {
+    if (!REPO_NAME_PATTERN.test(repo)) {
+        await interaction.reply({ content: 'Invalid repository format', ephemeral: true });
+        return;
+    }
     const issueNumber = interaction.options.getInteger('number', true);
     await interaction.deferReply();
     try {
@@ -69,7 +75,7 @@ export async function handleIssueCommand(interaction, githubToken, repo) {
         await interaction.editReply({ embeds: [embed] });
     }
     catch (error) {
-        console.error('[repo-relay] Error fetching issue:', error);
+        console.error('[repo-relay] Error fetching issue:', safeErrorMessage(error));
         await interaction.editReply('Failed to fetch issue information');
     }
 }
