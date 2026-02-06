@@ -8,22 +8,38 @@ import prompts from 'prompts';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { execSync } from 'child_process';
 import { join } from 'path';
-const WORKFLOW_TEMPLATE = (ciWorkflowName) => `name: Discord Notifications
+import { safeErrorMessage } from './utils/errors.js';
+const PROJECT_TYPES = {
+    library: { issues: true, releases: true },
+    webapp: { issues: true, releases: false },
+    minimal: { issues: false, releases: false },
+};
+function buildWorkflowTemplate(ciWorkflowName, features) {
+    const eventLines = [
+        '  pull_request:',
+        '    types: [opened, synchronize, closed, reopened, edited, ready_for_review, converted_to_draft]',
+        '  pull_request_review:',
+        '    types: [submitted]',
+    ];
+    if (features.issues) {
+        eventLines.push('  issue_comment:', '    types: [created]');
+        eventLines.push('  issues:', '    types: [opened, closed]');
+    }
+    if (features.releases) {
+        eventLines.push('  release:', '    types: [published]');
+    }
+    eventLines.push('  workflow_run:', `    workflows: ["${ciWorkflowName}"]`, '    types: [completed]');
+    const channelSecrets = ['          channel_prs: ${{ secrets.DISCORD_CHANNEL_PRS }}'];
+    if (features.issues) {
+        channelSecrets.push('          channel_issues: ${{ secrets.DISCORD_CHANNEL_ISSUES }}');
+    }
+    if (features.releases) {
+        channelSecrets.push('          channel_releases: ${{ secrets.DISCORD_CHANNEL_RELEASES }}');
+    }
+    return `name: Discord Notifications
 
 on:
-  pull_request:
-    types: [opened, synchronize, closed, reopened, edited, ready_for_review, converted_to_draft]
-  pull_request_review:
-    types: [submitted]
-  issue_comment:
-    types: [created]
-  issues:
-    types: [opened, closed]
-  release:
-    types: [published]
-  workflow_run:
-    workflows: ["${ciWorkflowName}"]
-    types: [completed]
+${eventLines.join('\n')}
 
 jobs:
   notify:
@@ -38,10 +54,9 @@ jobs:
       - uses: blamechris/repo-relay@v1
         with:
           discord_bot_token: \${{ secrets.DISCORD_BOT_TOKEN }}
-          channel_prs: \${{ secrets.DISCORD_CHANNEL_PRS }}
-          channel_issues: \${{ secrets.DISCORD_CHANNEL_ISSUES }}
-          channel_releases: \${{ secrets.DISCORD_CHANNEL_RELEASES }}
+${channelSecrets.join('\n')}
 `;
+}
 function getRepoUrl() {
     try {
         const remote = execSync('git remote get-url origin', { encoding: 'utf-8' }).trim();
@@ -87,24 +102,78 @@ async function main() {
         console.log('\n❌ Setup cancelled.\n');
         process.exit(1);
     }
-    // Step 3: Optional channels
-    console.log('\n\x1b[36mStep 3: Additional Channels (optional)\x1b[0m');
+    // Step 3: Project Type
+    console.log('\n\x1b[36mStep 3: Project Type\x1b[0m');
     console.log('────────────────────────────────────────');
-    console.log('Leave blank to use the PR channel for all notifications.\n');
-    const { channelIssues } = await prompts({
-        type: 'text',
-        name: 'channelIssues',
-        message: 'Channel ID for issues (blank = use PR channel):',
-        validate: (value) => value === '' || /^\d+$/.test(value) || 'Must be a number or blank',
+    console.log('Choose a template to configure which events trigger notifications.\n');
+    const { projectType } = await prompts({
+        type: 'select',
+        name: 'projectType',
+        message: 'Project type:',
+        choices: [
+            { title: 'Library / Package', description: 'PRs, CI, issues, releases', value: 'library' },
+            { title: 'Web App / Backend', description: 'PRs, CI, issues (no releases)', value: 'webapp' },
+            { title: 'Minimal', description: 'PRs and CI only', value: 'minimal' },
+            { title: 'Custom', description: 'Choose individual features', value: 'custom' },
+        ],
     });
-    const { channelReleases } = await prompts({
-        type: 'text',
-        name: 'channelReleases',
-        message: 'Channel ID for releases (blank = use PR channel):',
-        validate: (value) => value === '' || /^\d+$/.test(value) || 'Must be a number or blank',
-    });
-    // Step 4: CI Workflow name
-    console.log('\n\x1b[36mStep 4: CI Workflow Name\x1b[0m');
+    if (projectType === undefined) {
+        console.log('\n❌ Setup cancelled.\n');
+        process.exit(1);
+    }
+    // Determine features
+    let features;
+    if (projectType === 'custom') {
+        const { customFeatures } = await prompts({
+            type: 'multiselect',
+            name: 'customFeatures',
+            message: 'Select additional features:',
+            choices: [
+                { title: 'Issue notifications', value: 'issues', selected: true },
+                { title: 'Release notifications', value: 'releases' },
+            ],
+        });
+        if (!customFeatures) {
+            console.log('\n❌ Setup cancelled.\n');
+            process.exit(1);
+        }
+        features = {
+            issues: customFeatures.includes('issues'),
+            releases: customFeatures.includes('releases'),
+        };
+    }
+    else {
+        features = PROJECT_TYPES[projectType];
+    }
+    // Step 4: Channel IDs for enabled features
+    let channelIssues = '';
+    let channelReleases = '';
+    if (features.issues || features.releases) {
+        console.log('\n\x1b[36mStep 4: Additional Channels (optional)\x1b[0m');
+        console.log('────────────────────────────────────────');
+        console.log('Leave blank to use the PR channel for all notifications.\n');
+        if (features.issues) {
+            const result = await prompts({
+                type: 'text',
+                name: 'channelIssues',
+                message: 'Channel ID for issues (blank = use PR channel):',
+                validate: (value) => value === '' || /^\d+$/.test(value) || 'Must be a number or blank',
+            });
+            channelIssues = result.channelIssues ?? '';
+        }
+        if (features.releases) {
+            const result = await prompts({
+                type: 'text',
+                name: 'channelReleases',
+                message: 'Channel ID for releases (blank = use PR channel):',
+                validate: (value) => value === '' || /^\d+$/.test(value) || 'Must be a number or blank',
+            });
+            channelReleases = result.channelReleases ?? '';
+        }
+    }
+    // Step 5: CI Workflow name
+    const stepNum = (features.issues || features.releases) ? 5 : 4;
+    console.log(`\n\x1b[36mStep ${stepNum}: CI Workflow Name\x1b[0m`);
     console.log('────────────────────────────────────────');
     console.log('This is the name of your CI workflow (for tracking CI status).\n');
     const { ciWorkflow } = await prompts({
@@ -131,7 +200,7 @@ async function main() {
             process.exit(1);
         }
     }
-    writeFileSync(workflowPath, WORKFLOW_TEMPLATE(ciWorkflow || 'CI'));
+    writeFileSync(workflowPath, buildWorkflowTemplate(ciWorkflow || 'CI', features));
     console.log('\n✅ Created .github/workflows/discord-notify.yml\n');
     // Final instructions
     const repoUrl = getRepoUrl();
@@ -146,17 +215,17 @@ async function main() {
     console.log('│ Add these repository secrets:                               │');
     console.log(`│   \x1b[1mDISCORD_BOT_TOKEN\x1b[0m   = ${botToken.substring(0, 10)}...`);
     console.log(`│   \x1b[1mDISCORD_CHANNEL_PRS\x1b[0m = ${channelPrs}`);
-    if (channelIssues) {
+    if (features.issues && channelIssues) {
         console.log(`│   \x1b[1mDISCORD_CHANNEL_ISSUES\x1b[0m = ${channelIssues}`);
     }
-    if (channelReleases) {
+    if (features.releases && channelReleases) {
         console.log(`│   \x1b[1mDISCORD_CHANNEL_RELEASES\x1b[0m = ${channelReleases}`);
     }
     console.log('└─────────────────────────────────────────────────────────────┘');
     console.log('\n🎉 Done! Commit and push to enable Discord notifications.\n');
 }
 main().catch((error) => {
-    console.error('Error:', error);
+    console.error('Error:', safeErrorMessage(error));
     process.exit(1);
 });
 //# sourceMappingURL=setup.js.map
