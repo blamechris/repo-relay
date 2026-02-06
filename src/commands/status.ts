@@ -11,6 +11,7 @@ import {
   Colors,
 } from 'discord.js';
 import { safeErrorMessage } from '../utils/errors.js';
+import { REPO_NAME_PATTERN } from '../index.js';
 
 interface GitHubPr {
   number: number;
@@ -38,6 +39,11 @@ export async function handleStatusCommand(
   githubToken: string,
   repo: string
 ): Promise<void> {
+  if (!REPO_NAME_PATTERN.test(repo)) {
+    await interaction.reply('Invalid repository format');
+    return;
+  }
+
   await interaction.deferReply();
 
   try {
