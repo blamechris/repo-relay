@@ -130,7 +130,7 @@ export function buildReleaseEmbed(name, tagName, url, author, authorAvatar, body
     const label = prerelease ? ' [PRE-RELEASE]' : '';
     const embed = new EmbedBuilder()
         .setColor(prerelease ? Colors.Yellow : Colors.Blue)
-        .setTitle(`${emoji} Release: ${name}${label}`)
+        .setTitle(truncateTitle(`${emoji} Release: ${name}${label}`))
         .setURL(url)
         .setAuthor({
         name: author,
