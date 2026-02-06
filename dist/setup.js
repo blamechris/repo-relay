@@ -28,7 +28,8 @@ function buildWorkflowTemplate(ciWorkflowName, features) {
     if (features.releases) {
         eventLines.push('  release:', '    types: [published]');
     }
-    eventLines.push('  workflow_run:', `    workflows: ["${ciWorkflowName}"]`, '    types: [completed]');
+    const sanitizedName = ciWorkflowName.replace(/"/g, '\\"');
+    eventLines.push('  workflow_run:', `    workflows: ["${sanitizedName}"]`, '    types: [completed]');
     const channelSecrets = ['          channel_prs: ${{ secrets.DISCORD_CHANNEL_PRS }}'];
     if (features.issues) {
         channelSecrets.push('          channel_issues: ${{ secrets.DISCORD_CHANNEL_ISSUES }}');
@@ -159,6 +160,10 @@ async function main() {
                 message: 'Channel ID for issues (blank = use PR channel):',
                 validate: (value) => value === '' || /^\d+$/.test(value) || 'Must be a number or blank',
             });
+            if (!result || result.channelIssues === undefined) {
+                console.log('\n❌ Setup cancelled.\n');
+                process.exit(1);
+            }
             channelIssues = result.channelIssues ?? '';
         }
         if (features.releases) {
@@ -168,6 +173,10 @@ async function main() {
                 message: 'Channel ID for releases (blank = use PR channel):',
                 validate: (value) => value === '' || /^\d+$/.test(value) || 'Must be a number or blank',
             });
+            if (!result || result.channelReleases === undefined) {
+                console.log('\n❌ Setup cancelled.\n');
+                process.exit(1);
+            }
             channelReleases = result.channelReleases ?? '';
         }
     }

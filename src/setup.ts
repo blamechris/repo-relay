@@ -39,9 +39,10 @@ function buildWorkflowTemplate(ciWorkflowName: string, features: ProjectFeatures
     eventLines.push('  release:', '    types: [published]');
   }
 
+  const sanitizedName = ciWorkflowName.replace(/"/g, '\\"');
   eventLines.push(
     '  workflow_run:',
-    `    workflows: ["${ciWorkflowName}"]`,
+    `    workflows: ["${sanitizedName}"]`,
     '    types: [completed]',
   );
 
@@ -192,6 +193,10 @@ async function main(): Promise<void> {
         message: 'Channel ID for issues (blank = use PR channel):',
         validate: (value: string) => value === '' || /^\d+$/.test(value) || 'Must be a number or blank',
       });
+      if (!result || result.channelIssues === undefined) {
+        console.log('\n❌ Setup cancelled.\n');
+        process.exit(1);
+      }
       channelIssues = result.channelIssues ?? '';
     }
 
@@ -202,6 +207,10 @@ async function main(): Promise<void> {
         message: 'Channel ID for releases (blank = use PR channel):',
         validate: (value: string) => value === '' || /^\d+$/.test(value) || 'Must be a number or blank',
       });
+      if (!result || result.channelReleases === undefined) {
+        console.log('\n❌ Setup cancelled.\n');
+        process.exit(1);
+      }
       channelReleases = result.channelReleases ?? '';
     }
   }
