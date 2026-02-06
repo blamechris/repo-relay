@@ -22,6 +22,7 @@ import {
   type ReleaseEventPayload,
 } from './handlers/index.js';
 import { checkForReviews } from './github/reviews.js';
+import { safeErrorMessage } from './utils/errors.js';
 import { buildEmbedWithStatus } from './handlers/pr.js';
 import { buildPrEmbed, buildReviewReply } from './embeds/builders.js';
 import { TextChannel } from 'discord.js';
@@ -291,7 +292,7 @@ export class RepoRelay {
           }
         }
       } catch (error) {
-        console.log(`[repo-relay] Warning: Failed to update embed for detected reviews: ${error}`);
+        console.log(`[repo-relay] Warning: Failed to update embed for detected reviews: ${safeErrorMessage(error)}`);
       }
     }
   }

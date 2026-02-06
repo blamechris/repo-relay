@@ -11,6 +11,7 @@ import {
   APPROVED_PATTERNS,
   CHANGES_REQUESTED_PATTERNS,
 } from '../patterns/agent-review.js';
+import { safeErrorMessage } from '../utils/errors.js';
 
 interface GitHubReview {
   id: number;
@@ -92,7 +93,7 @@ export async function checkForReviews(
       }
     }
   } catch (error) {
-    console.log(`[repo-relay] Warning: Failed to check Copilot reviews: ${error}`);
+    console.log(`[repo-relay] Warning: Failed to check Copilot reviews: ${safeErrorMessage(error)}`);
   }
 
   // Check for agent-review comments
@@ -127,7 +128,7 @@ export async function checkForReviews(
       }
     }
   } catch (error) {
-    console.log(`[repo-relay] Warning: Failed to check agent-review comments: ${error}`);
+    console.log(`[repo-relay] Warning: Failed to check agent-review comments: ${safeErrorMessage(error)}`);
   }
 
   result.changed = changed;

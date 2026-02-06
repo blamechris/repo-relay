@@ -9,6 +9,7 @@ import prompts from 'prompts';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { execSync } from 'child_process';
 import { join } from 'path';
+import { safeErrorMessage } from './utils/errors.js';
 
 const WORKFLOW_TEMPLATE = (ciWorkflowName: string) => `name: Discord Notifications
 
@@ -179,6 +180,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error) => {
-  console.error('Error:', error);
+  console.error('Error:', safeErrorMessage(error));
   process.exit(1);
 });

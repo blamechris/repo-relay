@@ -7,6 +7,7 @@
 
 import { readFileSync } from 'fs';
 import { RepoRelay, type GitHubEventPayload } from './index.js';
+import { safeErrorMessage } from './utils/errors.js';
 import { getChannelConfig } from './config/channels.js';
 import type { PrEventPayload } from './handlers/pr.js';
 import type { WorkflowRunPayload } from './handlers/ci.js';
@@ -119,6 +120,6 @@ function mapGitHubEvent(
 }
 
 main().catch((error) => {
-  console.error('[repo-relay] Unhandled error:', error);
+  console.error('[repo-relay] Unhandled error:', safeErrorMessage(error));
   process.exit(1);
 });
