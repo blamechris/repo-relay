@@ -26,11 +26,20 @@ export class StateDb {
     }
     runMigrations() {
         // Migration: Add thread_id column if it doesn't exist
-        const columns = this.db.prepare("PRAGMA table_info(pr_messages)").all();
-        const hasThreadId = columns.some(col => col.name === 'thread_id');
+        const prColumns = this.db.prepare("PRAGMA table_info(pr_messages)").all();
+        const hasThreadId = prColumns.some(col => col.name === 'thread_id');
         if (!hasThreadId) {
             console.log('[repo-relay] Running migration: Adding thread_id column to pr_messages');
             this.db.exec("ALTER TABLE pr_messages ADD COLUMN thread_id TEXT");
+        }
+        // Migration: Rename event_log.pr_number → entity_number
+        const eventColumns = this.db.prepare("PRAGMA table_info(event_log)").all();
+        const hasPrNumber = eventColumns.some(col => col.name === 'pr_number');
+        if (hasPrNumber) {
+            console.log('[repo-relay] Running migration: Renaming event_log.pr_number to entity_number');
+            this.db.exec("ALTER TABLE event_log RENAME COLUMN pr_number TO entity_number");
+            this.db.exec("DROP INDEX IF EXISTS idx_event_log_repo_pr");
+            this.db.exec("CREATE INDEX IF NOT EXISTS idx_event_log_repo_entity ON event_log(repo, entity_number)");
         }
     }
     initSchema() {
@@ -106,14 +115,14 @@ export class StateDb {
       CREATE TABLE IF NOT EXISTS event_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         repo TEXT NOT NULL,
-        pr_number INTEGER,
+        entity_number INTEGER,
         event_type TEXT,
         payload TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
 
-      CREATE INDEX IF NOT EXISTS idx_event_log_repo_pr
-        ON event_log(repo, pr_number);
+      CREATE INDEX IF NOT EXISTS idx_event_log_repo_entity
+        ON event_log(repo, entity_number);
     `);
     }
     getPrMessage(repo, prNumber) {
@@ -329,24 +338,24 @@ export class StateDb {
     `);
         stmt.run(data.repo, data.issueNumber, data.title, data.url, data.author, data.authorAvatar, data.state, data.stateReason, data.labels, data.body, data.issueCreatedAt);
     }
-    logEvent(repo, prNumber, eventType, payload) {
+    logEvent(repo, entityNumber, eventType, payload) {
         const stmt = this.db.prepare(`
-      INSERT INTO event_log (repo, pr_number, event_type, payload)
+      INSERT INTO event_log (repo, entity_number, event_type, payload)
       VALUES (?, ?, ?, ?)
     `);
-        stmt.run(repo, prNumber, eventType, JSON.stringify(payload));
+        stmt.run(repo, entityNumber, eventType, JSON.stringify(payload));
     }
-    getRecentEvents(repo, prNumber, limit = 50) {
+    getRecentEvents(repo, entityNumber, limit = 50) {
         let query = `
-      SELECT id, repo, pr_number as prNumber, event_type as eventType,
+      SELECT id, repo, entity_number as entityNumber, event_type as eventType,
              payload, created_at as createdAt
       FROM event_log
       WHERE repo = ?
     `;
         const params = [repo];
-        if (prNumber !== undefined) {
-            query += ' AND pr_number = ?';
-            params.push(prNumber);
+        if (entityNumber !== undefined) {
+            query += ' AND entity_number = ?';
+            params.push(entityNumber);
         }
         query += ' ORDER BY created_at DESC LIMIT ?';
         params.push(limit);

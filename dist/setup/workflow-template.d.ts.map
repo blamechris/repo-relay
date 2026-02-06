@@ -1,0 +1,1 @@
+{"version":3,"file":"workflow-template.d.ts","sourceRoot":"","sources":["../../src/setup/workflow-template.ts"],"names":[],"mappings":"AAAA;;GAEG;AAEH,MAAM,WAAW,eAAe;IAC9B,MAAM,EAAE,OAAO,CAAC;IAChB,QAAQ,EAAE,OAAO,CAAC;CACnB;AAED,wBAAgB,qBAAqB,CAAC,cAAc,EAAE,MAAM,EAAE,QAAQ,EAAE,eAAe,GAAG,MAAM,CAwD/F"}

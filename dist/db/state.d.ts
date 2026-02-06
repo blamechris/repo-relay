@@ -62,7 +62,7 @@ export interface StoredIssueData {
 export interface EventLogEntry {
     id: number;
     repo: string;
-    prNumber: number | null;
+    entityNumber: number | null;
     eventType: string;
     payload: string;
     createdAt: string;
@@ -91,8 +91,8 @@ export declare class StateDb {
     deleteIssueMessage(repo: string, issueNumber: number): void;
     getIssueData(repo: string, issueNumber: number): StoredIssueData | null;
     saveIssueData(data: StoredIssueData): void;
-    logEvent(repo: string, prNumber: number | null, eventType: string, payload: object): void;
-    getRecentEvents(repo: string, prNumber?: number, limit?: number): EventLogEntry[];
+    logEvent(repo: string, entityNumber: number | null, eventType: string, payload: object): void;
+    getRecentEvents(repo: string, entityNumber?: number, limit?: number): EventLogEntry[];
     close(): void;
 }
 //# sourceMappingURL=state.d.ts.map
