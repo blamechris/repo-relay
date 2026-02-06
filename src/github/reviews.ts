@@ -51,7 +51,11 @@ export async function checkForReviews(
   prNumber: number,
   githubToken: string
 ): Promise<ReviewCheckResult> {
-  const [owner, repoName] = repo.split('/');
+  const parts = repo.split('/');
+  if (parts.length !== 2 || !parts[0] || !parts[1]) {
+    throw new Error(`Invalid repo format: expected "owner/name", got "${repo}"`);
+  }
+  const [owner, repoName] = parts;
   const headers = {
     'Authorization': `Bearer ${githubToken}`,
     'Accept': 'application/vnd.github+json',

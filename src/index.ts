@@ -42,6 +42,8 @@ export type GitHubEventPayload =
   | { event: 'issues'; payload: IssueEventPayload }
   | { event: 'release'; payload: ReleaseEventPayload };
 
+export const REPO_NAME_PATTERN = /^[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+$/;
+
 const REQUIRED_PERMISSIONS = [
   { flag: PermissionsBitField.Flags.SendMessages, name: 'Send Messages' },
   { flag: PermissionsBitField.Flags.CreatePublicThreads, name: 'Create Public Threads' },
@@ -295,6 +297,7 @@ export class RepoRelay {
   }
 
   private extractRepo(eventData: GitHubEventPayload): string | null {
+    let repo: string | null = null;
     switch (eventData.event) {
       case 'pull_request':
       case 'workflow_run':
@@ -302,10 +305,15 @@ export class RepoRelay {
       case 'issue_comment':
       case 'issues':
       case 'release':
-        return eventData.payload.repository.full_name;
+        repo = eventData.payload.repository.full_name;
+        break;
       default:
         return null;
     }
+    if (!repo || !REPO_NAME_PATTERN.test(repo)) {
+      return null;
+    }
+    return repo;
   }
 }
 
