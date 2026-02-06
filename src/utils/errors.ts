@@ -1,3 +1,4 @@
+/** Extract a safe log message from an unknown thrown value. */
 export function safeErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   return String(error);
