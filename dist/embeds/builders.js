@@ -89,29 +89,41 @@ export function buildClosedReply(closedBy) {
     const byText = closedBy ? ` by @${closedBy}` : '';
     return `🚫 Closed without merging${byText}`;
 }
-export function buildIssueEmbed(number, title, url, author, authorAvatar, state, labels, body) {
-    const emoji = state === 'open' ? '🟢' : '🟣';
-    const stateLabel = state === 'closed' ? ' [CLOSED]' : '';
+export function buildIssueEmbed(issue) {
+    const emoji = issue.state === 'open' ? '🟢' : '🟣';
+    const stateLabel = getIssueStateLabel(issue.state, issue.stateReason);
     const embed = new EmbedBuilder()
-        .setColor(state === 'open' ? Colors.Green : Colors.Purple)
-        .setTitle(`${emoji} Issue #${number}: ${title}${stateLabel}`)
-        .setURL(url)
+        .setColor(issue.state === 'open' ? Colors.Green : Colors.Purple)
+        .setTitle(`${emoji} Issue #${issue.number}: ${issue.title}${stateLabel}`)
+        .setURL(issue.url)
         .setAuthor({
-        name: author,
-        iconURL: authorAvatar,
-    });
-    if (labels.length > 0) {
+        name: issue.author,
+        iconURL: issue.authorAvatar,
+    })
+        .setTimestamp(new Date(issue.createdAt));
+    if (issue.labels.length > 0) {
         embed.addFields({
             name: 'Labels',
-            value: labels.map((l) => `\`${l}\``).join(' '),
+            value: issue.labels.map((l) => `\`${l}\``).join(' '),
             inline: false,
         });
     }
-    if (body && body.length > 0) {
-        const truncated = body.length > 200 ? body.substring(0, 197) + '...' : body;
+    if (issue.body && issue.body.length > 0) {
+        const truncated = issue.body.length > 200 ? issue.body.substring(0, 197) + '...' : issue.body;
         embed.setDescription(truncated);
     }
     return embed;
+}
+export function buildIssueClosedReply(closedBy, stateReason) {
+    const byText = closedBy ? ` by @${closedBy}` : '';
+    if (stateReason === 'not_planned') {
+        return `🟣 Closed as not planned${byText}`;
+    }
+    return `🟣 Closed${byText}`;
+}
+export function buildIssueReopenedReply(reopenedBy) {
+    const byText = reopenedBy ? ` by @${reopenedBy}` : '';
+    return `🟢 Reopened${byText}`;
 }
 export function buildReleaseEmbed(name, tagName, url, author, authorAvatar, body, prerelease) {
     const emoji = prerelease ? '🧪' : '🚀';
@@ -196,6 +208,12 @@ function getCiStatusText(ci) {
         case 'cancelled':
             return `⚪ Cancelled${name}`;
     }
+}
+function getIssueStateLabel(state, stateReason) {
+    if (state === 'closed') {
+        return stateReason === 'not_planned' ? ' [NOT PLANNED]' : ' [CLOSED]';
+    }
+    return '';
 }
 function capitalize(str) {
     return str.charAt(0).toUpperCase() + str.slice(1);
