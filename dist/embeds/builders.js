@@ -216,7 +216,7 @@ function getIssueStateLabel(state, stateReason) {
     return '';
 }
 function truncateTitle(title) {
-    return title.length > 256 ? title.substring(0, 253) + '...' : title;
+    return title.length > 256 ? title.substring(0, 255) + '…' : title;
 }
 function capitalize(str) {
     return str.charAt(0).toUpperCase() + str.slice(1);

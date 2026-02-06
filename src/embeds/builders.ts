@@ -321,7 +321,7 @@ function getIssueStateLabel(state: 'open' | 'closed', stateReason?: string | nul
 }
 
 function truncateTitle(title: string): string {
-  return title.length > 256 ? title.substring(0, 253) + '...' : title;
+  return title.length > 256 ? title.substring(0, 255) + '…' : title;
 }
 
 function capitalize(str: string): string {
