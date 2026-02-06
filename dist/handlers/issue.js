@@ -30,10 +30,10 @@ export async function handleIssueEvent(client, db, channelConfig, payload) {
             await handleIssueOpened(channel, db, repo, issueData);
             break;
         case 'closed':
-            await handleIssueClosed(channel, db, repo, issueData, payload.sender.login);
+            await handleIssueStateChange(channel, db, repo, issueData, buildIssueClosedReply(payload.sender.login, issueData.stateReason));
             break;
         case 'reopened':
-            await handleIssueReopened(channel, db, repo, issueData, payload.sender.login);
+            await handleIssueStateChange(channel, db, repo, issueData, buildIssueReopenedReply(payload.sender.login));
             break;
         case 'labeled':
         case 'unlabeled':
@@ -53,8 +53,8 @@ async function handleIssueOpened(channel, db, repo, issue) {
     saveIssueDataFromIssueData(db, repo, issue);
     await thread.send(`📋 Updates for Issue #${issue.number} will appear here.`);
 }
-async function handleIssueClosed(channel, db, repo, issue, closedBy) {
-    let existing = db.getIssueMessage(repo, issue.number);
+async function handleIssueStateChange(channel, db, repo, issue, replyText) {
+    const existing = db.getIssueMessage(repo, issue.number);
     if (existing) {
         try {
             const message = await channel.messages.fetch(existing.messageId);
@@ -62,7 +62,7 @@ async function handleIssueClosed(channel, db, repo, issue, closedBy) {
             const embed = buildIssueEmbed(issue);
             await message.edit({ embeds: [embed] });
             const thread = await getOrCreateIssueThread(channel, db, repo, issue, existing);
-            await thread.send(buildIssueClosedReply(closedBy, issue.stateReason));
+            await thread.send(replyText);
             db.updateIssueMessageTimestamp(repo, issue.number);
             return;
         }
@@ -71,59 +71,23 @@ async function handleIssueClosed(channel, db, repo, issue, closedBy) {
             if (errMsg.includes('Unknown Message')) {
                 console.log(`[repo-relay] Stale message for Issue #${issue.number}, creating new one`);
                 db.deleteIssueMessage(repo, issue.number);
-                existing = null;
             }
             else {
                 throw error;
             }
         }
     }
-    if (!existing) {
-        const embed = buildIssueEmbed(issue);
-        const message = await channel.send({ embeds: [embed] });
-        const thread = await message.startThread({
-            name: `Issue #${issue.number}: ${issue.title.substring(0, 90)}`,
-            autoArchiveDuration: 1440,
-        });
-        db.saveIssueMessage(repo, issue.number, channel.id, message.id, thread.id);
-        saveIssueDataFromIssueData(db, repo, issue);
-    }
-}
-async function handleIssueReopened(channel, db, repo, issue, reopenedBy) {
-    let existing = db.getIssueMessage(repo, issue.number);
-    if (existing) {
-        try {
-            const message = await channel.messages.fetch(existing.messageId);
-            saveIssueDataFromIssueData(db, repo, issue);
-            const embed = buildIssueEmbed(issue);
-            await message.edit({ embeds: [embed] });
-            const thread = await getOrCreateIssueThread(channel, db, repo, issue, existing);
-            await thread.send(buildIssueReopenedReply(reopenedBy));
-            db.updateIssueMessageTimestamp(repo, issue.number);
-            return;
-        }
-        catch (error) {
-            const errMsg = error instanceof Error ? error.message : String(error);
-            if (errMsg.includes('Unknown Message')) {
-                console.log(`[repo-relay] Stale message for Issue #${issue.number}, creating new one`);
-                db.deleteIssueMessage(repo, issue.number);
-                existing = null;
-            }
-            else {
-                throw error;
-            }
-        }
-    }
-    if (!existing) {
-        const embed = buildIssueEmbed(issue);
-        const message = await channel.send({ embeds: [embed] });
-        const thread = await message.startThread({
-            name: `Issue #${issue.number}: ${issue.title.substring(0, 90)}`,
-            autoArchiveDuration: 1440,
-        });
-        db.saveIssueMessage(repo, issue.number, channel.id, message.id, thread.id);
-        saveIssueDataFromIssueData(db, repo, issue);
-    }
+    // No existing message (or stale message was cleared) — create new embed
+    const embed = buildIssueEmbed(issue);
+    const message = await channel.send({ embeds: [embed] });
+    const thread = await message.startThread({
+        name: `Issue #${issue.number}: ${issue.title.substring(0, 90)}`,
+        autoArchiveDuration: 1440,
+    });
+    db.saveIssueMessage(repo, issue.number, channel.id, message.id, thread.id);
+    saveIssueDataFromIssueData(db, repo, issue);
+    await thread.send(replyText);
+    db.updateIssueMessageTimestamp(repo, issue.number);
 }
 function saveIssueDataFromIssueData(db, repo, issue) {
     db.saveIssueData({

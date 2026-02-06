@@ -98,7 +98,7 @@ describe('handleIssueEvent', () => {
   describe('opened', () => {
     it('creates embed, thread, and saves to DB', async () => {
       const thread = makeMockThread();
-      const { channel, message } = makeMockChannel(undefined, thread);
+      const { channel } = makeMockChannel(undefined, thread);
       const client = makeMockClient(channel);
       const db = makeMockDb();
       const payload = makePayload({ action: 'opened' });
@@ -209,7 +209,7 @@ describe('handleIssueEvent', () => {
       expect(db.saveIssueData).toHaveBeenCalled();
     });
 
-    it('creates new embed when no existing message', async () => {
+    it('creates new embed and posts close reply when no existing message', async () => {
       const thread = makeMockThread();
       const { channel } = makeMockChannel(undefined, thread);
       const client = makeMockClient(channel);
@@ -217,13 +217,16 @@ describe('handleIssueEvent', () => {
 
       db.getIssueMessage.mockReturnValue(null);
 
-      const payload = makePayload({ action: 'closed', state: 'closed' });
+      const payload = makePayload({ action: 'closed', state: 'closed', sender: 'closer' });
 
       await handleIssueEvent(client as any, db as any, { prs: 'channel-1' }, payload);
 
       // Creates new embed
       expect(channel.send).toHaveBeenCalledWith({ embeds: [{ mock: 'embed' }] });
       expect(db.saveIssueMessage).toHaveBeenCalled();
+
+      // Posts close reply to thread
+      expect(thread.send).toHaveBeenCalledWith('🟣 Closed by @closer');
     });
 
     it('shows NOT PLANNED state reason in close reply', async () => {
@@ -290,7 +293,7 @@ describe('handleIssueEvent', () => {
       expect(db.updateIssueMessageTimestamp).toHaveBeenCalledWith('test/repo', 42);
     });
 
-    it('creates new embed when no existing message', async () => {
+    it('creates new embed and posts reopen reply when no existing message', async () => {
       const thread = makeMockThread();
       const { channel } = makeMockChannel(undefined, thread);
       const client = makeMockClient(channel);
@@ -298,12 +301,15 @@ describe('handleIssueEvent', () => {
 
       db.getIssueMessage.mockReturnValue(null);
 
-      const payload = makePayload({ action: 'reopened', state: 'open' });
+      const payload = makePayload({ action: 'reopened', state: 'open', sender: 'reopener' });
 
       await handleIssueEvent(client as any, db as any, { prs: 'channel-1' }, payload);
 
       expect(channel.send).toHaveBeenCalledWith({ embeds: [{ mock: 'embed' }] });
       expect(db.saveIssueMessage).toHaveBeenCalled();
+
+      // Posts reopen reply to thread
+      expect(thread.send).toHaveBeenCalledWith('🟢 Reopened by @reopener');
     });
   });
 
