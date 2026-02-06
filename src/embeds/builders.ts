@@ -47,7 +47,7 @@ export function buildPrEmbed(
 
   const embed = new EmbedBuilder()
     .setColor(getPrColor(pr.state, pr.draft))
-    .setTitle(`${emoji} PR #${pr.number}: ${pr.title}${stateLabel}`)
+    .setTitle(truncateTitle(`${emoji} PR #${pr.number}: ${pr.title}${stateLabel}`))
     .setURL(pr.url)
     .setAuthor({
       name: pr.author,
@@ -172,7 +172,7 @@ export function buildIssueEmbed(issue: IssueData): EmbedBuilder {
 
   const embed = new EmbedBuilder()
     .setColor(issue.state === 'open' ? Colors.Green : Colors.Purple)
-    .setTitle(`${emoji} Issue #${issue.number}: ${issue.title}${stateLabel}`)
+    .setTitle(truncateTitle(`${emoji} Issue #${issue.number}: ${issue.title}${stateLabel}`))
     .setURL(issue.url)
     .setAuthor({
       name: issue.author,
@@ -223,7 +223,7 @@ export function buildReleaseEmbed(
 
   const embed = new EmbedBuilder()
     .setColor(prerelease ? Colors.Yellow : Colors.Blue)
-    .setTitle(`${emoji} Release: ${name}${label}`)
+    .setTitle(truncateTitle(`${emoji} Release: ${name}${label}`))
     .setURL(url)
     .setAuthor({
       name: author,
@@ -318,6 +318,10 @@ function getIssueStateLabel(state: 'open' | 'closed', stateReason?: string | nul
     return stateReason === 'not_planned' ? ' [NOT PLANNED]' : ' [CLOSED]';
   }
   return '';
+}
+
+function truncateTitle(title: string): string {
+  return title.length > 256 ? title.substring(0, 255) + '…' : title;
 }
 
 function capitalize(str: string): string {
