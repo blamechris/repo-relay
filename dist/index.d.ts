@@ -30,6 +30,7 @@ export type GitHubEventPayload = {
     event: 'release';
     payload: ReleaseEventPayload;
 };
+export declare const REPO_NAME_PATTERN: RegExp;
 export declare class RepoRelay {
     private client;
     private db;

@@ -5,7 +5,13 @@
  * This is scaffolding for Phase 5.
  */
 import { EmbedBuilder, Colors, } from 'discord.js';
+import { safeErrorMessage } from '../utils/errors.js';
+import { REPO_NAME_PATTERN } from '../index.js';
 export async function handleStatusCommand(interaction, githubToken, repo) {
+    if (!REPO_NAME_PATTERN.test(repo)) {
+        await interaction.reply('Invalid repository format');
+        return;
+    }
     await interaction.deferReply();
     try {
         // Fetch open PRs, open issues, and latest release in parallel
@@ -105,7 +111,7 @@ export async function handleStatusCommand(interaction, githubToken, repo) {
         await interaction.editReply({ embeds: [embed] });
     }
     catch (error) {
-        console.error('[repo-relay] Error fetching status:', error);
+        console.error('[repo-relay] Error fetching status:', safeErrorMessage(error));
         await interaction.editReply('Failed to fetch project status');
     }
 }
