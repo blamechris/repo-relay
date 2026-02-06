@@ -5,6 +5,7 @@
  * Run this once when setting up the bot or when commands change.
  */
 import { REST, Routes, SlashCommandBuilder } from 'discord.js';
+import { safeErrorMessage } from '../utils/errors.js';
 export const commands = [
     new SlashCommandBuilder()
         .setName('pr')
@@ -64,7 +65,7 @@ if (process.argv[1]?.endsWith('register.ts') || process.argv[1]?.endsWith('regis
         process.exit(0);
     })
         .catch((error) => {
-        console.error('[repo-relay] Command registration failed:', error);
+        console.error('[repo-relay] Command registration failed:', safeErrorMessage(error));
         process.exit(1);
     });
 }

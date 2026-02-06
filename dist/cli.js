@@ -6,6 +6,7 @@
  */
 import { readFileSync } from 'fs';
 import { RepoRelay } from './index.js';
+import { safeErrorMessage } from './utils/errors.js';
 import { getChannelConfig } from './config/channels.js';
 async function main() {
     console.log('[repo-relay] Starting...');
@@ -31,7 +32,7 @@ async function main() {
         channelConfig = getChannelConfig();
     }
     catch (error) {
-        console.error(`[repo-relay] ERROR: ${error.message}`);
+        console.error(`[repo-relay] ERROR: ${safeErrorMessage(error)}`);
         process.exit(1);
     }
     // Read event payload
@@ -41,7 +42,7 @@ async function main() {
         payload = JSON.parse(eventData);
     }
     catch (error) {
-        console.error(`[repo-relay] ERROR: Failed to read event payload: ${error.message}`);
+        console.error(`[repo-relay] ERROR: Failed to read event payload: ${safeErrorMessage(error)}`);
         process.exit(1);
     }
     // Map GitHub event name to our event type
@@ -69,7 +70,7 @@ async function main() {
         console.log('[repo-relay] Event processed successfully');
     }
     catch (error) {
-        console.error(`[repo-relay] ERROR: ${error.message}`);
+        console.error(`[repo-relay] ERROR: ${safeErrorMessage(error)}`);
         process.exit(1);
     }
     finally {
@@ -95,7 +96,7 @@ function mapGitHubEvent(eventName, payload) {
     }
 }
 main().catch((error) => {
-    console.error('[repo-relay] Unhandled error:', error);
+    console.error('[repo-relay] Unhandled error:', safeErrorMessage(error));
     process.exit(1);
 });
 //# sourceMappingURL=cli.js.map

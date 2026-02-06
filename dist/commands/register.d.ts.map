@@ -1,1 +1,1 @@
-{"version":3,"file":"register.d.ts","sourceRoot":"","sources":["../../src/commands/register.ts"],"names":[],"mappings":"AAAA;;;;;GAKG;AAIH,eAAO,MAAM,QAAQ,mHAkCpB,CAAC;AAEF,wBAAsB,gBAAgB,CACpC,KAAK,EAAE,MAAM,EACb,QAAQ,EAAE,MAAM,EAChB,OAAO,CAAC,EAAE,MAAM,GACf,OAAO,CAAC,IAAI,CAAC,CAoBf"}
+{"version":3,"file":"register.d.ts","sourceRoot":"","sources":["../../src/commands/register.ts"],"names":[],"mappings":"AAAA;;;;;GAKG;AAKH,eAAO,MAAM,QAAQ,mHAkCpB,CAAC;AAEF,wBAAsB,gBAAgB,CACpC,KAAK,EAAE,MAAM,EACb,QAAQ,EAAE,MAAM,EAChB,OAAO,CAAC,EAAE,MAAM,GACf,OAAO,CAAC,IAAI,CAAC,CAoBf"}

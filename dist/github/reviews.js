@@ -5,12 +5,17 @@
  * since GitHub Apps using GITHUB_TOKEN don't trigger workflows.
  */
 import { AGENT_REVIEW_PATTERNS, APPROVED_PATTERNS, CHANGES_REQUESTED_PATTERNS, } from '../patterns/agent-review.js';
+import { safeErrorMessage } from '../utils/errors.js';
 /**
  * Check GitHub API for Copilot reviews and agent-review comments
  * Returns whether any status changed (for deciding whether to update embed)
  */
 export async function checkForReviews(db, repo, prNumber, githubToken) {
-    const [owner, repoName] = repo.split('/');
+    const parts = repo.split('/');
+    if (parts.length !== 2 || !parts[0] || !parts[1]) {
+        throw new Error(`Invalid repo format: expected "owner/name", got "${repo}"`);
+    }
+    const [owner, repoName] = parts;
     const headers = {
         'Authorization': `Bearer ${githubToken}`,
         'Accept': 'application/vnd.github+json',
@@ -41,7 +46,7 @@ export async function checkForReviews(db, repo, prNumber, githubToken) {
         }
     }
     catch (error) {
-        console.log(`[repo-relay] Warning: Failed to check Copilot reviews: ${error}`);
+        console.log(`[repo-relay] Warning: Failed to check Copilot reviews: ${safeErrorMessage(error)}`);
     }
     // Check for agent-review comments
     try {
@@ -72,7 +77,7 @@ export async function checkForReviews(db, repo, prNumber, githubToken) {
         }
     }
     catch (error) {
-        console.log(`[repo-relay] Warning: Failed to check agent-review comments: ${error}`);
+        console.log(`[repo-relay] Warning: Failed to check agent-review comments: ${safeErrorMessage(error)}`);
     }
     result.changed = changed;
     return result;

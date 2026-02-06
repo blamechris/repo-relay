@@ -5,6 +5,7 @@
  */
 import { type ChannelConfig } from './config/channels.js';
 import { type PrEventPayload, type WorkflowRunPayload, type PrReviewPayload, type IssueCommentPayload, type IssueEventPayload, type ReleaseEventPayload } from './handlers/index.js';
+import { REPO_NAME_PATTERN } from './utils/validation.js';
 export interface RepoRelayConfig {
     discordToken: string;
     githubToken?: string;
@@ -30,6 +31,7 @@ export type GitHubEventPayload = {
     event: 'release';
     payload: ReleaseEventPayload;
 };
+export { REPO_NAME_PATTERN };
 export declare class RepoRelay {
     private client;
     private db;
