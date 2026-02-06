@@ -38,6 +38,20 @@ export declare function buildCiReply(ci: CiStatus): string;
 export declare function buildReviewReply(type: 'copilot' | 'agent', status: string, comments?: number, url?: string): string;
 export declare function buildMergedReply(mergedBy?: string): string;
 export declare function buildClosedReply(closedBy?: string): string;
-export declare function buildIssueEmbed(number: number, title: string, url: string, author: string, authorAvatar: string | undefined, state: 'open' | 'closed', labels: string[], body?: string): EmbedBuilder;
+export interface IssueData {
+    number: number;
+    title: string;
+    url: string;
+    author: string;
+    authorAvatar?: string;
+    state: 'open' | 'closed';
+    stateReason?: string | null;
+    labels: string[];
+    body?: string;
+    createdAt: string;
+}
+export declare function buildIssueEmbed(issue: IssueData): EmbedBuilder;
+export declare function buildIssueClosedReply(closedBy?: string, stateReason?: string | null): string;
+export declare function buildIssueReopenedReply(reopenedBy?: string): string;
 export declare function buildReleaseEmbed(name: string, tagName: string, url: string, author: string, authorAvatar: string | undefined, body?: string, prerelease?: boolean): EmbedBuilder;
 //# sourceMappingURL=builders.d.ts.map

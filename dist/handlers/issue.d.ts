@@ -1,8 +1,9 @@
 /**
- * Issue event handler
+ * Issue event handler with threaded embed lifecycle
  */
-import { Client } from 'discord.js';
-import { StateDb } from '../db/state.js';
+import { Client, TextChannel, ThreadChannel } from 'discord.js';
+import { StateDb, IssueMessage } from '../db/state.js';
+import { IssueData } from '../embeds/builders.js';
 import { ChannelConfig } from '../config/channels.js';
 export interface IssueEventPayload {
     action: 'opened' | 'closed' | 'reopened' | 'labeled' | 'unlabeled' | 'edited';
@@ -15,6 +16,7 @@ export interface IssueEventPayload {
             avatar_url: string;
         };
         state: 'open' | 'closed';
+        state_reason?: 'completed' | 'not_planned' | 'reopened' | null;
         labels: Array<{
             name: string;
         }>;
@@ -24,6 +26,13 @@ export interface IssueEventPayload {
     repository: {
         full_name: string;
     };
+    sender: {
+        login: string;
+    };
+    label?: {
+        name: string;
+    };
 }
 export declare function handleIssueEvent(client: Client, db: StateDb, channelConfig: ChannelConfig, payload: IssueEventPayload): Promise<void>;
+export declare function getOrCreateIssueThread(channel: TextChannel, db: StateDb, repo: string, issue: IssueData, existing: IssueMessage): Promise<ThreadChannel>;
 //# sourceMappingURL=issue.d.ts.map

@@ -5,6 +5,6 @@ export { handlePrEvent, type PrEventPayload } from './pr.js';
 export { handleCiEvent, type WorkflowRunPayload } from './ci.js';
 export { handleReviewEvent, type PrReviewPayload } from './review.js';
 export { handleCommentEvent, type IssueCommentPayload } from './comment.js';
-export { handleIssueEvent, type IssueEventPayload } from './issue.js';
+export { handleIssueEvent, getOrCreateIssueThread, type IssueEventPayload } from './issue.js';
 export { handleReleaseEvent, type ReleaseEventPayload } from './release.js';
 //# sourceMappingURL=index.d.ts.map

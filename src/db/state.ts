@@ -1,5 +1,5 @@
 /**
- * SQLite state management for PR ↔ Discord message mappings
+ * SQLite state management for PR/Issue ↔ Discord message mappings
  */
 
 import Database from 'better-sqlite3';
@@ -44,6 +44,30 @@ export interface PrStatus {
   ciStatus: 'pending' | 'running' | 'success' | 'failure' | 'cancelled';
   ciWorkflowName: string | null;
   ciUrl: string | null;
+}
+
+export interface IssueMessage {
+  repo: string;
+  issueNumber: number;
+  channelId: string;
+  messageId: string;
+  threadId: string | null;
+  createdAt: string;
+  lastUpdated: string;
+}
+
+export interface StoredIssueData {
+  repo: string;
+  issueNumber: number;
+  title: string;
+  url: string;
+  author: string;
+  authorAvatar: string | null;
+  state: string;
+  stateReason: string | null;
+  labels: string;
+  body: string | null;
+  issueCreatedAt: string;
 }
 
 export interface EventLogEntry {
@@ -130,6 +154,32 @@ export class StateDb {
         draft INTEGER DEFAULT 0,
         pr_created_at TEXT NOT NULL,
         PRIMARY KEY (repo, pr_number)
+      );
+
+      CREATE TABLE IF NOT EXISTS issue_messages (
+        repo TEXT NOT NULL,
+        issue_number INTEGER NOT NULL,
+        channel_id TEXT NOT NULL,
+        message_id TEXT NOT NULL,
+        thread_id TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (repo, issue_number)
+      );
+
+      CREATE TABLE IF NOT EXISTS issue_data (
+        repo TEXT NOT NULL,
+        issue_number INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        url TEXT NOT NULL,
+        author TEXT NOT NULL,
+        author_avatar TEXT,
+        state TEXT DEFAULT 'open',
+        state_reason TEXT,
+        labels TEXT DEFAULT '[]',
+        body TEXT,
+        issue_created_at TEXT NOT NULL,
+        PRIMARY KEY (repo, issue_number)
       );
 
       CREATE TABLE IF NOT EXISTS event_log (
@@ -340,6 +390,94 @@ export class StateDb {
       data.authorUrl, data.authorAvatar, data.branch, data.baseBranch,
       data.additions, data.deletions, data.changedFiles, data.state,
       data.draft ? 1 : 0, data.prCreatedAt
+    );
+  }
+
+  getIssueMessage(repo: string, issueNumber: number): IssueMessage | null {
+    const stmt = this.db.prepare(`
+      SELECT repo, issue_number as issueNumber, channel_id as channelId,
+             message_id as messageId, thread_id as threadId,
+             created_at as createdAt, last_updated as lastUpdated
+      FROM issue_messages
+      WHERE repo = ? AND issue_number = ?
+    `);
+    return (stmt.get(repo, issueNumber) as IssueMessage) ?? null;
+  }
+
+  saveIssueMessage(
+    repo: string,
+    issueNumber: number,
+    channelId: string,
+    messageId: string,
+    threadId?: string
+  ): void {
+    const stmt = this.db.prepare(`
+      INSERT INTO issue_messages (repo, issue_number, channel_id, message_id, thread_id)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(repo, issue_number) DO UPDATE SET
+        message_id = excluded.message_id,
+        channel_id = excluded.channel_id,
+        thread_id = excluded.thread_id,
+        last_updated = CURRENT_TIMESTAMP
+    `);
+    stmt.run(repo, issueNumber, channelId, messageId, threadId ?? null);
+  }
+
+  updateIssueThread(repo: string, issueNumber: number, threadId: string): void {
+    const stmt = this.db.prepare(`
+      UPDATE issue_messages
+      SET thread_id = ?, last_updated = CURRENT_TIMESTAMP
+      WHERE repo = ? AND issue_number = ?
+    `);
+    stmt.run(threadId, repo, issueNumber);
+  }
+
+  updateIssueMessageTimestamp(repo: string, issueNumber: number): void {
+    const stmt = this.db.prepare(`
+      UPDATE issue_messages
+      SET last_updated = CURRENT_TIMESTAMP
+      WHERE repo = ? AND issue_number = ?
+    `);
+    stmt.run(repo, issueNumber);
+  }
+
+  deleteIssueMessage(repo: string, issueNumber: number): void {
+    const stmt = this.db.prepare(`
+      DELETE FROM issue_messages
+      WHERE repo = ? AND issue_number = ?
+    `);
+    stmt.run(repo, issueNumber);
+  }
+
+  getIssueData(repo: string, issueNumber: number): StoredIssueData | null {
+    const stmt = this.db.prepare(`
+      SELECT repo, issue_number as issueNumber, title, url, author,
+             author_avatar as authorAvatar, state, state_reason as stateReason,
+             labels, body, issue_created_at as issueCreatedAt
+      FROM issue_data
+      WHERE repo = ? AND issue_number = ?
+    `);
+    return (stmt.get(repo, issueNumber) as StoredIssueData) ?? null;
+  }
+
+  saveIssueData(data: StoredIssueData): void {
+    const stmt = this.db.prepare(`
+      INSERT INTO issue_data (repo, issue_number, title, url, author,
+                             author_avatar, state, state_reason, labels,
+                             body, issue_created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(repo, issue_number) DO UPDATE SET
+        title = excluded.title,
+        url = excluded.url,
+        state = excluded.state,
+        state_reason = excluded.state_reason,
+        labels = excluded.labels,
+        body = excluded.body
+    `);
+    stmt.run(
+      data.repo, data.issueNumber, data.title, data.url, data.author,
+      data.authorAvatar, data.state, data.stateReason, data.labels,
+      data.body, data.issueCreatedAt
     );
   }
 
