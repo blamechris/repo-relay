@@ -10,6 +10,7 @@ import {
   EmbedBuilder,
   Colors,
 } from 'discord.js';
+import { safeErrorMessage } from '../utils/errors.js';
 
 interface GitHubPr {
   number: number;
@@ -127,7 +128,7 @@ async function handlePrShow(
 
     await interaction.editReply({ embeds: [embed] });
   } catch (error) {
-    console.error('[repo-relay] Error fetching PR:', error);
+    console.error('[repo-relay] Error fetching PR:', safeErrorMessage(error));
     await interaction.editReply('Failed to fetch PR information');
   }
 }
@@ -175,7 +176,7 @@ async function handlePrList(
 
     await interaction.editReply({ embeds: [embed] });
   } catch (error) {
-    console.error('[repo-relay] Error fetching PRs:', error);
+    console.error('[repo-relay] Error fetching PRs:', safeErrorMessage(error));
     await interaction.editReply('Failed to fetch PRs');
   }
 }

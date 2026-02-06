@@ -10,6 +10,7 @@ import {
   EmbedBuilder,
   Colors,
 } from 'discord.js';
+import { safeErrorMessage } from '../utils/errors.js';
 
 interface GitHubPr {
   number: number;
@@ -152,7 +153,7 @@ export async function handleStatusCommand(
 
     await interaction.editReply({ embeds: [embed] });
   } catch (error) {
-    console.error('[repo-relay] Error fetching status:', error);
+    console.error('[repo-relay] Error fetching status:', safeErrorMessage(error));
     await interaction.editReply('Failed to fetch project status');
   }
 }

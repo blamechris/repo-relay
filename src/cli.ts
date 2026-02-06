@@ -7,6 +7,7 @@
 
 import { readFileSync } from 'fs';
 import { RepoRelay, type GitHubEventPayload } from './index.js';
+import { safeErrorMessage } from './utils/errors.js';
 import { getChannelConfig } from './config/channels.js';
 import type { PrEventPayload } from './handlers/pr.js';
 import type { WorkflowRunPayload } from './handlers/ci.js';
@@ -42,7 +43,7 @@ async function main(): Promise<void> {
   try {
     channelConfig = getChannelConfig();
   } catch (error) {
-    console.error(`[repo-relay] ERROR: ${(error as Error).message}`);
+    console.error(`[repo-relay] ERROR: ${safeErrorMessage(error)}`);
     process.exit(1);
   }
 
@@ -52,7 +53,7 @@ async function main(): Promise<void> {
     const eventData = readFileSync(eventPath, 'utf-8');
     payload = JSON.parse(eventData);
   } catch (error) {
-    console.error(`[repo-relay] ERROR: Failed to read event payload: ${(error as Error).message}`);
+    console.error(`[repo-relay] ERROR: Failed to read event payload: ${safeErrorMessage(error)}`);
     process.exit(1);
   }
 
@@ -83,7 +84,7 @@ async function main(): Promise<void> {
     await relay.handleEvent(eventData);
     console.log('[repo-relay] Event processed successfully');
   } catch (error) {
-    console.error(`[repo-relay] ERROR: ${(error as Error).message}`);
+    console.error(`[repo-relay] ERROR: ${safeErrorMessage(error)}`);
     process.exit(1);
   } finally {
     await relay.disconnect();
@@ -119,6 +120,6 @@ function mapGitHubEvent(
 }
 
 main().catch((error) => {
-  console.error('[repo-relay] Unhandled error:', error);
+  console.error('[repo-relay] Unhandled error:', safeErrorMessage(error));
   process.exit(1);
 });

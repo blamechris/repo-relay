@@ -10,6 +10,7 @@ import {
   EmbedBuilder,
   Colors,
 } from 'discord.js';
+import { safeErrorMessage } from '../utils/errors.js';
 
 interface GitHubIssue {
   number: number;
@@ -115,7 +116,7 @@ export async function handleIssueCommand(
 
     await interaction.editReply({ embeds: [embed] });
   } catch (error) {
-    console.error('[repo-relay] Error fetching issue:', error);
+    console.error('[repo-relay] Error fetching issue:', safeErrorMessage(error));
     await interaction.editReply('Failed to fetch issue information');
   }
 }
