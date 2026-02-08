@@ -157,13 +157,7 @@ For each finding (critical, suggestion, nitpick):
 
 ```bash
 # Create issue for deferred finding
-ISSUE_URL=$(gh issue create \
-  --title "Short descriptive title from review finding" \
-  --label "from-review" \
-  --label "enhancement" \
-  --label "complexity:low" \
-  --label "testing:low" \
-  --body "$(cat <<'ISSUE_BODY'
+ISSUE_BODY=$(cat <<'ISSUE_BODY_EOF'
 ## Context
 
 Identified during agent review of PR #PRNUM.
@@ -186,8 +180,16 @@ What needs to be done and why.
 
 - [ ] Criterion 1
 - [ ] Criterion 2
-ISSUE_BODY
-)" | sed "s/PRNUM/${PR_NUM}/g")
+ISSUE_BODY_EOF
+)
+
+ISSUE_URL=$(gh issue create \
+  --title "Short descriptive title from review finding" \
+  --label "from-review" \
+  --label "enhancement" \
+  --label "complexity:low" \
+  --label "testing:low" \
+  --body "${ISSUE_BODY//PRNUM/${PR_NUM}}")
 
 echo "Created: ${ISSUE_URL}"
 ```
