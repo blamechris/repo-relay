@@ -166,7 +166,8 @@ export function buildDeploymentEmbed(state, environment, ref, sha, author, autho
     })
         .addFields({ name: 'Environment', value: environment, inline: true }, { name: 'Ref', value: `\`${ref}\``, inline: true }, { name: 'Commit', value: `\`${sha.substring(0, 7)}\``, inline: true }, { name: 'Status', value: capitalize(state), inline: true });
     if (description) {
-        embed.setDescription(description);
+        const truncated = description.length > 500 ? description.substring(0, 497) + '...' : description;
+        embed.setDescription(truncated);
     }
     if (targetUrl) {
         embed.setURL(targetUrl);

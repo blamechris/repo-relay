@@ -279,7 +279,8 @@ export function buildDeploymentEmbed(
     );
 
   if (description) {
-    embed.setDescription(description);
+    const truncated = description.length > 500 ? description.substring(0, 497) + '...' : description;
+    embed.setDescription(truncated);
   }
 
   if (targetUrl) {
