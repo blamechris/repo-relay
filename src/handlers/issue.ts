@@ -6,6 +6,7 @@ import { Client, TextChannel, ThreadChannel } from 'discord.js';
 import { StateDb, IssueMessage } from '../db/state.js';
 import { buildIssueEmbed, buildIssueClosedReply, buildIssueReopenedReply, IssueData } from '../embeds/builders.js';
 import { getChannelForEvent, ChannelConfig } from '../config/channels.js';
+import { getExistingIssueMessage } from '../discord/lookup.js';
 
 export interface IssueEventPayload {
   action: 'opened' | 'closed' | 'reopened' | 'labeled' | 'unlabeled' | 'edited';
@@ -120,7 +121,7 @@ async function handleIssueStateChange(
   issue: IssueData,
   replyText: string
 ): Promise<void> {
-  const existing = db.getIssueMessage(repo, issue.number);
+  const existing = await getExistingIssueMessage(db, channel, repo, issue.number);
 
   if (existing) {
     try {

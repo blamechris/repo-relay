@@ -7,6 +7,7 @@ import { StateDb } from '../db/state.js';
 import { buildReviewReply, buildPrEmbed } from '../embeds/builders.js';
 import { getChannelForEvent, ChannelConfig } from '../config/channels.js';
 import { buildEmbedWithStatus, getOrCreateThread } from './pr.js';
+import { getExistingPrMessage } from '../discord/lookup.js';
 
 export interface PrReviewPayload {
   action: 'submitted' | 'edited' | 'dismissed';
@@ -62,7 +63,7 @@ export async function handleReviewEvent(
 
   db.logEvent(repo, pr.number, `review.${action}`, payload);
 
-  const existing = db.getPrMessage(repo, pr.number);
+  const existing = await getExistingPrMessage(db, channel, repo, pr.number);
   if (!existing) {
     return;
   }

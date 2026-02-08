@@ -7,6 +7,7 @@ import { StateDb } from '../db/state.js';
 import { buildReviewReply, buildPrEmbed } from '../embeds/builders.js';
 import { getChannelForEvent, ChannelConfig } from '../config/channels.js';
 import { buildEmbedWithStatus, getOrCreateThread } from './pr.js';
+import { getExistingPrMessage } from '../discord/lookup.js';
 import {
   AGENT_REVIEW_PATTERNS,
   APPROVED_PATTERNS,
@@ -71,7 +72,7 @@ export async function handleCommentEvent(
 
   db.logEvent(repo, prNumber, 'review.agent', payload);
 
-  const existing = db.getPrMessage(repo, prNumber);
+  const existing = await getExistingPrMessage(db, channel, repo, prNumber);
   if (!existing) {
     return;
   }

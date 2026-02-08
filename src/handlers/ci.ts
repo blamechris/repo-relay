@@ -7,6 +7,7 @@ import { StateDb } from '../db/state.js';
 import { buildCiReply, CiStatus, buildPrEmbed, PrData } from '../embeds/builders.js';
 import { getChannelForEvent, ChannelConfig } from '../config/channels.js';
 import { buildEmbedWithStatus, getOrCreateThread } from './pr.js';
+import { getExistingPrMessage } from '../discord/lookup.js';
 
 export interface WorkflowRunPayload {
   action: 'completed' | 'requested' | 'in_progress';
@@ -54,7 +55,7 @@ export async function handleCiEvent(
     console.log(`[repo-relay] Processing CI for PR #${pr.number}`);
     db.logEvent(repo, pr.number, `ci.${payload.action}`, payload);
 
-    const existing = db.getPrMessage(repo, pr.number);
+    const existing = await getExistingPrMessage(db, channel, repo, pr.number);
     if (!existing) {
       console.log(`[repo-relay] No message found for PR #${pr.number}, skipping`);
       continue;

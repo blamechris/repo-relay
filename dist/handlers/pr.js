@@ -4,6 +4,7 @@
 import { TextChannel } from 'discord.js';
 import { buildPrEmbed, buildMergedReply, buildClosedReply, buildPushReply } from '../embeds/builders.js';
 import { getChannelForEvent } from '../config/channels.js';
+import { getExistingPrMessage } from '../discord/lookup.js';
 export async function handlePrEvent(client, db, channelConfig, payload) {
     const { action, pull_request: pr, repository } = payload;
     const repo = repository.full_name;
@@ -67,7 +68,7 @@ async function handlePrOpened(channel, db, repo, pr) {
     await thread.send(`📋 Updates for PR #${pr.number} will appear here.`);
 }
 async function handlePrClosed(channel, db, repo, pr) {
-    let existing = db.getPrMessage(repo, pr.number);
+    let existing = await getExistingPrMessage(db, channel, repo, pr.number);
     if (existing) {
         try {
             // Update the original embed with full status
@@ -115,7 +116,7 @@ async function handlePrClosed(channel, db, repo, pr) {
     }
 }
 async function handlePrPush(channel, db, repo, pr, payload) {
-    let existing = db.getPrMessage(repo, pr.number);
+    let existing = await getExistingPrMessage(db, channel, repo, pr.number);
     // Check if existing message is stale (deleted from Discord)
     if (existing) {
         try {
@@ -161,7 +162,7 @@ async function handlePrPush(channel, db, repo, pr, payload) {
     db.updatePrMessageTimestamp(repo, pr.number);
 }
 async function handlePrUpdated(channel, db, repo, pr) {
-    let existing = db.getPrMessage(repo, pr.number);
+    let existing = await getExistingPrMessage(db, channel, repo, pr.number);
     if (existing) {
         try {
             const message = await channel.messages.fetch(existing.messageId);

@@ -4,6 +4,7 @@
 import { TextChannel } from 'discord.js';
 import { buildIssueEmbed, buildIssueClosedReply, buildIssueReopenedReply } from '../embeds/builders.js';
 import { getChannelForEvent } from '../config/channels.js';
+import { getExistingIssueMessage } from '../discord/lookup.js';
 export async function handleIssueEvent(client, db, channelConfig, payload) {
     const { action, issue, repository } = payload;
     const repo = repository.full_name;
@@ -54,7 +55,7 @@ async function handleIssueOpened(channel, db, repo, issue) {
     await thread.send(`📋 Updates for Issue #${issue.number} will appear here.`);
 }
 async function handleIssueStateChange(channel, db, repo, issue, replyText) {
-    const existing = db.getIssueMessage(repo, issue.number);
+    const existing = await getExistingIssueMessage(db, channel, repo, issue.number);
     if (existing) {
         try {
             const message = await channel.messages.fetch(existing.messageId);

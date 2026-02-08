@@ -13,6 +13,7 @@ import { buildEmbedWithStatus } from './handlers/pr.js';
 import { buildPrEmbed, buildReviewReply } from './embeds/builders.js';
 import { TextChannel } from 'discord.js';
 import { getChannelForEvent } from './config/channels.js';
+import { getExistingPrMessage } from './discord/lookup.js';
 export { REPO_NAME_PATTERN };
 const REQUIRED_PERMISSIONS = [
     { flag: PermissionsBitField.Flags.SendMessages, name: 'Send Messages' },
@@ -153,13 +154,13 @@ export class RepoRelay {
         const result = await checkForReviews(this.db, repo, prNumber, this.config.githubToken);
         // If status changed, update the embed
         if (result.changed) {
-            const existing = this.db.getPrMessage(repo, prNumber);
-            if (!existing)
-                return;
             try {
                 const channelId = getChannelForEvent(this.config.channelConfig, 'pr');
                 const channel = await this.client.channels.fetch(channelId);
                 if (!channel || !(channel instanceof TextChannel))
+                    return;
+                const existing = await getExistingPrMessage(this.db, channel, repo, prNumber);
+                if (!existing)
                     return;
                 const message = await channel.messages.fetch(existing.messageId);
                 const statusData = buildEmbedWithStatus(this.db, repo, prNumber);

@@ -5,6 +5,7 @@ import { TextChannel } from 'discord.js';
 import { buildReviewReply, buildPrEmbed } from '../embeds/builders.js';
 import { getChannelForEvent } from '../config/channels.js';
 import { buildEmbedWithStatus, getOrCreateThread } from './pr.js';
+import { getExistingPrMessage } from '../discord/lookup.js';
 export async function handleReviewEvent(client, db, channelConfig, payload) {
     const { action, review, pull_request: pr, repository } = payload;
     const repo = repository.full_name;
@@ -25,7 +26,7 @@ export async function handleReviewEvent(client, db, channelConfig, payload) {
         throw new Error(`Channel ${channelId} not found or not a text channel`);
     }
     db.logEvent(repo, pr.number, `review.${action}`, payload);
-    const existing = db.getPrMessage(repo, pr.number);
+    const existing = await getExistingPrMessage(db, channel, repo, pr.number);
     if (!existing) {
         return;
     }
