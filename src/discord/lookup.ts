@@ -10,10 +10,11 @@ const PR_TITLE_PATTERN = /PR #(\d+):/;
 const ISSUE_TITLE_PATTERN = /Issue #(\d+):/;
 
 /**
- * Search the last 100 messages in a channel for a PR embed matching the given number.
+ * Search the last 100 messages in a channel for a PR embed matching the given number and repo.
  */
 async function findPrMessageInChannel(
   channel: TextChannel,
+  repo: string,
   prNumber: number
 ): Promise<{ messageId: string; threadId: string | null } | null> {
   const messages = await channel.messages.fetch({ limit: 100 });
@@ -24,6 +25,8 @@ async function findPrMessageInChannel(
 
     const match = embed.title.match(PR_TITLE_PATTERN);
     if (match && parseInt(match[1], 10) === prNumber) {
+      // Verify the embed belongs to this repo via its URL
+      if (embed.url && !embed.url.includes(`github.com/${repo}/`)) continue;
       return {
         messageId: message.id,
         threadId: message.thread?.id ?? null,
@@ -35,10 +38,11 @@ async function findPrMessageInChannel(
 }
 
 /**
- * Search the last 100 messages in a channel for an issue embed matching the given number.
+ * Search the last 100 messages in a channel for an issue embed matching the given number and repo.
  */
 async function findIssueMessageInChannel(
   channel: TextChannel,
+  repo: string,
   issueNumber: number
 ): Promise<{ messageId: string; threadId: string | null } | null> {
   const messages = await channel.messages.fetch({ limit: 100 });
@@ -49,6 +53,8 @@ async function findIssueMessageInChannel(
 
     const match = embed.title.match(ISSUE_TITLE_PATTERN);
     if (match && parseInt(match[1], 10) === issueNumber) {
+      // Verify the embed belongs to this repo via its URL
+      if (embed.url && !embed.url.includes(`github.com/${repo}/`)) continue;
       return {
         messageId: message.id,
         threadId: message.thread?.id ?? null,
@@ -74,23 +80,15 @@ export async function getExistingPrMessage(
   if (cached) return cached;
 
   // Slow path: search Discord channel
-  const found = await findPrMessageInChannel(channel, prNumber);
+  const found = await findPrMessageInChannel(channel, repo, prNumber);
   if (!found) return null;
 
-  // Cache back to DB
+  // Cache back to DB and return the saved row
   db.savePrMessage(repo, prNumber, channel.id, found.messageId, found.threadId ?? undefined);
   db.savePrStatus(repo, prNumber);
   console.log(`[repo-relay] Recovered message for PR #${prNumber} from Discord channel`);
 
-  return {
-    repo,
-    prNumber,
-    channelId: channel.id,
-    messageId: found.messageId,
-    threadId: found.threadId,
-    createdAt: '',
-    lastUpdated: '',
-  };
+  return db.getPrMessage(repo, prNumber);
 }
 
 /**
@@ -108,20 +106,12 @@ export async function getExistingIssueMessage(
   if (cached) return cached;
 
   // Slow path: search Discord channel
-  const found = await findIssueMessageInChannel(channel, issueNumber);
+  const found = await findIssueMessageInChannel(channel, repo, issueNumber);
   if (!found) return null;
 
-  // Cache back to DB
+  // Cache back to DB and return the saved row
   db.saveIssueMessage(repo, issueNumber, channel.id, found.messageId, found.threadId ?? undefined);
   console.log(`[repo-relay] Recovered message for Issue #${issueNumber} from Discord channel`);
 
-  return {
-    repo,
-    issueNumber,
-    channelId: channel.id,
-    messageId: found.messageId,
-    threadId: found.threadId,
-    createdAt: '',
-    lastUpdated: '',
-  };
+  return db.getIssueMessage(repo, issueNumber);
 }
