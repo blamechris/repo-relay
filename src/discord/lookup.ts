@@ -6,8 +6,8 @@
 import { TextChannel } from 'discord.js';
 import { StateDb, PrMessage, IssueMessage } from '../db/state.js';
 
-const PR_TITLE_PATTERN = /^PR #(\d+):/;
-const ISSUE_TITLE_PATTERN = /^Issue #(\d+):/;
+const PR_TITLE_PATTERN = /PR #(\d+):/;
+const ISSUE_TITLE_PATTERN = /Issue #(\d+):/;
 
 /**
  * Search the last 100 messages in a channel for a PR embed matching the given number.

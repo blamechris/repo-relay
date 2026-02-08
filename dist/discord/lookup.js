@@ -2,8 +2,8 @@
  * Discord channel search fallback for recovering message/thread mappings
  * when SQLite state is lost (e.g., on ephemeral GitHub-hosted runners).
  */
-const PR_TITLE_PATTERN = /^PR #(\d+):/;
-const ISSUE_TITLE_PATTERN = /^Issue #(\d+):/;
+const PR_TITLE_PATTERN = /PR #(\d+):/;
+const ISSUE_TITLE_PATTERN = /Issue #(\d+):/;
 /**
  * Search the last 100 messages in a channel for a PR embed matching the given number.
  */
