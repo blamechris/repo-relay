@@ -4,7 +4,7 @@
  * Entry point for the bot library.
  */
 import { type ChannelConfig } from './config/channels.js';
-import { type PrEventPayload, type WorkflowRunPayload, type PrReviewPayload, type IssueCommentPayload, type IssueEventPayload, type ReleaseEventPayload } from './handlers/index.js';
+import { type PrEventPayload, type WorkflowRunPayload, type PrReviewPayload, type IssueCommentPayload, type IssueEventPayload, type ReleaseEventPayload, type DeploymentStatusPayload } from './handlers/index.js';
 import { REPO_NAME_PATTERN } from './utils/validation.js';
 export interface RepoRelayConfig {
     discordToken: string;
@@ -30,6 +30,9 @@ export type GitHubEventPayload = {
 } | {
     event: 'release';
     payload: ReleaseEventPayload;
+} | {
+    event: 'deployment_status';
+    payload: DeploymentStatusPayload;
 };
 export { REPO_NAME_PATTERN };
 export declare class RepoRelay {
