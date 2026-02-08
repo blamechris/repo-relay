@@ -155,7 +155,44 @@ For each finding (critical, suggestion, nitpick):
 - All issues MUST have `complexity:` and `testing:` labels
 - Post follow-up comment linking all created issues
 
-See the full issue creation workflow in `.claude/skills/agent-review/skill.md` sections 5-8.
+```bash
+# Create issue for deferred finding
+ISSUE_URL=$(gh issue create \
+  --title "Short descriptive title from review finding" \
+  --label "from-review" \
+  --label "enhancement" \
+  --label "complexity:low" \
+  --label "testing:low" \
+  --body "$(cat <<EOF
+## Context
+
+Identified during agent review of PR #${PR_NUM}.
+
+## Finding
+
+**Severity:** Critical / Suggestion / Nitpick
+**File:** \`path/to/file.ts\`
+**Line:** XX
+
+## Description
+
+What needs to be done and why.
+
+## Original Review Comment
+
+> Quote the finding here
+
+## Acceptance Criteria
+
+- [ ] Criterion 1
+- [ ] Criterion 2
+EOF
+)")
+
+echo "Created: ${ISSUE_URL}"
+```
+
+See `.claude/skills/agent-review/skill.md` sections 5-8 for the full issue creation workflow.
 
 ### 6. Report to User
 
