@@ -36,15 +36,40 @@ gh api repos/${REPO}/pulls/${PR_NUM}/comments
 gh api repos/${REPO}/pulls/${PR_NUM}/reviews
 ```
 
-### 2. Process EVERY Comment
+### 2. Skip Already-Replied Comments
 
-For each review comment (Copilot or human), you MUST:
+Before processing, filter out comments that already have a reply from this bot/agent. This ensures re-running `/check-pr` on the same PR is idempotent and doesn't double-reply.
+
+```bash
+# Determine the current authenticated user (this bot/agent)
+BOT_LOGIN=$(gh api user --jq .login)
+
+# Fetch all replies from this user and build a set of already-addressed comment IDs
+REPLIES=$(gh api repos/${REPO}/pulls/${PR_NUM}/comments --paginate \
+  --jq "[.[] | select(.in_reply_to_id and .user.login==\"${BOT_LOGIN}\") | .in_reply_to_id]")
+
+# When building worklist, only consider TOP-LEVEL comments (in_reply_to_id == null)
+# For each top-level comment, skip if its ID appears in the REPLIES list
+# Only process comments where in_reply_to_id is null AND COMMENT_ID is NOT in REPLIES
+```
+
+### 3. Process EVERY Unaddressed Comment
+
+For each review comment (Copilot or human) not already replied to, you MUST:
 
 1. Read the comment carefully
 2. Evaluate if it's actionable
 3. Take action AND post a reply
 
-**Default stance: FIX IT NOW** - Only defer if truly a false positive.
+**ONLY THREE valid outcomes per comment — no exceptions:**
+
+| Outcome | Requirements | No comment may be... |
+|---------|-------------|---------------------|
+| **FIX** | Commit hash + before/after code diff — both mandatory | ...acknowledged without a fix |
+| **FALSE POSITIVE** | Evidence required (docs, code refs, reasoning) | ...dismissed without evidence |
+| **FOLLOW-UP ISSUE** | `gh issue create` — issue URL mandatory | ...deferred without a tracked issue |
+
+There is NO "acknowledge and move on" option. Every comment results in a commit, evidence, or an issue.
 
 #### If Valid Issue → FIX IMMEDIATELY
 
@@ -84,23 +109,6 @@ gh api repos/${REPO}/pulls/${PR_NUM}/comments/${COMMENT_ID}/replies \
 - Link to similar code in codebase"
 ```
 
-#### If Intentional Design → DOCUMENT
-
-Reply inline with rationale:
-
-```bash
-gh api repos/${REPO}/pulls/${PR_NUM}/comments/${COMMENT_ID}/replies \
-  --method POST \
-  -f body="**Intentional design decision**
-
-**Rationale:** Why this approach was chosen
-
-**Trade-offs considered:**
-- Alternative A: why not
-- Alternative B: why not
-- Current approach: why yes"
-```
-
 #### If Valid But Out of Scope → CREATE FOLLOW-UP ISSUE
 
 When a suggestion is valid but would expand scope, create a tracked issue:
@@ -111,8 +119,8 @@ ISSUE_URL=$(gh issue create \
   --title "Short descriptive title" \
   --label "enhancement" \
   --label "from-review" \
-  --label "complexity: low" \
-  --label "testing: low" \
+  --label "complexity:low" \
+  --label "testing:low" \
   --body "$(cat <<'EOF'
 ## Context
 
@@ -146,8 +154,8 @@ Valid suggestion. Created ${ISSUE_URL} to track this work.
 **Required labels for follow-up issues:**
 - `from-review` - Always add this to identify issues from PR reviews
 - Type label: `enhancement`, `bug`, `test`, `docs`, etc.
-- `complexity: [low|medium|high]` - **REQUIRED** (see guidelines below)
-- `testing: [low|medium|high]` - **REQUIRED** (see guidelines below)
+- `complexity:[low|medium|high]` - **REQUIRED** (see guidelines below)
+- `testing:[low|medium|high]` - **REQUIRED** (see guidelines below)
 - Optional: `tech-debt`, `low-priority`, `good-first-issue`
 
 **Label Guidelines:**
@@ -164,13 +172,13 @@ Valid suggestion. Created ${ISSUE_URL} to track this work.
 | `medium` | Requires Discord bot setup, moderate verification |
 | `high` | Full GitHub Actions integration testing needed |
 
-### 3. Push All Fixes
+### 4. Push All Fixes
 
 ```bash
 git push
 ```
 
-### 4. Post Summary Comment
+### 5. Post Summary Comment
 
 After addressing all comments, post a summary on the PR using heredoc:
 
@@ -181,19 +189,18 @@ gh pr comment ${PR_NUM} --body "$(cat <<'EOF'
 | Comment | Action | Commit/Issue |
 |---------|--------|--------------|
 | Comment 1 summary | Fixed | `abc123` |
-| Comment 2 summary | False positive | N/A |
+| Comment 2 summary | False positive | Evidence provided |
 | Comment 3 summary | Follow-up | #456 |
 
 **Total:** X comments addressed
 - Fixed: Y
 - False positives: Z
-- Design decisions: W
-- Follow-up issues: V
+- Follow-up issues: W
 EOF
 )"
 ```
 
-### 5. Report to User
+### 6. Report to User
 
 Output:
 - Total comments processed

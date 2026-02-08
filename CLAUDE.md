@@ -33,6 +33,20 @@ gh issue list
 
 # 4. If on a feature branch, check CI status
 gh run list --limit 3
+
+# 5. Sync skill templates (check for drift)
+~/Projects/skill-templates/sync.sh repo-relay
+```
+
+### Skill Templates
+
+Reusable skill templates (check-pr, agent-review, etc.) are maintained in the private repo `blamechris/skill-templates`. When the sync script reports drift, review the generic template and customization notes, then update local skills as needed.
+
+```
+~/Projects/skill-templates/
+├── generic/           # Gold standard templates
+├── customizations/    # Per-repo adaptation notes (repo-relay.md)
+└── sync.sh           # Drift detection
 ```
 
 ## Git Workflow

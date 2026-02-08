@@ -149,14 +149,14 @@ EOF
 - Clear linkage between issue → fix → PR
 
 **REQUIRED LABELS:** All issues MUST include complexity and testing labels:
-- `complexity: low` / `complexity: medium` / `complexity: high`
-- `testing: low` / `testing: medium` / `testing: high`
+- `complexity:low` / `complexity:medium` / `complexity:high`
+- `testing:low` / `testing:medium` / `testing:high`
 
 ```bash
 # Create issue for EVERY critical finding (with required labels)
 gh issue create --title "fix(scope): [Brief description of bug]" \
-  --label "complexity: [low|medium|high]" \
-  --label "testing: [low|medium|high]" \
+  --label "complexity:[low|medium|high]" \
+  --label "testing:[low|medium|high]" \
   --body "## Critical Issue from PR #${PR_NUM} Review
 
 **File:** \`src/handlers/example.ts\`
@@ -228,8 +228,8 @@ For each suggestion:
 ```bash
 # Create issue for EVERY non-addressed suggestion (with required labels)
 gh issue create --title "refactor(scope): [suggestion title]" \
-  --label "complexity: [low|medium|high]" \
-  --label "testing: [low|medium|high]" \
+  --label "complexity:[low|medium|high]" \
+  --label "testing:[low|medium|high]" \
   --label "from-review" \
   --body "## From PR #${PR_NUM} Agent Review
 
@@ -259,8 +259,8 @@ Even minor style/formatting notes should be captured if not fixed immediately.
 # Create issue for non-addressed nitpicks (can batch multiple into one issue)
 # Nitpicks are typically low complexity and low testing
 gh issue create --title "style: Minor polish items from PR #${PR_NUM}" \
-  --label "complexity: low" \
-  --label "testing: low" \
+  --label "complexity:low" \
+  --label "testing:low" \
   --label "from-review" \
   --body "## Nitpicks from PR #${PR_NUM} Agent Review
 
@@ -441,8 +441,8 @@ gh pr comment {pr_number} --body "[review]"
 # Create GitHub issue (REQUIRED for all non-addressed items)
 # MUST include complexity and testing labels!
 gh issue create --title "type(scope): Brief description" \
-  --label "complexity: [low|medium|high]" \
-  --label "testing: [low|medium|high]" \
+  --label "complexity:[low|medium|high]" \
+  --label "testing:[low|medium|high]" \
   --label "from-review" \
   --body "From PR #{pr_number} review..."
 
