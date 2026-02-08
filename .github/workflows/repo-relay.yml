@@ -18,12 +18,15 @@ on:
 jobs:
   notify:
     runs-on: ubuntu-latest
-    # Skip bot comments to prevent recursive cascades
-    if: github.actor != 'github-actions[bot]'
+    # Skip bots (prevent cascades) and fork PRs (no secrets access)
+    if: >-
+      github.actor != 'github-actions[bot]' &&
+      (github.event_name != 'pull_request' ||
+       github.event.pull_request.head.repo.full_name == github.repository)
     steps:
       - uses: blamechris/repo-relay@v1
         with:
           discord_bot_token: ${{ secrets.DISCORD_BOT_TOKEN }}
           channel_prs: ${{ secrets.DISCORD_CHANNEL_PRS }}
-          channel_issues: ${{ secrets.DISCORD_CHANNEL_ISSUES }}
-          channel_releases: ${{ secrets.DISCORD_CHANNEL_RELEASES }}
+          channel_issues: ${{ secrets.DISCORD_CHANNEL_ISSUES || secrets.DISCORD_CHANNEL_PRS }}
+          channel_releases: ${{ secrets.DISCORD_CHANNEL_RELEASES || secrets.DISCORD_CHANNEL_PRS }}
