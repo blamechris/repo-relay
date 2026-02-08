@@ -14,12 +14,14 @@ import {
   handleCommentEvent,
   handleIssueEvent,
   handleReleaseEvent,
+  handleDeploymentEvent,
   type PrEventPayload,
   type WorkflowRunPayload,
   type PrReviewPayload,
   type IssueCommentPayload,
   type IssueEventPayload,
   type ReleaseEventPayload,
+  type DeploymentStatusPayload,
 } from './handlers/index.js';
 import { checkForReviews } from './github/reviews.js';
 import { safeErrorMessage } from './utils/errors.js';
@@ -42,7 +44,8 @@ export type GitHubEventPayload =
   | { event: 'pull_request_review'; payload: PrReviewPayload }
   | { event: 'issue_comment'; payload: IssueCommentPayload }
   | { event: 'issues'; payload: IssueEventPayload }
-  | { event: 'release'; payload: ReleaseEventPayload };
+  | { event: 'release'; payload: ReleaseEventPayload }
+  | { event: 'deployment_status'; payload: DeploymentStatusPayload };
 
 
 export { REPO_NAME_PATTERN };
@@ -80,8 +83,8 @@ export class RepoRelay {
     const requiredNames = REQUIRED_PERMISSIONS.map((p) => p.name).join(', ');
 
     // Collect unique channel IDs
-    const { prs, issues, releases } = this.config.channelConfig;
-    const channelIds = [...new Set([prs, issues, releases].filter(Boolean) as string[])];
+    const { prs, issues, releases, deployments } = this.config.channelConfig;
+    const channelIds = [...new Set([prs, issues, releases, deployments].filter(Boolean) as string[])];
 
     const errors: string[] = [];
 
@@ -235,6 +238,15 @@ export class RepoRelay {
         );
         break;
 
+      case 'deployment_status':
+        await handleDeploymentEvent(
+          this.client,
+          db,
+          this.config.channelConfig,
+          eventData.payload
+        );
+        break;
+
       default:
         console.log(`[repo-relay] Unknown event type, skipping`);
     }
@@ -308,6 +320,7 @@ export class RepoRelay {
       case 'issue_comment':
       case 'issues':
       case 'release':
+      case 'deployment_status':
         repo = eventData.payload.repository.full_name;
         break;
       default:

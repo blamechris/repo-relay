@@ -54,4 +54,5 @@ export declare function buildIssueEmbed(issue: IssueData): EmbedBuilder;
 export declare function buildIssueClosedReply(closedBy?: string, stateReason?: string | null): string;
 export declare function buildIssueReopenedReply(reopenedBy?: string): string;
 export declare function buildReleaseEmbed(name: string, tagName: string, url: string, author: string, authorAvatar: string | undefined, body?: string, prerelease?: boolean): EmbedBuilder;
+export declare function buildDeploymentEmbed(state: 'success' | 'failure' | 'error' | 'pending' | 'in_progress' | 'queued' | 'inactive', environment: string, ref: string, sha: string, author: string, authorAvatar: string | undefined, description?: string, targetUrl?: string): EmbedBuilder;
 //# sourceMappingURL=builders.d.ts.map

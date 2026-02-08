@@ -147,6 +147,32 @@ export function buildReleaseEmbed(name, tagName, url, author, authorAvatar, body
     }
     return embed;
 }
+export function buildDeploymentEmbed(state, environment, ref, sha, author, authorAvatar, description, targetUrl) {
+    const isSuccess = state === 'success';
+    const isFailure = state === 'failure' || state === 'error';
+    const emoji = isSuccess ? '🚀' : isFailure ? '❌' : '🔄';
+    const title = isSuccess
+        ? `${emoji} Deployed to ${environment}`
+        : isFailure
+            ? `${emoji} Deploy Failed: ${environment}`
+            : `${emoji} Deploying to ${environment}`;
+    const color = isSuccess ? Colors.Green : isFailure ? Colors.Red : Colors.Yellow;
+    const embed = new EmbedBuilder()
+        .setColor(color)
+        .setTitle(truncateTitle(title))
+        .setAuthor({
+        name: author,
+        iconURL: authorAvatar,
+    })
+        .addFields({ name: 'Environment', value: environment, inline: true }, { name: 'Ref', value: `\`${ref}\``, inline: true }, { name: 'Commit', value: `\`${sha.substring(0, 7)}\``, inline: true }, { name: 'Status', value: capitalize(state), inline: true });
+    if (description) {
+        embed.setDescription(description);
+    }
+    if (targetUrl) {
+        embed.setURL(targetUrl);
+    }
+    return embed;
+}
 // Helper functions
 function getPrEmoji(state, draft) {
     if (draft)

@@ -10,6 +10,7 @@ export function getChannelConfig() {
         prs,
         issues: process.env.DISCORD_CHANNEL_ISSUES,
         releases: process.env.DISCORD_CHANNEL_RELEASES,
+        deployments: process.env.DISCORD_CHANNEL_DEPLOYMENTS,
     };
 }
 export function getChannelForEvent(config, eventType) {
@@ -23,6 +24,8 @@ export function getChannelForEvent(config, eventType) {
             return config.issues ?? config.prs;
         case 'release':
             return config.releases ?? config.prs;
+        case 'deployment':
+            return config.deployments ?? config.prs;
     }
 }
 //# sourceMappingURL=channels.js.map

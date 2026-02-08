@@ -91,6 +91,8 @@ function mapGitHubEvent(eventName, payload) {
             return { event: 'issues', payload: payload };
         case 'release':
             return { event: 'release', payload: payload };
+        case 'deployment_status':
+            return { event: 'deployment_status', payload: payload };
         default:
             return null;
     }
