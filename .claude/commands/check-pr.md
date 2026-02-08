@@ -189,7 +189,7 @@ gh pr comment ${PR_NUM} --body "$(cat <<'EOF'
 | Comment | Action | Commit/Issue |
 |---------|--------|--------------|
 | Comment 1 summary | Fixed | `abc123` |
-| Comment 2 summary | False positive | N/A |
+| Comment 2 summary | False positive | Evidence provided |
 | Comment 3 summary | Follow-up | #456 |
 
 **Total:** X comments addressed

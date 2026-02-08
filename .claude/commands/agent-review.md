@@ -194,7 +194,7 @@ ISSUE_URL=$(gh issue create \
 echo "Created: ${ISSUE_URL}"
 ```
 
-See `.claude/skills/agent-review/skill.md` sections 5-8 for the full issue creation workflow. Note: the canonical label format in this repo is `complexity:low` / `testing:low` (no space after the colon), even if older documentation shows a space.
+See `.claude/skills/agent-review/skill.md` sections 5-8 for the full issue creation workflow.
 
 ### 6. Report to User
 
