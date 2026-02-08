@@ -6,6 +6,7 @@ import { Client, TextChannel, ThreadChannel, ChannelType } from 'discord.js';
 import { StateDb, StoredPrData, PrMessage } from '../db/state.js';
 import { buildPrEmbed, buildMergedReply, buildClosedReply, buildPushReply, PrData, ReviewStatus, CiStatus } from '../embeds/builders.js';
 import { getChannelForEvent, ChannelConfig } from '../config/channels.js';
+import { getExistingPrMessage } from '../discord/lookup.js';
 
 export interface PrEventPayload {
   action: 'opened' | 'closed' | 'reopened' | 'synchronize' | 'edited' | 'ready_for_review' | 'converted_to_draft';
@@ -139,7 +140,7 @@ async function handlePrClosed(
   repo: string,
   pr: PrData
 ): Promise<void> {
-  let existing = db.getPrMessage(repo, pr.number);
+  let existing = await getExistingPrMessage(db, channel, repo, pr.number);
 
   if (existing) {
     try {
@@ -198,7 +199,7 @@ async function handlePrPush(
   pr: PrData,
   payload: PrEventPayload
 ): Promise<void> {
-  let existing = db.getPrMessage(repo, pr.number);
+  let existing = await getExistingPrMessage(db, channel, repo, pr.number);
 
   // Check if existing message is stale (deleted from Discord)
   if (existing) {
@@ -261,7 +262,7 @@ async function handlePrUpdated(
   repo: string,
   pr: PrData
 ): Promise<void> {
-  let existing = db.getPrMessage(repo, pr.number);
+  let existing = await getExistingPrMessage(db, channel, repo, pr.number);
 
   if (existing) {
     try {

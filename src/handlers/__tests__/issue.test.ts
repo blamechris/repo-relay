@@ -56,11 +56,19 @@ function makeMockMessage(thread?: ReturnType<typeof makeMockThread>) {
 function makeMockChannel(message?: ReturnType<typeof makeMockMessage>, thread?: ReturnType<typeof makeMockThread>) {
   const msg = message ?? makeMockMessage(thread);
   const channel = Object.create(TextChannel.prototype);
+  // messages.fetch handles both signatures:
+  // fetch(id: string) -> single message, fetch({ limit }) -> Collection-like map
+  const messagesFetch = vi.fn((arg?: string | object) => {
+    if (typeof arg === 'string') return Promise.resolve(msg);
+    // Return empty collection for channel search (no embeds to find)
+    const emptyMap = new Map();
+    return Promise.resolve(emptyMap);
+  });
   Object.assign(channel, {
     id: 'channel-1',
     send: vi.fn(() => Promise.resolve(msg)),
     messages: {
-      fetch: vi.fn(() => Promise.resolve(msg)),
+      fetch: messagesFetch,
     },
     threads: {
       fetch: vi.fn(() => Promise.resolve(thread ?? makeMockThread())),

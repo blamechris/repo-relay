@@ -5,6 +5,7 @@ import { TextChannel } from 'discord.js';
 import { buildCiReply, buildPrEmbed } from '../embeds/builders.js';
 import { getChannelForEvent } from '../config/channels.js';
 import { buildEmbedWithStatus, getOrCreateThread } from './pr.js';
+import { getExistingPrMessage } from '../discord/lookup.js';
 export async function handleCiEvent(client, db, channelConfig, payload) {
     const { workflow_run: run, repository } = payload;
     const repo = repository.full_name;
@@ -22,7 +23,7 @@ export async function handleCiEvent(client, db, channelConfig, payload) {
     for (const pr of run.pull_requests) {
         console.log(`[repo-relay] Processing CI for PR #${pr.number}`);
         db.logEvent(repo, pr.number, `ci.${payload.action}`, payload);
-        const existing = db.getPrMessage(repo, pr.number);
+        const existing = await getExistingPrMessage(db, channel, repo, pr.number);
         if (!existing) {
             console.log(`[repo-relay] No message found for PR #${pr.number}, skipping`);
             continue;

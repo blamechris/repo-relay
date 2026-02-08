@@ -5,6 +5,7 @@ import { TextChannel } from 'discord.js';
 import { buildReviewReply, buildPrEmbed } from '../embeds/builders.js';
 import { getChannelForEvent } from '../config/channels.js';
 import { buildEmbedWithStatus, getOrCreateThread } from './pr.js';
+import { getExistingPrMessage } from '../discord/lookup.js';
 import { AGENT_REVIEW_PATTERNS, APPROVED_PATTERNS, CHANGES_REQUESTED_PATTERNS, } from '../patterns/agent-review.js';
 export async function handleCommentEvent(client, db, channelConfig, payload) {
     const { action, comment, issue, repository } = payload;
@@ -26,7 +27,7 @@ export async function handleCommentEvent(client, db, channelConfig, payload) {
         throw new Error(`Channel ${channelId} not found or not a text channel`);
     }
     db.logEvent(repo, prNumber, 'review.agent', payload);
-    const existing = db.getPrMessage(repo, prNumber);
+    const existing = await getExistingPrMessage(db, channel, repo, prNumber);
     if (!existing) {
         return;
     }
