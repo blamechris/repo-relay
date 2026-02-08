@@ -5,7 +5,7 @@
  */
 import { Client, GatewayIntentBits, PermissionsBitField } from 'discord.js';
 import { StateDb } from './db/state.js';
-import { handlePrEvent, handleCiEvent, handleReviewEvent, handleCommentEvent, handleIssueEvent, handleReleaseEvent, } from './handlers/index.js';
+import { handlePrEvent, handleCiEvent, handleReviewEvent, handleCommentEvent, handleIssueEvent, handleReleaseEvent, handleDeploymentEvent, } from './handlers/index.js';
 import { checkForReviews } from './github/reviews.js';
 import { safeErrorMessage } from './utils/errors.js';
 import { REPO_NAME_PATTERN } from './utils/validation.js';
@@ -42,8 +42,8 @@ export class RepoRelay {
     async validatePermissions() {
         const requiredNames = REQUIRED_PERMISSIONS.map((p) => p.name).join(', ');
         // Collect unique channel IDs
-        const { prs, issues, releases } = this.config.channelConfig;
-        const channelIds = [...new Set([prs, issues, releases].filter(Boolean))];
+        const { prs, issues, releases, deployments } = this.config.channelConfig;
+        const channelIds = [...new Set([prs, issues, releases, deployments].filter(Boolean))];
         const errors = [];
         for (const channelId of channelIds) {
             let channel;
@@ -135,6 +135,9 @@ export class RepoRelay {
             case 'release':
                 await handleReleaseEvent(this.client, db, this.config.channelConfig, eventData.payload);
                 break;
+            case 'deployment_status':
+                await handleDeploymentEvent(this.client, db, this.config.channelConfig, eventData.payload);
+                break;
             default:
                 console.log(`[repo-relay] Unknown event type, skipping`);
         }
@@ -199,6 +202,7 @@ export class RepoRelay {
             case 'issue_comment':
             case 'issues':
             case 'release':
+            case 'deployment_status':
                 repo = eventData.payload.repository.full_name;
                 break;
             default:

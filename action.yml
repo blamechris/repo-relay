@@ -1,5 +1,5 @@
 name: 'Repo Relay'
-description: 'GitHub-Discord integration bot that tracks PRs, CI, issues, and releases with threaded updates'
+description: 'GitHub-Discord integration bot that tracks PRs, CI, issues, releases, and deployments with threaded updates'
 author: 'Christopher Pishaki'
 
 branding:
@@ -18,6 +18,9 @@ inputs:
     required: false
   channel_releases:
     description: 'Discord channel ID for release notifications (defaults to channel_prs)'
+    required: false
+  channel_deployments:
+    description: 'Discord channel ID for deployment notifications (defaults to channel_prs)'
     required: false
   state_dir:
     description: 'Directory for SQLite state persistence (default: ~/.repo-relay)'
@@ -65,6 +68,7 @@ runs:
         DISCORD_CHANNEL_PRS: ${{ inputs.channel_prs }}
         DISCORD_CHANNEL_ISSUES: ${{ inputs.channel_issues }}
         DISCORD_CHANNEL_RELEASES: ${{ inputs.channel_releases }}
+        DISCORD_CHANNEL_DEPLOYMENTS: ${{ inputs.channel_deployments }}
         GITHUB_TOKEN: ${{ inputs.github_token || github.token }}
         STATE_DIR: ${{ inputs.state_dir }}
       run: node dist/cli.js

@@ -6,6 +6,7 @@ export interface ChannelConfig {
   prs: string;
   issues?: string;
   releases?: string;
+  deployments?: string;
 }
 
 export function getChannelConfig(): ChannelConfig {
@@ -18,12 +19,13 @@ export function getChannelConfig(): ChannelConfig {
     prs,
     issues: process.env.DISCORD_CHANNEL_ISSUES,
     releases: process.env.DISCORD_CHANNEL_RELEASES,
+    deployments: process.env.DISCORD_CHANNEL_DEPLOYMENTS,
   };
 }
 
 export function getChannelForEvent(
   config: ChannelConfig,
-  eventType: 'pr' | 'issue' | 'release' | 'ci' | 'review' | 'comment'
+  eventType: 'pr' | 'issue' | 'release' | 'ci' | 'review' | 'comment' | 'deployment'
 ): string {
   switch (eventType) {
     case 'pr':
@@ -35,5 +37,7 @@ export function getChannelForEvent(
       return config.issues ?? config.prs;
     case 'release':
       return config.releases ?? config.prs;
+    case 'deployment':
+      return config.deployments ?? config.prs;
   }
 }

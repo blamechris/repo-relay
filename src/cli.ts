@@ -15,6 +15,7 @@ import type { PrReviewPayload } from './handlers/review.js';
 import type { IssueCommentPayload } from './handlers/comment.js';
 import type { IssueEventPayload } from './handlers/issue.js';
 import type { ReleaseEventPayload } from './handlers/release.js';
+import type { DeploymentStatusPayload } from './handlers/deployment.js';
 
 async function main(): Promise<void> {
   console.log('[repo-relay] Starting...');
@@ -113,6 +114,9 @@ function mapGitHubEvent(
 
     case 'release':
       return { event: 'release', payload: payload as ReleaseEventPayload };
+
+    case 'deployment_status':
+      return { event: 'deployment_status', payload: payload as DeploymentStatusPayload };
 
     default:
       return null;
