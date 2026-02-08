@@ -1,5 +1,5 @@
 name: 'Repo Relay'
-description: 'GitHub-Discord integration bot that tracks PRs, CI, issues, and releases with threaded updates'
+description: 'GitHub-Discord integration bot that tracks PRs, CI, issues, releases, and deployments with threaded updates'
 author: 'Christopher Pishaki'
 
 branding:
