@@ -41,11 +41,16 @@ gh api repos/${REPO}/pulls/${PR_NUM}/reviews
 Before processing, filter out comments that already have a reply from this bot/agent. This ensures re-running `/check-pr` on the same PR is idempotent and doesn't double-reply.
 
 ```bash
-# Fetch all replies and build a set of already-addressed comment IDs
-REPLIES=$(gh api repos/${REPO}/pulls/${PR_NUM}/comments --jq '[.[] | select(.in_reply_to_id) | .in_reply_to_id]')
+# Determine the current authenticated user (this bot/agent)
+BOT_LOGIN=$(gh api user --jq .login)
 
-# For each comment, skip if its ID appears in the replies list
-# Only process comments where COMMENT_ID is NOT in REPLIES
+# Fetch all replies from this user and build a set of already-addressed comment IDs
+REPLIES=$(gh api repos/${REPO}/pulls/${PR_NUM}/comments --paginate \
+  --jq "[.[] | select(.in_reply_to_id and .user.login==\"${BOT_LOGIN}\") | .in_reply_to_id]")
+
+# When building worklist, only consider TOP-LEVEL comments (in_reply_to_id == null)
+# For each top-level comment, skip if its ID appears in the REPLIES list
+# Only process comments where in_reply_to_id is null AND COMMENT_ID is NOT in REPLIES
 ```
 
 ### 3. Process EVERY Unaddressed Comment

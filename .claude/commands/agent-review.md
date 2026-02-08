@@ -163,15 +163,15 @@ ISSUE_URL=$(gh issue create \
   --label "enhancement" \
   --label "complexity:low" \
   --label "testing:low" \
-  --body "$(cat <<EOF
+  --body "$(cat <<'ISSUE_BODY'
 ## Context
 
-Identified during agent review of PR #${PR_NUM}.
+Identified during agent review of PR #PRNUM.
 
 ## Finding
 
 **Severity:** Critical / Suggestion / Nitpick
-**File:** \`path/to/file.ts\`
+**File:** `path/to/file.ts`
 **Line:** XX
 
 ## Description
@@ -186,13 +186,13 @@ What needs to be done and why.
 
 - [ ] Criterion 1
 - [ ] Criterion 2
-EOF
-)")
+ISSUE_BODY
+)" | sed "s/PRNUM/${PR_NUM}/g")
 
 echo "Created: ${ISSUE_URL}"
 ```
 
-See `.claude/skills/agent-review/skill.md` sections 5-8 for the full issue creation workflow.
+See `.claude/skills/agent-review/skill.md` sections 5-8 for the full issue creation workflow. Note: the canonical label format in this repo is `complexity:low` / `testing:low` (no space after the colon), even if older documentation shows a space.
 
 ### 6. Report to User
 
