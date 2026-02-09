@@ -234,6 +234,9 @@ GitHub Apps using `GITHUB_TOKEN` don't trigger `pull_request_review` workflow ev
 
 Key file: `src/github/reviews.ts`
 
+### Scheduled Review Polling
+Optional `schedule` trigger polls all open PRs (from `pr_data` table) every 5 minutes for review updates. Catches reviews on quiet PRs where no further events fire. Enable via `reviewPolling` in setup wizard. Uses `StateDb.getOpenPrNumbers()` — zero extra API calls to find which PRs to poll.
+
 ### State Storage
 - Location: `~/.repo-relay/{repo-name}/state.db`
 - SQLite with WAL mode for concurrent access
@@ -320,18 +323,14 @@ Patterns are defined in `src/patterns/agent-review.ts` and shared by both detect
 
 ## Known Limitations
 
-### Review Detection Delay (Piggyback Approach)
+### Review Detection (Piggyback + Scheduled Polling)
 
-**Current behavior:** Reviews from Copilot and agent-review are not detected immediately. They are only discovered when the next PR event fires (push, CI completion, etc.).
+GitHub Apps using `GITHUB_TOKEN` don't trigger `pull_request_review` workflow events. Two mechanisms compensate:
 
-**Why:** GitHub Apps using `GITHUB_TOKEN` don't trigger `pull_request_review` workflow events. The bot works around this by checking the GitHub API for reviews whenever other events occur.
+1. **Piggyback detection** (fast path): On every PR/CI event, the bot checks the GitHub API for reviews. Active PRs get near-instant detection.
+2. **Scheduled polling** (optional): A `schedule` trigger polls all open PRs every 5 minutes, catching reviews on quiet PRs. Enable via `reviewPolling` in the setup wizard.
 
-**Impact:**
-- Review status in embeds may be stale until the next event
-- Thread updates for reviews are delayed
-- If no further events occur on a PR, reviews may never be reflected
-
-**Future improvement:** See [#4](https://github.com/blamechris/repo-relay/issues/4) for investigating active polling or webhook-based solutions to eliminate this delay.
+Without scheduled polling, reviews on quiet PRs may not be reflected until the next event fires. See [#4](https://github.com/blamechris/repo-relay/issues/4).
 
 ### Self-Hosted Runners Recommended
 
