@@ -11,6 +11,7 @@ export function getChannelConfig() {
         issues: process.env.DISCORD_CHANNEL_ISSUES || undefined,
         releases: process.env.DISCORD_CHANNEL_RELEASES || undefined,
         deployments: process.env.DISCORD_CHANNEL_DEPLOYMENTS || undefined,
+        security: process.env.DISCORD_CHANNEL_SECURITY || undefined,
     };
 }
 export function getChannelForEvent(config, eventType) {
@@ -27,6 +28,8 @@ export function getChannelForEvent(config, eventType) {
             return config.releases ?? config.prs;
         case 'deployment':
             return config.deployments ?? config.prs;
+        case 'security':
+            return config.security ?? config.prs;
     }
 }
 //# sourceMappingURL=channels.js.map

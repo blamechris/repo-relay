@@ -18,6 +18,7 @@ import type { IssueEventPayload } from './handlers/issue.js';
 import type { ReleaseEventPayload } from './handlers/release.js';
 import type { DeploymentStatusPayload } from './handlers/deployment.js';
 import type { PushEventPayload } from './handlers/push.js';
+import type { DependabotAlertPayload, SecretScanningAlertPayload, CodeScanningAlertPayload } from './handlers/security.js';
 
 async function main(): Promise<void> {
   console.log('[repo-relay] Starting...');
@@ -129,6 +130,15 @@ function mapGitHubEvent(
 
     case 'push':
       return { event: 'push', payload: payload as PushEventPayload };
+
+    case 'dependabot_alert':
+      return { event: 'dependabot_alert', payload: payload as DependabotAlertPayload };
+
+    case 'secret_scanning_alert':
+      return { event: 'secret_scanning_alert', payload: payload as SecretScanningAlertPayload };
+
+    case 'code_scanning_alert':
+      return { event: 'code_scanning_alert', payload: payload as CodeScanningAlertPayload };
 
     case 'schedule': {
       const repoFullName = process.env.GITHUB_REPOSITORY;

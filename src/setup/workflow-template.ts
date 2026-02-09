@@ -8,6 +8,7 @@ export interface ProjectFeatures {
   deployments: boolean;
   reviewPolling: boolean;
   pushEvents: boolean;
+  securityAlerts?: boolean;
 }
 
 export function buildWorkflowTemplate(ciWorkflowName: string, features: ProjectFeatures): string {
@@ -35,6 +36,17 @@ export function buildWorkflowTemplate(ciWorkflowName: string, features: ProjectF
     eventLines.push('  deployment_status:');
   }
 
+  if (features.securityAlerts) {
+    eventLines.push(
+      '  dependabot_alert:',
+      '    types: [created]',
+      '  secret_scanning_alert:',
+      '    types: [created]',
+      '  code_scanning_alert:',
+      '    types: [created, appeared_in_branch]',
+    );
+  }
+
   if (features.reviewPolling) {
     eventLines.push('  # Poll open PRs for review updates every 5 minutes');
     eventLines.push('  schedule:', "    - cron: '*/5 * * * *'");
@@ -57,10 +69,16 @@ export function buildWorkflowTemplate(ciWorkflowName: string, features: ProjectF
   if (features.deployments) {
     channelSecrets.push('          channel_deployments: ${{ secrets.DISCORD_CHANNEL_DEPLOYMENTS }}');
   }
+  if (features.securityAlerts) {
+    channelSecrets.push('          channel_security: ${{ secrets.DISCORD_CHANNEL_SECURITY }}');
+  }
 
   const permissionLines = ['      pull-requests: read'];
   if (features.issues) {
     permissionLines.push('      issues: read');
+  }
+  if (features.securityAlerts) {
+    permissionLines.push('      security-events: read');
   }
   permissionLines.push('      contents: read');
 

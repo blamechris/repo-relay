@@ -172,4 +172,34 @@ describe('buildWorkflowTemplate', () => {
     expect(result).not.toContain('schedule:');
     expect(result).not.toContain('cron:');
   });
+
+  it('securityAlerts enabled: includes security event triggers, channel, and permission', () => {
+    const result = buildWorkflowTemplate('CI', { issues: false, releases: false, deployments: false, reviewPolling: false, pushEvents: false, securityAlerts: true });
+
+    // Security events
+    expect(result).toContain('dependabot_alert:');
+    expect(result).toContain('secret_scanning_alert:');
+    expect(result).toContain('code_scanning_alert:');
+    expect(result).toContain('types: [created, appeared_in_branch]');
+
+    // Channel secret
+    expect(result).toContain('channel_security:');
+
+    // Permission
+    expect(result).toContain('security-events: read');
+
+    // Core events still present
+    expect(result).toContain('pull_request:');
+    expect(result).toContain('workflow_run:');
+  });
+
+  it('securityAlerts disabled: no security events in output', () => {
+    const result = buildWorkflowTemplate('CI', { issues: false, releases: false, deployments: false, reviewPolling: false, pushEvents: false });
+
+    expect(result).not.toContain('dependabot_alert:');
+    expect(result).not.toContain('secret_scanning_alert:');
+    expect(result).not.toContain('code_scanning_alert:');
+    expect(result).not.toContain('channel_security:');
+    expect(result).not.toContain('security-events:');
+  });
 });

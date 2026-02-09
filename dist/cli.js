@@ -102,6 +102,12 @@ function mapGitHubEvent(eventName, payload) {
             return { event: 'deployment_status', payload: payload };
         case 'push':
             return { event: 'push', payload: payload };
+        case 'dependabot_alert':
+            return { event: 'dependabot_alert', payload: payload };
+        case 'secret_scanning_alert':
+            return { event: 'secret_scanning_alert', payload: payload };
+        case 'code_scanning_alert':
+            return { event: 'code_scanning_alert', payload: payload };
         case 'schedule': {
             const repoFullName = process.env.GITHUB_REPOSITORY;
             if (!repoFullName) {
