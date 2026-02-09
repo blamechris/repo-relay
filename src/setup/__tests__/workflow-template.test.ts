@@ -69,7 +69,7 @@ describe('buildWorkflowTemplate', () => {
     expect(result).not.toContain('issues: read');
   });
 
-  it('mobileapp: includes issues + deployments but not releases', () => {
+  it('app: includes issues + deployments but not releases', () => {
     const result = buildWorkflowTemplate('CI', { issues: true, releases: false, deployments: true });
 
     // Has issues events
