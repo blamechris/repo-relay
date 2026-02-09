@@ -133,5 +133,8 @@ describe('buildWorkflowTemplate', () => {
     expect(result).toContain('issues: read');
     expect(result).toContain('pull-requests: read');
     expect(result).toContain('contents: read');
+
+    // If-guard comment explains filtering logic
+    expect(result).toContain('# Skip workflow_run events with no associated PR');
   });
 });
