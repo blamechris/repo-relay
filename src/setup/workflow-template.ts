@@ -19,7 +19,7 @@ export function buildWorkflowTemplate(ciWorkflowName: string, features: ProjectF
   ];
 
   if (features.pushEvents) {
-    eventLines.push('  push:', `    branches: [main]`);
+    eventLines.push('  push:', `    branches: [$default-branch]`);
   }
 
   if (features.issues) {

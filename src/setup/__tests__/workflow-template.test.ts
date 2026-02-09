@@ -153,7 +153,7 @@ describe('buildWorkflowTemplate', () => {
     const result = buildWorkflowTemplate('CI', { issues: false, releases: false, deployments: false, reviewPolling: false, pushEvents: true });
 
     expect(result).toContain('push:');
-    expect(result).toContain('branches: [main]');
+    expect(result).toContain('branches: [$default-branch]');
 
     // Core events still present
     expect(result).toContain('pull_request:');
