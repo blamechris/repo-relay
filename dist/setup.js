@@ -118,7 +118,11 @@ async function main() {
             message: 'Enable review polling? (catches Copilot reviews within ~5 min; best with self-hosted runner since ephemeral runners lose state)',
             initial: false,
         });
-        if (enablePolling) {
+        if (enablePolling === undefined) {
+            console.log('\n❌ Setup cancelled.\n');
+            process.exit(1);
+        }
+        else if (enablePolling) {
             features = { ...features, reviewPolling: true };
         }
     }

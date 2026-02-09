@@ -210,6 +210,7 @@ export class RepoRelay {
             return;
         }
         console.log(`[repo-relay] Polling ${openPrs.length} open PR(s) for review updates`);
+        const startTime = Date.now();
         for (const prNumber of openPrs) {
             try {
                 await this.checkAndUpdateReviews(repo, prNumber);
@@ -217,6 +218,12 @@ export class RepoRelay {
             catch (error) {
                 console.log(`[repo-relay] Warning: Failed to poll PR #${prNumber}: ${safeErrorMessage(error)}`);
             }
+        }
+        const elapsedMs = Date.now() - startTime;
+        const elapsedSec = (elapsedMs / 1000).toFixed(1);
+        console.log(`[repo-relay] Review polling completed: ${openPrs.length} PR(s) in ${elapsedSec}s`);
+        if (elapsedMs > 240_000) {
+            console.log(`[repo-relay] Warning: Polling took ${elapsedSec}s, approaching 5-min schedule interval`);
         }
     }
     extractRepo(eventData) {

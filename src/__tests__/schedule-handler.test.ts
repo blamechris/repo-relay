@@ -156,6 +156,22 @@ describe('schedule handler', () => {
     expect(mockCheckForReviews).not.toHaveBeenCalled();
   });
 
+  it('logs elapsed time after polling', async () => {
+    mockGetOpenPrNumbers.mockReturnValue([1]);
+    const consoleSpy = vi.spyOn(console, 'log');
+    relay = new RepoRelay(makeConfig());
+    await relay.connect();
+
+    await relay.handleEvent(makeSchedulePayload());
+
+    const completionLog = consoleSpy.mock.calls.find(
+      (args) => typeof args[0] === 'string' && args[0].includes('Review polling completed')
+    );
+    expect(completionLog).toBeDefined();
+    expect(completionLog![0]).toMatch(/1 PR\(s\) in \d+\.\d+s/);
+    consoleSpy.mockRestore();
+  });
+
   it('continues polling remaining PRs if one fails', async () => {
     mockGetOpenPrNumbers.mockReturnValue([1, 2, 3]);
     mockCheckForReviews
