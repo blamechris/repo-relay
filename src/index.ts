@@ -309,7 +309,7 @@ export class RepoRelay {
           this.client,
           db,
           this.config.channelConfig,
-          { event: eventData.event, payload: eventData.payload } as SecurityAlertPayload
+          eventData
         );
         break;
 

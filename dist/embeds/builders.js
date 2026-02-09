@@ -252,15 +252,16 @@ export function buildDependabotAlertEmbed(payload) {
 }
 export function buildSecretScanningAlertEmbed(payload) {
     const { alert } = payload;
-    const embed = new EmbedBuilder()
+    const bypassValue = alert.push_protection_bypassed === true
+        ? '⚠️ Bypassed'
+        : alert.push_protection_bypassed === false
+            ? '✅ Active'
+            : '—';
+    return new EmbedBuilder()
         .setColor(Colors.Red)
         .setTitle(truncateTitle(`🔑 Secret Detected: ${alert.secret_type_display_name}`))
         .setURL(alert.html_url)
-        .addFields({ name: 'Secret Type', value: alert.secret_type_display_name, inline: true });
-    if (alert.push_protection_bypassed) {
-        embed.addFields({ name: 'Push Protection', value: '⚠️ Bypassed', inline: true });
-    }
-    return embed;
+        .addFields({ name: 'Secret Type', value: alert.secret_type_display_name, inline: true }, { name: 'Push Protection', value: bypassValue, inline: true });
 }
 export function buildCodeScanningAlertEmbed(payload) {
     const { alert } = payload;

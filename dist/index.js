@@ -167,7 +167,7 @@ export class RepoRelay {
             case 'dependabot_alert':
             case 'secret_scanning_alert':
             case 'code_scanning_alert':
-                await handleSecurityAlertEvent(this.client, db, this.config.channelConfig, { event: eventData.event, payload: eventData.payload });
+                await handleSecurityAlertEvent(this.client, db, this.config.channelConfig, eventData);
                 break;
             case 'schedule':
                 if (!this.config.githubToken) {

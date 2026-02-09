@@ -88,13 +88,13 @@ export async function handleSecurityAlertEvent(
       break;
   }
 
-  db.logEvent(repo, alertNumber, `${alertData.event}.${alertData.payload.action}`, alertData.payload);
-
   const channelId = getChannelForEvent(channelConfig, 'security');
   const channel = await withRetry(() => client.channels.fetch(channelId));
   if (!channel || !(channel instanceof TextChannel)) {
     throw new Error(`Channel ${channelId} not found or not a text channel`);
   }
+
+  db.logEvent(repo, alertNumber, `${alertData.event}.${alertData.payload.action}`, alertData.payload);
 
   let embed;
   switch (alertData.event) {
