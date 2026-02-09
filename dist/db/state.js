@@ -45,8 +45,8 @@ export class StateDb {
             this.db = new Database(dbPath);
         }
         this.db.pragma('journal_mode = WAL');
-        this.initSchema();
         this.runMigrations();
+        this.initSchema();
     }
     runMigrations() {
         // Migration: Add thread_id column if it doesn't exist

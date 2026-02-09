@@ -119,23 +119,23 @@ export class StateDb {
     }
 
     this.db.pragma('journal_mode = WAL');
-    this.initSchema();
     this.runMigrations();
+    this.initSchema();
   }
 
   private runMigrations(): void {
     // Migration: Add thread_id column if it doesn't exist
+    // Guard: table may not exist yet on a fresh DB (initSchema runs after)
     const prColumns = this.db.prepare("PRAGMA table_info(pr_messages)").all() as Array<{ name: string }>;
-    const hasThreadId = prColumns.some(col => col.name === 'thread_id');
-    if (!hasThreadId) {
+    if (prColumns.length > 0 && !prColumns.some(col => col.name === 'thread_id')) {
       console.log('[repo-relay] Running migration: Adding thread_id column to pr_messages');
       this.db.exec("ALTER TABLE pr_messages ADD COLUMN thread_id TEXT");
     }
 
     // Migration: Rename event_log.pr_number → entity_number
+    // Must run before initSchema so the index on entity_number can be created
     const eventColumns = this.db.prepare("PRAGMA table_info(event_log)").all() as Array<{ name: string }>;
-    const hasPrNumber = eventColumns.some(col => col.name === 'pr_number');
-    if (hasPrNumber) {
+    if (eventColumns.length > 0 && eventColumns.some(col => col.name === 'pr_number')) {
       console.log('[repo-relay] Running migration: Renaming event_log.pr_number to entity_number');
       this.db.exec("ALTER TABLE event_log RENAME COLUMN pr_number TO entity_number");
       this.db.exec("DROP INDEX IF EXISTS idx_event_log_repo_pr");
