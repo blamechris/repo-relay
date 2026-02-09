@@ -5,7 +5,7 @@ import { TextChannel } from 'discord.js';
 import { buildPushEmbed, buildForcePushEmbed } from '../embeds/builders.js';
 import { getChannelForEvent } from '../config/channels.js';
 import { withRetry } from '../utils/retry.js';
-const MERGE_COMMIT_PATTERN = /^Merge pull request #\d+/;
+const PR_MERGE_COMMIT_PATTERN = /^Merge pull request #\d+/;
 export async function handlePushEvent(client, db, channelConfig, payload) {
     const { ref, forced, created, deleted, commits, compare, sender, repository } = payload;
     const repo = repository.full_name;
@@ -20,7 +20,7 @@ export async function handlePushEvent(client, db, channelConfig, payload) {
         return;
     }
     // Skip if every commit is a PR merge commit (PR handler covers these)
-    if (commits.length > 0 && commits.every(c => MERGE_COMMIT_PATTERN.test(c.message))) {
+    if (commits.length > 0 && commits.every(c => PR_MERGE_COMMIT_PATTERN.test(c.message))) {
         return;
     }
     const channelId = getChannelForEvent(channelConfig, 'push');
