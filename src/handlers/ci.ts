@@ -8,6 +8,7 @@ import { buildCiReply, CiStatus, buildPrEmbed, PrData } from '../embeds/builders
 import { getChannelForEvent, ChannelConfig } from '../config/channels.js';
 import { buildEmbedWithStatus, getOrCreateThread } from './pr.js';
 import { getExistingPrMessage } from '../discord/lookup.js';
+import { withRetry } from '../utils/retry.js';
 
 export interface WorkflowRunPayload {
   action: 'completed' | 'requested' | 'in_progress';
@@ -81,14 +82,14 @@ export async function handleCiEvent(
     if (statusData) {
       console.log(`[repo-relay] Rebuilding embed with CI: ${statusData.ci.status}`);
       const embed = buildPrEmbed(statusData.prData, statusData.ci, statusData.reviews);
-      await message.edit({ embeds: [embed] });
+      await withRetry(() => message.edit({ embeds: [embed] }));
       console.log(`[repo-relay] Embed updated successfully`);
 
       // Only post to thread for completed runs
       if (payload.action === 'completed') {
         const thread = await getOrCreateThread(channel, db, repo, statusData.prData, existing);
         const reply = buildCiReply(ciStatus);
-        await thread.send(reply);
+        await withRetry(() => thread.send(reply));
         console.log(`[repo-relay] Posted CI update to thread`);
         db.updatePrMessageTimestamp(repo, pr.number);
       }

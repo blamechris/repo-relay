@@ -3,6 +3,7 @@
  * when SQLite state is lost (e.g., on ephemeral GitHub-hosted runners).
  */
 import { safeErrorMessage } from '../utils/errors.js';
+import { withRetry } from '../utils/retry.js';
 const PR_TITLE_PATTERN = /PR #(\d+):/;
 const ISSUE_TITLE_PATTERN = /Issue #(\d+):/;
 /**
@@ -10,7 +11,7 @@ const ISSUE_TITLE_PATTERN = /Issue #(\d+):/;
  */
 async function findMessageInChannel(channel, pattern, repo, targetNumber, label) {
     try {
-        const messages = await channel.messages.fetch({ limit: 100 });
+        const messages = await withRetry(() => channel.messages.fetch({ limit: 100 }));
         for (const message of messages.values()) {
             const embed = message.embeds[0];
             if (!embed?.title)

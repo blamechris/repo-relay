@@ -6,6 +6,7 @@ import { buildReviewReply, buildPrEmbed } from '../embeds/builders.js';
 import { getChannelForEvent } from '../config/channels.js';
 import { buildEmbedWithStatus, getOrCreateThread } from './pr.js';
 import { getExistingPrMessage } from '../discord/lookup.js';
+import { withRetry } from '../utils/retry.js';
 import { AGENT_REVIEW_PATTERNS, APPROVED_PATTERNS, CHANGES_REQUESTED_PATTERNS, } from '../patterns/agent-review.js';
 export async function handleCommentEvent(client, db, channelConfig, payload) {
     const { action, comment, issue, repository } = payload;
@@ -46,11 +47,11 @@ export async function handleCommentEvent(client, db, channelConfig, payload) {
     const statusData = buildEmbedWithStatus(db, repo, prNumber);
     if (statusData) {
         const embed = buildPrEmbed(statusData.prData, statusData.ci, statusData.reviews);
-        await message.edit({ embeds: [embed] });
+        await withRetry(() => message.edit({ embeds: [embed] }));
         // Post to thread
         const thread = await getOrCreateThread(channel, db, repo, statusData.prData, existing);
         const reply = buildReviewReply('agent', status, undefined, comment.html_url);
-        await thread.send(reply);
+        await withRetry(() => thread.send(reply));
     }
     db.updatePrMessageTimestamp(repo, prNumber);
 }

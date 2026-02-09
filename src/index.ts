@@ -26,6 +26,7 @@ import {
 import { checkForReviews } from './github/reviews.js';
 import { safeErrorMessage } from './utils/errors.js';
 import { REPO_NAME_PATTERN } from './utils/validation.js';
+import { withRetry } from './utils/retry.js';
 import { buildEmbedWithStatus } from './handlers/pr.js';
 import { buildPrEmbed, buildReviewReply } from './embeds/builders.js';
 import { TextChannel } from 'discord.js';
@@ -296,7 +297,7 @@ export class RepoRelay {
 
         if (statusData) {
           const embed = buildPrEmbed(statusData.prData, statusData.ci, statusData.reviews);
-          await message.edit({ embeds: [embed] });
+          await withRetry(() => message.edit({ embeds: [embed] }));
           console.log(`[repo-relay] Updated embed for PR #${prNumber} with detected reviews`);
 
           // Post to thread about detected reviews
@@ -306,11 +307,11 @@ export class RepoRelay {
               if (thread) {
                 if (result.copilotReviewed && result.copilotUrl) {
                   const reply = buildReviewReply('copilot', 'reviewed', undefined, result.copilotUrl);
-                  await thread.send(reply);
+                  await withRetry(() => thread.send(reply));
                 }
                 if (result.agentReviewStatus !== 'pending' && result.agentReviewUrl) {
                   const reply = buildReviewReply('agent', result.agentReviewStatus, undefined, result.agentReviewUrl);
-                  await thread.send(reply);
+                  await withRetry(() => thread.send(reply));
                 }
               }
             } catch {
