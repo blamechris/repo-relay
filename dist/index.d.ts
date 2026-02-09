@@ -53,6 +53,7 @@ export declare class RepoRelay {
     private repo;
     constructor(config: RepoRelayConfig);
     connect(): Promise<void>;
+    private logSessionBudget;
     validatePermissions(): Promise<void>;
     disconnect(): Promise<void>;
     handleEvent(eventData: GitHubEventPayload): Promise<void>;
