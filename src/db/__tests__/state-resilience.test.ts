@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
+import Database from 'better-sqlite3';
 import { StateDb } from '../state.js';
-import { rmSync, mkdtempSync, existsSync, writeFileSync, statSync } from 'fs';
+import { rmSync, mkdtempSync, mkdirSync, existsSync, writeFileSync, statSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
@@ -68,6 +69,42 @@ describe('StateDb resilience', () => {
     // Old data should not exist (DB was recreated)
     const oldResult = db.getPrMessage('test/repo', 1);
     expect(oldResult).toBeNull();
+  });
+
+  it('migrates old event_log.pr_number to entity_number (#96)', () => {
+    // Simulate a DB from the pre-586d312 schema with pr_number column
+    tmpDir = mkdtempSync(join(tmpdir(), 'repo-relay-test-'));
+    const repoDir = join(tmpDir, 'test-repo');
+    mkdirSync(repoDir, { recursive: true });
+    const dbPath = join(repoDir, 'state.db');
+
+    // Create old-schema DB manually
+    const oldDb = new Database(dbPath);
+    oldDb.pragma('journal_mode = WAL');
+    oldDb.exec(`
+      CREATE TABLE event_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        repo TEXT NOT NULL,
+        pr_number INTEGER,
+        event_type TEXT,
+        payload TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX idx_event_log_repo_pr ON event_log(repo, pr_number);
+    `);
+    oldDb.prepare('INSERT INTO event_log (repo, pr_number, event_type, payload) VALUES (?, ?, ?, ?)')
+      .run('test/repo', 42, 'pr.opened', '{}');
+    oldDb.close();
+
+    // Opening with StateDb should migrate without error
+    db = new StateDb('test/repo', tmpDir);
+
+    // Verify the migrated column works
+    db.logEvent('test/repo', 99, 'pr.closed', {});
+    const events = db.getRecentEvents('test/repo');
+    expect(events).toHaveLength(2);
+    expect(events.some(e => e.entityNumber === 42)).toBe(true);
+    expect(events.some(e => e.entityNumber === 99)).toBe(true);
   });
 
   it('recreated DB logs warning', () => {
