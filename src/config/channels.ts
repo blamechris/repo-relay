@@ -25,13 +25,14 @@ export function getChannelConfig(): ChannelConfig {
 
 export function getChannelForEvent(
   config: ChannelConfig,
-  eventType: 'pr' | 'issue' | 'release' | 'ci' | 'review' | 'comment' | 'deployment'
+  eventType: 'pr' | 'issue' | 'release' | 'ci' | 'review' | 'comment' | 'deployment' | 'push'
 ): string {
   switch (eventType) {
     case 'pr':
     case 'ci':
     case 'review':
     case 'comment':
+    case 'push':
       return config.prs;
     case 'issue':
       return config.issues ?? config.prs;

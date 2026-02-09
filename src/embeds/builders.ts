@@ -290,6 +290,51 @@ export function buildDeploymentEmbed(
   return embed;
 }
 
+export function buildPushEmbed(
+  branch: string,
+  commits: Array<{ id: string; message: string }>,
+  sender: string,
+  senderAvatar: string,
+  compareUrl: string
+): EmbedBuilder {
+  const maxDisplay = 5;
+  const commitLines = commits.slice(0, maxDisplay).map(c => {
+    const sha = c.id.substring(0, 7);
+    const firstLine = c.message.split('\n')[0];
+    return `\`${sha}\` ${firstLine}`;
+  });
+
+  if (commits.length > maxDisplay) {
+    commitLines.push(`and ${commits.length - maxDisplay} more...`);
+  }
+
+  return new EmbedBuilder()
+    .setColor(Colors.Yellow)
+    .setTitle(truncateTitle(`📤 Push to ${branch}`))
+    .setAuthor({ name: sender, iconURL: senderAvatar })
+    .setDescription(commitLines.join('\n'))
+    .addFields({ name: 'Compare', value: `[View changes](${compareUrl})`, inline: false });
+}
+
+export function buildForcePushEmbed(
+  branch: string,
+  beforeSha: string,
+  afterSha: string,
+  sender: string,
+  senderAvatar: string,
+  compareUrl: string
+): EmbedBuilder {
+  return new EmbedBuilder()
+    .setColor(Colors.Red)
+    .setTitle(truncateTitle(`⚠️ Force Push to ${branch}`))
+    .setAuthor({ name: sender, iconURL: senderAvatar })
+    .addFields(
+      { name: 'Before', value: `\`${beforeSha.substring(0, 7)}\``, inline: true },
+      { name: 'After', value: `\`${afterSha.substring(0, 7)}\``, inline: true },
+      { name: 'Compare', value: `[View changes](${compareUrl})`, inline: false }
+    );
+}
+
 // Helper functions
 
 function getPrEmoji(state: 'open' | 'closed' | 'merged', draft: boolean): string {

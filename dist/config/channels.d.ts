@@ -8,5 +8,5 @@ export interface ChannelConfig {
     deployments?: string;
 }
 export declare function getChannelConfig(): ChannelConfig;
-export declare function getChannelForEvent(config: ChannelConfig, eventType: 'pr' | 'issue' | 'release' | 'ci' | 'review' | 'comment' | 'deployment'): string;
+export declare function getChannelForEvent(config: ChannelConfig, eventType: 'pr' | 'issue' | 'release' | 'ci' | 'review' | 'comment' | 'deployment' | 'push'): string;
 //# sourceMappingURL=channels.d.ts.map

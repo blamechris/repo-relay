@@ -55,4 +55,9 @@ export declare function buildIssueClosedReply(closedBy?: string, stateReason?: s
 export declare function buildIssueReopenedReply(reopenedBy?: string): string;
 export declare function buildReleaseEmbed(name: string, tagName: string, url: string, author: string, authorAvatar: string | undefined, body?: string, prerelease?: boolean): EmbedBuilder;
 export declare function buildDeploymentEmbed(state: 'success' | 'failure' | 'error' | 'pending' | 'in_progress' | 'queued' | 'inactive', environment: string, ref: string, sha: string, author: string, authorAvatar: string | undefined, description?: string, targetUrl?: string): EmbedBuilder;
+export declare function buildPushEmbed(branch: string, commits: Array<{
+    id: string;
+    message: string;
+}>, sender: string, senderAvatar: string, compareUrl: string): EmbedBuilder;
+export declare function buildForcePushEmbed(branch: string, beforeSha: string, afterSha: string, sender: string, senderAvatar: string, compareUrl: string): EmbedBuilder;
 //# sourceMappingURL=builders.d.ts.map

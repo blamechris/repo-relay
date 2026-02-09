@@ -19,6 +19,7 @@ export function getChannelForEvent(config, eventType) {
         case 'ci':
         case 'review':
         case 'comment':
+        case 'push':
             return config.prs;
         case 'issue':
             return config.issues ?? config.prs;

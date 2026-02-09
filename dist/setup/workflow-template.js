@@ -8,6 +8,9 @@ export function buildWorkflowTemplate(ciWorkflowName, features) {
         '  pull_request_review:',
         '    types: [submitted]',
     ];
+    if (features.pushEvents) {
+        eventLines.push('  push:', `    branches: [$default-branch]`);
+    }
     if (features.issues) {
         eventLines.push('  issue_comment:', '    types: [created]');
         eventLines.push('  issues:', '    types: [opened, closed]');

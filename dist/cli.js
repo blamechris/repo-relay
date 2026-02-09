@@ -93,6 +93,8 @@ function mapGitHubEvent(eventName, payload) {
             return { event: 'release', payload: payload };
         case 'deployment_status':
             return { event: 'deployment_status', payload: payload };
+        case 'push':
+            return { event: 'push', payload: payload };
         case 'schedule': {
             const repoFullName = process.env.GITHUB_REPOSITORY;
             if (!repoFullName) {
