@@ -6,6 +6,7 @@ import { Client, TextChannel } from 'discord.js';
 import { StateDb } from '../db/state.js';
 import { buildDeploymentEmbed } from '../embeds/builders.js';
 import { getChannelForEvent, ChannelConfig } from '../config/channels.js';
+import { withRetry } from '../utils/retry.js';
 
 export interface DeploymentStatusPayload {
   action: 'created';
@@ -67,5 +68,5 @@ export async function handleDeploymentEvent(
     deployment_status.target_url ?? undefined
   );
 
-  await channel.send({ embeds: [embed] });
+  await withRetry(() => channel.send({ embeds: [embed] }));
 }

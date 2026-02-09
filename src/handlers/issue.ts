@@ -7,6 +7,7 @@ import { StateDb, IssueMessage } from '../db/state.js';
 import { buildIssueEmbed, buildIssueClosedReply, buildIssueReopenedReply, IssueData } from '../embeds/builders.js';
 import { getChannelForEvent, ChannelConfig } from '../config/channels.js';
 import { getExistingIssueMessage } from '../discord/lookup.js';
+import { withRetry } from '../utils/retry.js';
 
 export interface IssueEventPayload {
   action: 'opened' | 'closed' | 'reopened' | 'labeled' | 'unlabeled' | 'edited';
@@ -101,17 +102,17 @@ async function handleIssueOpened(
   issue: IssueData
 ): Promise<void> {
   const embed = buildIssueEmbed(issue);
-  const message = await channel.send({ embeds: [embed] });
+  const message = await withRetry(() => channel.send({ embeds: [embed] }));
 
-  const thread = await message.startThread({
+  const thread = await withRetry(() => message.startThread({
     name: `Issue #${issue.number}: ${issue.title.substring(0, 90)}`,
     autoArchiveDuration: 1440,
-  });
+  }));
 
   db.saveIssueMessage(repo, issue.number, channel.id, message.id, thread.id);
   saveIssueDataFromIssueData(db, repo, issue);
 
-  await thread.send(`📋 Updates for Issue #${issue.number} will appear here.`);
+  await withRetry(() => thread.send(`📋 Updates for Issue #${issue.number} will appear here.`));
 }
 
 async function handleIssueStateChange(
@@ -128,10 +129,10 @@ async function handleIssueStateChange(
       const message = await channel.messages.fetch(existing.messageId);
       saveIssueDataFromIssueData(db, repo, issue);
       const embed = buildIssueEmbed(issue);
-      await message.edit({ embeds: [embed] });
+      await withRetry(() => message.edit({ embeds: [embed] }));
 
       const thread = await getOrCreateIssueThread(channel, db, repo, issue, existing);
-      await thread.send(replyText);
+      await withRetry(() => thread.send(replyText));
       db.updateIssueMessageTimestamp(repo, issue.number);
       return;
     } catch (error: unknown) {
@@ -147,16 +148,16 @@ async function handleIssueStateChange(
 
   // No existing message (or stale message was cleared) — create new embed
   const embed = buildIssueEmbed(issue);
-  const message = await channel.send({ embeds: [embed] });
+  const message = await withRetry(() => channel.send({ embeds: [embed] }));
 
-  const thread = await message.startThread({
+  const thread = await withRetry(() => message.startThread({
     name: `Issue #${issue.number}: ${issue.title.substring(0, 90)}`,
     autoArchiveDuration: 1440,
-  });
+  }));
 
   db.saveIssueMessage(repo, issue.number, channel.id, message.id, thread.id);
   saveIssueDataFromIssueData(db, repo, issue);
-  await thread.send(replyText);
+  await withRetry(() => thread.send(replyText));
   db.updateIssueMessageTimestamp(repo, issue.number);
 }
 
@@ -188,7 +189,7 @@ export async function getOrCreateIssueThread(
       const thread = await channel.threads.fetch(existing.threadId);
       if (thread) {
         if (thread.archived) {
-          await thread.setArchived(false);
+          await withRetry(() => thread.setArchived(false) as Promise<ThreadChannel>);
         }
         return thread;
       }
@@ -198,14 +199,16 @@ export async function getOrCreateIssueThread(
   }
 
   const message = await channel.messages.fetch(existing.messageId);
-  const thread = await message.startThread({
-    name: `Issue #${issue.number}: ${issue.title.substring(0, 90)}`,
-    autoArchiveDuration: 1440,
-  });
+  const thread = await withRetry(() =>
+    message.startThread({
+      name: `Issue #${issue.number}: ${issue.title.substring(0, 90)}`,
+      autoArchiveDuration: 1440,
+    })
+  ) as ThreadChannel;
 
   db.updateIssueThread(repo, issue.number, thread.id);
 
-  await thread.send(`📋 Updates for Issue #${issue.number} will appear here.`);
+  await withRetry(() => thread.send(`📋 Updates for Issue #${issue.number} will appear here.`));
 
   return thread;
 }

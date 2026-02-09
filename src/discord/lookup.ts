@@ -6,6 +6,7 @@
 import { TextChannel } from 'discord.js';
 import { StateDb, PrMessage, IssueMessage } from '../db/state.js';
 import { safeErrorMessage } from '../utils/errors.js';
+import { withRetry } from '../utils/retry.js';
 
 const PR_TITLE_PATTERN = /PR #(\d+):/;
 const ISSUE_TITLE_PATTERN = /Issue #(\d+):/;
@@ -21,7 +22,7 @@ async function findMessageInChannel(
   label: string
 ): Promise<{ messageId: string; threadId: string | null } | null> {
   try {
-    const messages = await channel.messages.fetch({ limit: 100 });
+    const messages = await withRetry(() => channel.messages.fetch({ limit: 100 }));
 
     for (const message of messages.values()) {
       const embed = message.embeds[0];

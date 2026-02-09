@@ -4,6 +4,7 @@
 import { TextChannel } from 'discord.js';
 import { buildReleaseEmbed } from '../embeds/builders.js';
 import { getChannelForEvent } from '../config/channels.js';
+import { withRetry } from '../utils/retry.js';
 export async function handleReleaseEvent(client, db, channelConfig, payload) {
     const { action, release, repository } = payload;
     const repo = repository.full_name;
@@ -18,6 +19,6 @@ export async function handleReleaseEvent(client, db, channelConfig, payload) {
     }
     db.logEvent(repo, null, `release.${action}`, payload);
     const embed = buildReleaseEmbed(release.name ?? release.tag_name, release.tag_name, release.html_url, release.author.login, release.author.avatar_url, release.body ?? undefined, release.prerelease);
-    await channel.send({ embeds: [embed] });
+    await withRetry(() => channel.send({ embeds: [embed] }));
 }
 //# sourceMappingURL=release.js.map

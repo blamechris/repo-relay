@@ -6,6 +6,7 @@ import { buildReviewReply, buildPrEmbed } from '../embeds/builders.js';
 import { getChannelForEvent } from '../config/channels.js';
 import { buildEmbedWithStatus, getOrCreateThread } from './pr.js';
 import { getExistingPrMessage } from '../discord/lookup.js';
+import { withRetry } from '../utils/retry.js';
 export async function handleReviewEvent(client, db, channelConfig, payload) {
     const { action, review, pull_request: pr, repository } = payload;
     const repo = repository.full_name;
@@ -41,11 +42,11 @@ export async function handleReviewEvent(client, db, channelConfig, payload) {
         const statusData = buildEmbedWithStatus(db, repo, pr.number);
         if (statusData) {
             const embed = buildPrEmbed(statusData.prData, statusData.ci, statusData.reviews);
-            await message.edit({ embeds: [embed] });
+            await withRetry(() => message.edit({ embeds: [embed] }));
             // Post to thread
             const thread = await getOrCreateThread(channel, db, repo, statusData.prData, existing);
             const reply = buildReviewReply('copilot', 'reviewed', undefined, review.html_url);
-            await thread.send(reply);
+            await withRetry(() => thread.send(reply));
         }
         db.updatePrMessageTimestamp(repo, pr.number);
     }

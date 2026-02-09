@@ -6,6 +6,7 @@ import { Client, TextChannel } from 'discord.js';
 import { StateDb } from '../db/state.js';
 import { buildReleaseEmbed } from '../embeds/builders.js';
 import { getChannelForEvent, ChannelConfig } from '../config/channels.js';
+import { withRetry } from '../utils/retry.js';
 
 export interface ReleaseEventPayload {
   action: 'published' | 'created' | 'edited' | 'deleted';
@@ -60,5 +61,5 @@ export async function handleReleaseEvent(
     release.prerelease
   );
 
-  await channel.send({ embeds: [embed] });
+  await withRetry(() => channel.send({ embeds: [embed] }));
 }

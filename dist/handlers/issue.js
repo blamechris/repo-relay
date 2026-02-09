@@ -5,6 +5,7 @@ import { TextChannel } from 'discord.js';
 import { buildIssueEmbed, buildIssueClosedReply, buildIssueReopenedReply } from '../embeds/builders.js';
 import { getChannelForEvent } from '../config/channels.js';
 import { getExistingIssueMessage } from '../discord/lookup.js';
+import { withRetry } from '../utils/retry.js';
 export async function handleIssueEvent(client, db, channelConfig, payload) {
     const { action, issue, repository } = payload;
     const repo = repository.full_name;
@@ -45,14 +46,14 @@ export async function handleIssueEvent(client, db, channelConfig, payload) {
 }
 async function handleIssueOpened(channel, db, repo, issue) {
     const embed = buildIssueEmbed(issue);
-    const message = await channel.send({ embeds: [embed] });
-    const thread = await message.startThread({
+    const message = await withRetry(() => channel.send({ embeds: [embed] }));
+    const thread = await withRetry(() => message.startThread({
         name: `Issue #${issue.number}: ${issue.title.substring(0, 90)}`,
         autoArchiveDuration: 1440,
-    });
+    }));
     db.saveIssueMessage(repo, issue.number, channel.id, message.id, thread.id);
     saveIssueDataFromIssueData(db, repo, issue);
-    await thread.send(`📋 Updates for Issue #${issue.number} will appear here.`);
+    await withRetry(() => thread.send(`📋 Updates for Issue #${issue.number} will appear here.`));
 }
 async function handleIssueStateChange(channel, db, repo, issue, replyText) {
     const existing = await getExistingIssueMessage(db, channel, repo, issue.number);
@@ -61,9 +62,9 @@ async function handleIssueStateChange(channel, db, repo, issue, replyText) {
             const message = await channel.messages.fetch(existing.messageId);
             saveIssueDataFromIssueData(db, repo, issue);
             const embed = buildIssueEmbed(issue);
-            await message.edit({ embeds: [embed] });
+            await withRetry(() => message.edit({ embeds: [embed] }));
             const thread = await getOrCreateIssueThread(channel, db, repo, issue, existing);
-            await thread.send(replyText);
+            await withRetry(() => thread.send(replyText));
             db.updateIssueMessageTimestamp(repo, issue.number);
             return;
         }
@@ -80,14 +81,14 @@ async function handleIssueStateChange(channel, db, repo, issue, replyText) {
     }
     // No existing message (or stale message was cleared) — create new embed
     const embed = buildIssueEmbed(issue);
-    const message = await channel.send({ embeds: [embed] });
-    const thread = await message.startThread({
+    const message = await withRetry(() => channel.send({ embeds: [embed] }));
+    const thread = await withRetry(() => message.startThread({
         name: `Issue #${issue.number}: ${issue.title.substring(0, 90)}`,
         autoArchiveDuration: 1440,
-    });
+    }));
     db.saveIssueMessage(repo, issue.number, channel.id, message.id, thread.id);
     saveIssueDataFromIssueData(db, repo, issue);
-    await thread.send(replyText);
+    await withRetry(() => thread.send(replyText));
     db.updateIssueMessageTimestamp(repo, issue.number);
 }
 function saveIssueDataFromIssueData(db, repo, issue) {
@@ -111,7 +112,7 @@ export async function getOrCreateIssueThread(channel, db, repo, issue, existing)
             const thread = await channel.threads.fetch(existing.threadId);
             if (thread) {
                 if (thread.archived) {
-                    await thread.setArchived(false);
+                    await withRetry(() => thread.setArchived(false));
                 }
                 return thread;
             }
@@ -121,12 +122,12 @@ export async function getOrCreateIssueThread(channel, db, repo, issue, existing)
         }
     }
     const message = await channel.messages.fetch(existing.messageId);
-    const thread = await message.startThread({
+    const thread = await withRetry(() => message.startThread({
         name: `Issue #${issue.number}: ${issue.title.substring(0, 90)}`,
         autoArchiveDuration: 1440,
-    });
+    }));
     db.updateIssueThread(repo, issue.number, thread.id);
-    await thread.send(`📋 Updates for Issue #${issue.number} will appear here.`);
+    await withRetry(() => thread.send(`📋 Updates for Issue #${issue.number} will appear here.`));
     return thread;
 }
 //# sourceMappingURL=issue.js.map
