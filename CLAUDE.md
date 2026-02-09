@@ -332,11 +332,11 @@ GitHub Apps using `GITHUB_TOKEN` don't trigger `pull_request_review` workflow ev
 
 Without scheduled polling, reviews on quiet PRs may not be reflected until the next event fires. See [#4](https://github.com/blamechris/repo-relay/issues/4).
 
-### Self-Hosted Runners Recommended
+### State Persistence on GitHub-Hosted Runners
 
-GitHub-hosted runners don't persist state between workflow runs. The SQLite database at `~/.repo-relay/{repo}/state.db` is lost after each run unless you add artifact upload/download steps.
+GitHub-hosted runners don't persist state between workflow runs. The SQLite database at `~/.repo-relay/{repo}/state.db` is lost after each run.
 
-**Recommendation:** Use self-hosted runners for persistent state, or implement artifact-based state persistence for GitHub-hosted runners.
+**Recommendation:** Add `actions/cache@v4` before the repo-relay step to cache `~/.repo-relay`. The DB includes a WAL checkpoint on close and integrity check on startup, making it safe for cache-based persistence. See the README for the full snippet.
 
 ## Onboarding Learnings
 
