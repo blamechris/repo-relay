@@ -72,20 +72,22 @@ describe('StateDb resilience', () => {
 
   it('recreated DB logs warning', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      tmpDir = mkdtempSync(join(tmpdir(), 'repo-relay-test-'));
+      const validDb = new StateDb('test/repo', tmpDir);
+      validDb.close();
 
-    tmpDir = mkdtempSync(join(tmpdir(), 'repo-relay-test-'));
-    const validDb = new StateDb('test/repo', tmpDir);
-    validDb.close();
+      // Corrupt the DB file
+      const dbPath = join(tmpDir, 'test-repo', 'state.db');
+      writeFileSync(dbPath, 'this is not a valid sqlite database');
 
-    // Corrupt the DB file
-    const dbPath = join(tmpDir, 'test-repo', 'state.db');
-    writeFileSync(dbPath, 'this is not a valid sqlite database');
+      db = new StateDb('test/repo', tmpDir);
 
-    db = new StateDb('test/repo', tmpDir);
-
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('integrity check failed')
-    );
-    warnSpy.mockRestore();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('integrity check failed')
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 });

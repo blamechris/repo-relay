@@ -109,7 +109,9 @@ export class StateDb {
     if (!integrityOk) {
       console.warn('[repo-relay] Database integrity check failed, recreating...');
       this.db.close();
-      unlinkSync(dbPath);
+      for (const suffix of ['', '-wal', '-shm']) {
+        try { unlinkSync(dbPath + suffix); } catch { /* may not exist */ }
+      }
       this.db = new Database(dbPath);
     }
 
@@ -553,7 +555,12 @@ export class StateDb {
   }
 
   close(): void {
-    this.db.pragma('wal_checkpoint(TRUNCATE)');
-    this.db.close();
+    try {
+      this.db.pragma('wal_checkpoint(TRUNCATE)');
+    } catch {
+      // Checkpoint can fail if DB is already closed or not in WAL mode
+    } finally {
+      this.db.close();
+    }
   }
 }
