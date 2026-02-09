@@ -378,7 +378,8 @@ export async function getOrCreateThread(
   // If we have a thread ID, try to fetch it
   if (existing.threadId) {
     try {
-      const thread = await channel.threads.fetch(existing.threadId);
+      const threadId = existing.threadId;
+      const thread = await withRetry(() => channel.threads.fetch(threadId));
       if (thread) {
         // Unarchive if archived
         if (thread.archived) {

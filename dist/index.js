@@ -181,7 +181,8 @@ export class RepoRelay {
                     // Post to thread about detected reviews
                     if (existing.threadId) {
                         try {
-                            const thread = await channel.threads.fetch(existing.threadId);
+                            const threadId = existing.threadId;
+                            const thread = await withRetry(() => channel.threads.fetch(threadId));
                             if (thread) {
                                 if (result.copilotReviewed && result.copilotUrl) {
                                     const reply = buildReviewReply('copilot', 'reviewed', undefined, result.copilotUrl);

@@ -109,7 +109,8 @@ function saveIssueDataFromIssueData(db, repo, issue) {
 export async function getOrCreateIssueThread(channel, db, repo, issue, existing) {
     if (existing.threadId) {
         try {
-            const thread = await channel.threads.fetch(existing.threadId);
+            const threadId = existing.threadId;
+            const thread = await withRetry(() => channel.threads.fetch(threadId));
             if (thread) {
                 if (thread.archived) {
                     await withRetry(async () => { await thread.setArchived(false); });
