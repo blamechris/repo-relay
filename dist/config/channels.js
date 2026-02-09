@@ -8,9 +8,9 @@ export function getChannelConfig() {
     }
     return {
         prs,
-        issues: process.env.DISCORD_CHANNEL_ISSUES,
-        releases: process.env.DISCORD_CHANNEL_RELEASES,
-        deployments: process.env.DISCORD_CHANNEL_DEPLOYMENTS,
+        issues: process.env.DISCORD_CHANNEL_ISSUES || undefined,
+        releases: process.env.DISCORD_CHANNEL_RELEASES || undefined,
+        deployments: process.env.DISCORD_CHANNEL_DEPLOYMENTS || undefined,
     };
 }
 export function getChannelForEvent(config, eventType) {

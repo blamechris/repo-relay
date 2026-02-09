@@ -11,9 +11,10 @@ import { join } from 'path';
 import { safeErrorMessage } from './utils/errors.js';
 import { buildWorkflowTemplate } from './setup/workflow-template.js';
 const PROJECT_TYPES = {
-    library: { issues: true, releases: true },
-    webapp: { issues: true, releases: false },
-    minimal: { issues: false, releases: false },
+    library: { issues: true, releases: true, deployments: false },
+    webapp: { issues: true, releases: false, deployments: false },
+    mobileapp: { issues: true, releases: false, deployments: true },
+    minimal: { issues: false, releases: false, deployments: false },
 };
 function getRepoUrl() {
     try {
@@ -71,6 +72,7 @@ async function main() {
         choices: [
             { title: 'Library / Package', description: 'PRs, CI, reviews, issues, releases', value: 'library' },
             { title: 'Web App / Backend', description: 'PRs, CI, reviews, issues', value: 'webapp' },
+            { title: 'Mobile App', description: 'PRs, CI, reviews, issues, deployments', value: 'mobileapp' },
             { title: 'Minimal', description: 'PRs, CI, reviews only', value: 'minimal' },
             { title: 'Custom', description: 'Choose individual features', value: 'custom' },
         ],
@@ -90,6 +92,7 @@ async function main() {
             choices: [
                 { title: 'Issue notifications', value: 'issues', selected: true },
                 { title: 'Release notifications', value: 'releases' },
+                { title: 'Deployment notifications', value: 'deployments' },
             ],
         });
         if (!customFeatures) {
@@ -99,6 +102,7 @@ async function main() {
         features = {
             issues: customFeatures.includes('issues'),
             releases: customFeatures.includes('releases'),
+            deployments: customFeatures.includes('deployments'),
         };
     }
     else {
@@ -107,7 +111,8 @@ async function main() {
     // Step 4: Channel IDs for enabled features
     let channelIssues = '';
     let channelReleases = '';
-    if (features.issues || features.releases) {
+    let channelDeployments = '';
+    if (features.issues || features.releases || features.deployments) {
         console.log('\n\x1b[36mStep 4: Additional Channels (optional)\x1b[0m');
         console.log('────────────────────────────────────────');
         console.log('Leave blank to use the PR channel for all notifications.\n');
@@ -137,9 +142,22 @@ async function main() {
             }
             channelReleases = result.channelReleases ?? '';
         }
+        if (features.deployments) {
+            const result = await prompts({
+                type: 'text',
+                name: 'channelDeployments',
+                message: 'Channel ID for deployments (blank = use PR channel):',
+                validate: (value) => value === '' || /^\d+$/.test(value) || 'Must be a number or blank',
+            });
+            if (!result || result.channelDeployments === undefined) {
+                console.log('\n❌ Setup cancelled.\n');
+                process.exit(1);
+            }
+            channelDeployments = result.channelDeployments ?? '';
+        }
     }
     // Step 5: CI Workflow name
-    const stepNum = (features.issues || features.releases) ? 5 : 4;
+    const stepNum = (features.issues || features.releases || features.deployments) ? 5 : 4;
     console.log(`\n\x1b[36mStep ${stepNum}: CI Workflow Name\x1b[0m`);
     console.log('────────────────────────────────────────');
     console.log('This is the name of your CI workflow (for tracking CI status).\n');
@@ -190,6 +208,9 @@ async function main() {
     }
     if (features.releases && channelReleases) {
         console.log(`│   \x1b[1mDISCORD_CHANNEL_RELEASES\x1b[0m = ${channelReleases}`);
+    }
+    if (features.deployments && channelDeployments) {
+        console.log(`│   \x1b[1mDISCORD_CHANNEL_DEPLOYMENTS\x1b[0m = ${channelDeployments}`);
     }
     console.log('└─────────────────────────────────────────────────────────────┘');
     console.log('\n🎉 Done! Commit and push to enable Discord notifications.\n');

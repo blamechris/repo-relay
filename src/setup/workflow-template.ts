@@ -5,6 +5,7 @@
 export interface ProjectFeatures {
   issues: boolean;
   releases: boolean;
+  deployments: boolean;
 }
 
 export function buildWorkflowTemplate(ciWorkflowName: string, features: ProjectFeatures): string {
@@ -24,6 +25,10 @@ export function buildWorkflowTemplate(ciWorkflowName: string, features: ProjectF
     eventLines.push('  release:', '    types: [published]');
   }
 
+  if (features.deployments) {
+    eventLines.push('  deployment_status:');
+  }
+
   const sanitizedName = ciWorkflowName.replace(/"/g, '\\"');
   eventLines.push(
     '  workflow_run:',
@@ -37,6 +42,9 @@ export function buildWorkflowTemplate(ciWorkflowName: string, features: ProjectF
   }
   if (features.releases) {
     channelSecrets.push('          channel_releases: ${{ secrets.DISCORD_CHANNEL_RELEASES }}');
+  }
+  if (features.deployments) {
+    channelSecrets.push('          channel_deployments: ${{ secrets.DISCORD_CHANNEL_DEPLOYMENTS }}');
   }
 
   const permissionLines = ['      pull-requests: read'];
