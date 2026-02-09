@@ -4,7 +4,7 @@
 
 import { Client, TextChannel } from 'discord.js';
 import { StateDb } from '../db/state.js';
-import { buildCiReply, buildCiFailureReply, CiStatus, buildPrEmbed, buildPrComponents, PrData } from '../embeds/builders.js';
+import { buildCiReply, buildCiFailureReply, CiStatus, buildPrEmbed, buildPrComponents } from '../embeds/builders.js';
 import { getChannelForEvent, ChannelConfig } from '../config/channels.js';
 import { buildEmbedWithStatus, getOrCreateThread } from './pr.js';
 import { getExistingPrMessage } from '../discord/lookup.js';
