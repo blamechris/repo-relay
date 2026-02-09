@@ -118,6 +118,21 @@ function mapGitHubEvent(
     case 'deployment_status':
       return { event: 'deployment_status', payload: payload as DeploymentStatusPayload };
 
+    case 'schedule': {
+      const repoFullName = process.env.GITHUB_REPOSITORY;
+      if (!repoFullName) {
+        console.log('[repo-relay] Schedule event but GITHUB_REPOSITORY not set, skipping');
+        return null;
+      }
+      return {
+        event: 'schedule',
+        payload: {
+          schedule: (payload as { schedule?: string })?.schedule ?? '',
+          repository: { full_name: repoFullName },
+        },
+      };
+    }
+
     default:
       return null;
   }

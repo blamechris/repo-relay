@@ -46,7 +46,8 @@ export type GitHubEventPayload =
   | { event: 'issue_comment'; payload: IssueCommentPayload }
   | { event: 'issues'; payload: IssueEventPayload }
   | { event: 'release'; payload: ReleaseEventPayload }
-  | { event: 'deployment_status'; payload: DeploymentStatusPayload };
+  | { event: 'deployment_status'; payload: DeploymentStatusPayload }
+  | { event: 'schedule'; payload: { schedule: string; repository: { full_name: string } } };
 
 
 export { REPO_NAME_PATTERN };
@@ -248,6 +249,14 @@ export class RepoRelay {
         );
         break;
 
+      case 'schedule':
+        if (!this.config.githubToken) {
+          console.log('[repo-relay] Skipping scheduled review poll: no GITHUB_TOKEN');
+          break;
+        }
+        await this.pollOpenPrReviews(repo);
+        break;
+
       default:
         console.log(`[repo-relay] Unknown event type, skipping`);
     }
@@ -312,6 +321,26 @@ export class RepoRelay {
     }
   }
 
+  private async pollOpenPrReviews(repo: string): Promise<void> {
+    if (!this.db) return;
+
+    const openPrs = this.db.getOpenPrNumbers(repo);
+    if (openPrs.length === 0) {
+      console.log('[repo-relay] No open PRs to poll for reviews');
+      return;
+    }
+
+    console.log(`[repo-relay] Polling ${openPrs.length} open PR(s) for review updates`);
+
+    for (const prNumber of openPrs) {
+      try {
+        await this.checkAndUpdateReviews(repo, prNumber);
+      } catch (error) {
+        console.log(`[repo-relay] Warning: Failed to poll PR #${prNumber}: ${safeErrorMessage(error)}`);
+      }
+    }
+  }
+
   private extractRepo(eventData: GitHubEventPayload): string | null {
     let repo: string | null = null;
     switch (eventData.event) {
@@ -322,6 +351,7 @@ export class RepoRelay {
       case 'issues':
       case 'release':
       case 'deployment_status':
+      case 'schedule':
         repo = eventData.payload.repository.full_name;
         break;
       default:
