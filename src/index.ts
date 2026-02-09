@@ -53,7 +53,7 @@ export type GitHubEventPayload =
 export { REPO_NAME_PATTERN };
 
 /** Warn if scheduled polling exceeds 80% of the 5-min cron interval. */
-const POLL_WARN_THRESHOLD_MS = 240_000;
+const POLL_WARN_THRESHOLD_MS = 4 * 60_000;
 
 const REQUIRED_PERMISSIONS = [
   { flag: PermissionsBitField.Flags.SendMessages, name: 'Send Messages' },
@@ -335,7 +335,7 @@ export class RepoRelay {
 
     console.log(`[repo-relay] Polling ${openPrs.length} open PR(s) for review updates`);
 
-    const startTime = Date.now();
+    const startTime = performance.now();
 
     for (const prNumber of openPrs) {
       try {
@@ -345,7 +345,7 @@ export class RepoRelay {
       }
     }
 
-    const elapsedMs = Date.now() - startTime;
+    const elapsedMs = performance.now() - startTime;
     const elapsedSec = (elapsedMs / 1000).toFixed(1);
     console.log(`[repo-relay] Review polling completed: ${openPrs.length} PR(s) in ${elapsedSec}s`);
 
