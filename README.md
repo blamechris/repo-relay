@@ -232,7 +232,7 @@ If the bot connects but can't post, check the channel-level permissions. The bot
 
 | Aspect | Self-Hosted | GitHub-Hosted |
 |--------|-------------|---------------|
-| **State Persistence** | ✅ SQLite persists in `~/.repo-relay/` | ❌ Lost after each run |
+| **State Persistence** | ✅ SQLite persists in `~/.repo-relay/` | ⚠️ Requires `actions/cache` |
 | **Setup** | Requires runner installation | Zero setup |
 | **Cost** | Your hardware | GitHub Actions minutes |
 | **Speed** | Fast (no cold start) | ~30s cold start |
@@ -241,16 +241,33 @@ If the bot connects but can't post, check the channel-level permissions. The bot
 
 **Recommendation:**
 - **Self-hosted** if you have existing runners and want persistent PR tracking
-- **GitHub-hosted** (`ubuntu-latest`) if you don't need state persistence or want guaranteed availability
+- **GitHub-hosted** (`ubuntu-latest`) with `actions/cache` for state persistence (see below)
+
+### State Persistence with GitHub-Hosted Runners
+
+Add an `actions/cache` step before repo-relay to persist state between runs:
+
+```yaml
+    - uses: actions/cache@v4
+      with:
+        path: ~/.repo-relay
+        key: repo-relay-state-${{ github.repository }}
+
+    - uses: blamechris/repo-relay@v1
+      ...
+```
+
+**Notes:**
+- Cache evicts after 7 days of inactivity (fine for active repos)
+- No security concern — the state DB contains only Discord message IDs and PR metadata
+- If cache misses, repo-relay falls back to searching the last 100 channel messages
 
 ## State Storage
 
 | Runner Type | Storage Location | Persistence |
 |-------------|------------------|-------------|
 | **Self-hosted** (recommended) | `~/.repo-relay/{repo-name}/state.db` | Permanent |
-| **GitHub-hosted** | Workflow artifacts | Per-run (requires artifact upload/download) |
-
-For GitHub-hosted runners, you'll need to add artifact upload/download steps to persist state between runs.
+| **GitHub-hosted** | `actions/cache` | Persistent with cache (see [State Persistence](#state-persistence-with-github-hosted-runners)) |
 
 ## Troubleshooting
 
@@ -287,7 +304,7 @@ For GitHub-hosted runners, you'll need to add artifact upload/download steps to 
 
 1. **Review events don't trigger immediately** - GitHub Apps using `GITHUB_TOKEN` don't trigger workflows. Reviews are detected on the next push or CI event via the piggyback approach.
 
-2. **Self-hosted runners recommended** - GitHub-hosted runners don't persist state between runs without additional artifact handling.
+2. **GitHub-hosted runners lose state** - GitHub-hosted runners don't persist state between runs. Use `actions/cache` to persist the `~/.repo-relay` directory (see [State Persistence](#state-persistence-with-github-hosted-runners)).
 
 ## Development
 
