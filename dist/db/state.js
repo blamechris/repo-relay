@@ -267,6 +267,10 @@ export class StateDb {
     `);
         stmt.run(data.repo, data.prNumber, data.title, data.url, data.author, data.authorUrl, data.authorAvatar, data.branch, data.baseBranch, data.additions, data.deletions, data.changedFiles, data.state, data.draft ? 1 : 0, data.prCreatedAt);
     }
+    getOpenPrNumbers(repo) {
+        const stmt = this.db.prepare('SELECT pr_number FROM pr_data WHERE repo = ? AND state = ?');
+        return stmt.all(repo, 'open').map(r => r.pr_number);
+    }
     getIssueMessage(repo, issueNumber) {
         const stmt = this.db.prepare(`
       SELECT repo, issue_number as issueNumber, channel_id as channelId,

@@ -139,6 +139,13 @@ export class RepoRelay {
             case 'deployment_status':
                 await handleDeploymentEvent(this.client, db, this.config.channelConfig, eventData.payload);
                 break;
+            case 'schedule':
+                if (!this.config.githubToken) {
+                    console.log('[repo-relay] Skipping scheduled review poll: no GITHUB_TOKEN');
+                    break;
+                }
+                await this.pollOpenPrReviews(repo);
+                break;
             default:
                 console.log(`[repo-relay] Unknown event type, skipping`);
         }
@@ -194,6 +201,24 @@ export class RepoRelay {
             }
         }
     }
+    async pollOpenPrReviews(repo) {
+        if (!this.db)
+            return;
+        const openPrs = this.db.getOpenPrNumbers(repo);
+        if (openPrs.length === 0) {
+            console.log('[repo-relay] No open PRs to poll for reviews');
+            return;
+        }
+        console.log(`[repo-relay] Polling ${openPrs.length} open PR(s) for review updates`);
+        for (const prNumber of openPrs) {
+            try {
+                await this.checkAndUpdateReviews(repo, prNumber);
+            }
+            catch (error) {
+                console.log(`[repo-relay] Warning: Failed to poll PR #${prNumber}: ${safeErrorMessage(error)}`);
+            }
+        }
+    }
     extractRepo(eventData) {
         let repo = null;
         switch (eventData.event) {
@@ -204,6 +229,7 @@ export class RepoRelay {
             case 'issues':
             case 'release':
             case 'deployment_status':
+            case 'schedule':
                 repo = eventData.payload.repository.full_name;
                 break;
             default:
