@@ -1,7 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { StateDb, type StoredPrData } from '../state.js';
-import { rmSync } from 'fs';
-import { mkdtempSync } from 'fs';
+import { rmSync, mkdtempSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 

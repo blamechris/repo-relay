@@ -135,7 +135,10 @@ async function main(): Promise<void> {
       initial: false,
     });
 
-    if (enablePolling) {
+    if (enablePolling === undefined) {
+      console.log('\n❌ Setup cancelled.\n');
+      process.exit(1);
+    } else if (enablePolling) {
       features = { ...features, reviewPolling: true };
     }
   }
