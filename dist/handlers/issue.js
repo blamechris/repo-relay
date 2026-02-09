@@ -22,7 +22,7 @@ export async function handleIssueEvent(client, db, channelConfig, payload) {
         createdAt: issue.created_at,
     };
     const channelId = getChannelForEvent(channelConfig, 'issue');
-    const channel = await client.channels.fetch(channelId);
+    const channel = await withRetry(() => client.channels.fetch(channelId));
     if (!channel || !(channel instanceof TextChannel)) {
         throw new Error(`Channel ${channelId} not found or not a text channel`);
     }
@@ -59,7 +59,7 @@ async function handleIssueStateChange(channel, db, repo, issue, replyText) {
     const existing = await getExistingIssueMessage(db, channel, repo, issue.number);
     if (existing) {
         try {
-            const message = await channel.messages.fetch(existing.messageId);
+            const message = await withRetry(() => channel.messages.fetch(existing.messageId));
             saveIssueDataFromIssueData(db, repo, issue);
             const embed = buildIssueEmbed(issue);
             await withRetry(() => message.edit({ embeds: [embed] }));
@@ -112,7 +112,7 @@ export async function getOrCreateIssueThread(channel, db, repo, issue, existing)
             const thread = await channel.threads.fetch(existing.threadId);
             if (thread) {
                 if (thread.archived) {
-                    await withRetry(() => thread.setArchived(false));
+                    await withRetry(async () => { await thread.setArchived(false); });
                 }
                 return thread;
             }
@@ -121,7 +121,7 @@ export async function getOrCreateIssueThread(channel, db, repo, issue, existing)
             // Thread doesn't exist or was deleted, create a new one
         }
     }
-    const message = await channel.messages.fetch(existing.messageId);
+    const message = await withRetry(() => channel.messages.fetch(existing.messageId));
     const thread = await withRetry(() => message.startThread({
         name: `Issue #${issue.number}: ${issue.title.substring(0, 90)}`,
         autoArchiveDuration: 1440,

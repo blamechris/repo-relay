@@ -52,7 +52,7 @@ export class RepoRelay {
         for (const channelId of channelIds) {
             let channel;
             try {
-                channel = await this.client.channels.fetch(channelId);
+                channel = await withRetry(() => this.client.channels.fetch(channelId));
             }
             catch {
                 errors.push(`[repo-relay] ERROR: Could not access channel ${channelId}\n` +
@@ -166,13 +166,13 @@ export class RepoRelay {
         if (result.changed) {
             try {
                 const channelId = getChannelForEvent(this.config.channelConfig, 'pr');
-                const channel = await this.client.channels.fetch(channelId);
+                const channel = await withRetry(() => this.client.channels.fetch(channelId));
                 if (!channel || !(channel instanceof TextChannel))
                     return;
                 const existing = await getExistingPrMessage(this.db, channel, repo, prNumber);
                 if (!existing)
                     return;
-                const message = await channel.messages.fetch(existing.messageId);
+                const message = await withRetry(() => channel.messages.fetch(existing.messageId));
                 const statusData = buildEmbedWithStatus(this.db, repo, prNumber);
                 if (statusData) {
                     const embed = buildPrEmbed(statusData.prData, statusData.ci, statusData.reviews);

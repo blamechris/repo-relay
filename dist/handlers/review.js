@@ -22,7 +22,7 @@ export async function handleReviewEvent(client, db, channelConfig, payload) {
         return;
     }
     const channelId = getChannelForEvent(channelConfig, 'review');
-    const channel = await client.channels.fetch(channelId);
+    const channel = await withRetry(() => client.channels.fetch(channelId));
     if (!channel || !(channel instanceof TextChannel)) {
         throw new Error(`Channel ${channelId} not found or not a text channel`);
     }
@@ -35,7 +35,7 @@ export async function handleReviewEvent(client, db, channelConfig, payload) {
     const isCopilot = review.user.type === 'Bot' &&
         review.user.login.toLowerCase().includes('copilot');
     if (isCopilot) {
-        const message = await channel.messages.fetch(existing.messageId);
+        const message = await withRetry(() => channel.messages.fetch(existing.messageId));
         // Update status in DB
         db.updateCopilotStatus(repo, pr.number, 'reviewed', 0);
         // Rebuild and edit the embed with updated status

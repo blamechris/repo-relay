@@ -61,7 +61,7 @@ export async function handleIssueEvent(
   };
 
   const channelId = getChannelForEvent(channelConfig, 'issue');
-  const channel = await client.channels.fetch(channelId);
+  const channel = await withRetry(() => client.channels.fetch(channelId));
   if (!channel || !(channel instanceof TextChannel)) {
     throw new Error(`Channel ${channelId} not found or not a text channel`);
   }
@@ -126,7 +126,7 @@ async function handleIssueStateChange(
 
   if (existing) {
     try {
-      const message = await channel.messages.fetch(existing.messageId);
+      const message = await withRetry(() => channel.messages.fetch(existing.messageId));
       saveIssueDataFromIssueData(db, repo, issue);
       const embed = buildIssueEmbed(issue);
       await withRetry(() => message.edit({ embeds: [embed] }));
@@ -198,7 +198,7 @@ export async function getOrCreateIssueThread(
     }
   }
 
-  const message = await channel.messages.fetch(existing.messageId);
+  const message = await withRetry(() => channel.messages.fetch(existing.messageId));
   const thread = await withRetry(() =>
     message.startThread({
       name: `Issue #${issue.number}: ${issue.title.substring(0, 90)}`,

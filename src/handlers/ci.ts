@@ -47,7 +47,7 @@ export async function handleCiEvent(
   }
 
   const channelId = getChannelForEvent(channelConfig, 'ci');
-  const channel = await client.channels.fetch(channelId);
+  const channel = await withRetry(() => client.channels.fetch(channelId));
   if (!channel || !(channel instanceof TextChannel)) {
     throw new Error(`Channel ${channelId} not found or not a text channel`);
   }
@@ -74,7 +74,7 @@ export async function handleCiEvent(
     db.updateCiStatus(repo, pr.number, ciStatus.status, run.name, run.html_url);
     console.log(`[repo-relay] Updated CI status to ${ciStatus.status}`);
 
-    const message = await channel.messages.fetch(existing.messageId);
+    const message = await withRetry(() => channel.messages.fetch(existing.messageId));
     console.log(`[repo-relay] Fetched Discord message`);
 
     // Rebuild and edit the embed with updated status
