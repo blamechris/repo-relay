@@ -5,6 +5,8 @@ import { TextChannel } from 'discord.js';
 import { buildPushEmbed, buildForcePushEmbed } from '../embeds/builders.js';
 import { getChannelForEvent } from '../config/channels.js';
 import { withRetry } from '../utils/retry.js';
+// Matches GitHub's default merge commit format ("Merge pull request #123 from user/branch").
+// Custom merge commit messages or rebase-merges won't match and will produce a notification.
 const PR_MERGE_COMMIT_PATTERN = /^Merge pull request #\d+/;
 export async function handlePushEvent(client, db, channelConfig, payload) {
     const { ref, forced, created, deleted, commits, compare, sender, repository } = payload;
