@@ -5,6 +5,7 @@
 
 import { TextChannel } from 'discord.js';
 import { StateDb, PrMessage, IssueMessage } from '../db/state.js';
+import { safeErrorMessage } from '../utils/errors.js';
 
 const PR_TITLE_PATTERN = /PR #(\d+):/;
 const ISSUE_TITLE_PATTERN = /Issue #(\d+):/;
@@ -18,24 +19,29 @@ async function findMessageInChannel(
   repo: string,
   targetNumber: number
 ): Promise<{ messageId: string; threadId: string | null } | null> {
-  const messages = await channel.messages.fetch({ limit: 100 });
+  try {
+    const messages = await channel.messages.fetch({ limit: 100 });
 
-  for (const message of messages.values()) {
-    const embed = message.embeds[0];
-    if (!embed?.title) continue;
+    for (const message of messages.values()) {
+      const embed = message.embeds[0];
+      if (!embed?.title) continue;
 
-    const match = embed.title.match(pattern);
-    if (match && parseInt(match[1], 10) === targetNumber) {
-      // Verify the embed belongs to this repo via its URL
-      if (embed.url && !embed.url.includes(`github.com/${repo}/`)) continue;
-      return {
-        messageId: message.id,
-        threadId: message.thread?.id ?? null,
-      };
+      const match = embed.title.match(pattern);
+      if (match && parseInt(match[1], 10) === targetNumber) {
+        // Verify the embed belongs to this repo via its URL
+        if (embed.url && !embed.url.includes(`github.com/${repo}/`)) continue;
+        return {
+          messageId: message.id,
+          threadId: message.thread?.id ?? null,
+        };
+      }
     }
-  }
 
-  return null;
+    return null;
+  } catch (err) {
+    console.error(`[repo-relay] Channel search failed: ${safeErrorMessage(err)}`);
+    return null;
+  }
 }
 
 /**
