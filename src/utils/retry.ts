@@ -16,6 +16,8 @@ export async function withRetry<T>(
   retries = 3,
   baseDelay = 1000
 ): Promise<T> {
+  if (retries < 0) throw new RangeError(`retries must be >= 0 (got ${retries})`);
+  if (baseDelay < 0) throw new RangeError(`baseDelay must be >= 0 (got ${baseDelay})`);
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       return await fn();

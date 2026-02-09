@@ -100,6 +100,20 @@ describe('withRetry', () => {
     expect(fn).toHaveBeenCalledTimes(1);
   });
 
+  it('throws RangeError for negative retries', async () => {
+    const fn = vi.fn().mockResolvedValue('ok');
+    await expect(withRetry(fn, -1)).rejects.toThrow(RangeError);
+    await expect(withRetry(fn, -1)).rejects.toThrow('retries must be >= 0');
+    expect(fn).not.toHaveBeenCalled();
+  });
+
+  it('throws RangeError for negative baseDelay', async () => {
+    const fn = vi.fn().mockResolvedValue('ok');
+    await expect(withRetry(fn, 3, -100)).rejects.toThrow(RangeError);
+    await expect(withRetry(fn, 3, -100)).rejects.toThrow('baseDelay must be >= 0');
+    expect(fn).not.toHaveBeenCalled();
+  });
+
   it('logs retry attempts', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const fn = vi.fn()

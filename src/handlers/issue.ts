@@ -189,7 +189,7 @@ export async function getOrCreateIssueThread(
       const thread = await channel.threads.fetch(existing.threadId);
       if (thread) {
         if (thread.archived) {
-          await withRetry(() => thread.setArchived(false) as Promise<ThreadChannel>);
+          await withRetry(async () => { await thread.setArchived(false); });
         }
         return thread;
       }
@@ -204,7 +204,7 @@ export async function getOrCreateIssueThread(
       name: `Issue #${issue.number}: ${issue.title.substring(0, 90)}`,
       autoArchiveDuration: 1440,
     })
-  ) as ThreadChannel;
+  );
 
   db.updateIssueThread(repo, issue.number, thread.id);
 

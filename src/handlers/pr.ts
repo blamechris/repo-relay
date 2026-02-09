@@ -379,7 +379,7 @@ export async function getOrCreateThread(
       if (thread) {
         // Unarchive if archived
         if (thread.archived) {
-          await withRetry(() => thread.setArchived(false) as Promise<ThreadChannel>);
+          await withRetry(async () => { await thread.setArchived(false); });
         }
         return thread;
       }
@@ -395,7 +395,7 @@ export async function getOrCreateThread(
       name: `PR #${pr.number}: ${pr.title.substring(0, 90)}`,
       autoArchiveDuration: 1440,
     })
-  ) as ThreadChannel;
+  );
 
   // Update the database with the new thread ID
   db.updatePrThread(repo, pr.number, thread.id);
