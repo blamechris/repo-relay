@@ -84,7 +84,9 @@ export class RepoRelay {
   }
 
   async connect(): Promise<void> {
-    await this.logSessionBudget();
+    if (process.env.REPO_RELAY_LOG_SESSION_BUDGET) {
+      await this.logSessionBudget();
+    }
     await this.client.login(this.config.discordToken);
     console.log(`[repo-relay] Connected to Discord as ${this.client.user?.tag}`);
   }

@@ -14,7 +14,8 @@ import type { GitHubEventPayload } from './index.js';
 export function shouldSkipEvent(eventData: GitHubEventPayload): string | null {
   switch (eventData.event) {
     case 'workflow_run': {
-      // ci.ts:46 — no PRs means nothing to update
+      // Also guarded in workflow YAML if-condition (defense-in-depth)
+      // Mirrors ci handler: no PRs means nothing to update
       const prs = eventData.payload.workflow_run.pull_requests;
       if (prs.length === 0) {
         return 'workflow_run: no associated PRs';
@@ -23,7 +24,7 @@ export function shouldSkipEvent(eventData: GitHubEventPayload): string | null {
     }
 
     case 'issue_comment': {
-      // comment.ts:52 — only created comments on PRs
+      // Mirrors comment handler: only created comments on PRs
       if (eventData.payload.action !== 'created') {
         return `issue_comment: action '${eventData.payload.action}' not handled`;
       }
@@ -34,7 +35,7 @@ export function shouldSkipEvent(eventData: GitHubEventPayload): string | null {
     }
 
     case 'deployment_status': {
-      // deployment.ts:48 — only terminal states
+      // Mirrors deployment handler: only terminal states
       const state = eventData.payload.deployment_status.state;
       if (state !== 'success' && state !== 'failure' && state !== 'error') {
         return `deployment_status: state '${state}' not terminal`;
@@ -45,15 +46,15 @@ export function shouldSkipEvent(eventData: GitHubEventPayload): string | null {
     case 'push': {
       const payload = eventData.payload;
       const branch = payload.ref.replace('refs/heads/', '');
-      // push.ts:47 — only default branch
+      // Mirrors push handler: only default branch
       if (branch !== payload.repository.default_branch) {
         return `push: branch '${branch}' is not default branch`;
       }
-      // push.ts:52 — skip branch creation/deletion
+      // Mirrors push handler: skip branch creation/deletion
       if (payload.created || payload.deleted) {
         return 'push: branch creation or deletion event';
       }
-      // push.ts:57 — skip if every commit is a PR merge commit
+      // Mirrors push handler: skip if every commit is a PR merge commit
       if (
         payload.commits.length > 0 &&
         payload.commits.every((c: { message: string }) => /^Merge pull request #\d+/.test(c.message))
@@ -64,7 +65,7 @@ export function shouldSkipEvent(eventData: GitHubEventPayload): string | null {
     }
 
     case 'release': {
-      // release.ts:42 — only published, non-draft
+      // Mirrors release handler: only published, non-draft
       if (eventData.payload.action !== 'published') {
         return `release: action '${eventData.payload.action}' not handled`;
       }
@@ -75,11 +76,11 @@ export function shouldSkipEvent(eventData: GitHubEventPayload): string | null {
     }
 
     case 'pull_request_review': {
-      // review.ts:45 — only submitted
+      // Mirrors review handler: only submitted
       if (eventData.payload.action !== 'submitted') {
         return `pull_request_review: action '${eventData.payload.action}' not handled`;
       }
-      // review.ts:50-55 — ignore owner comment replies to avoid cascades
+      // Mirrors review handler: ignore owner comment replies to avoid cascades
       const { review, repository } = eventData.payload;
       if (review?.user?.login === repository?.owner?.login && review?.state === 'commented') {
         return 'pull_request_review: owner comment reply';
@@ -88,7 +89,7 @@ export function shouldSkipEvent(eventData: GitHubEventPayload): string | null {
     }
 
     case 'issues': {
-      // issue.ts:90-94 — only opened, closed, reopened
+      // Mirrors issue handler: only opened, closed, reopened
       const action = eventData.payload.action;
       if (action !== 'opened' && action !== 'closed' && action !== 'reopened') {
         return `issues: action '${action}' not handled`;

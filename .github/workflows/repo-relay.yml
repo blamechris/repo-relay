@@ -19,6 +19,7 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     # Skip bots, fork PRs (no secrets), and workflow_runs with no associated PRs
+    # Note: workflow_run guard duplicates pre-filter.ts check (intentional defense-in-depth)
     if: >-
       github.actor != 'github-actions[bot]' &&
       (github.event.pull_request.head.repo.full_name == github.repository ||
