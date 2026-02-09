@@ -8,4 +8,5 @@ export { handleCommentEvent } from './comment.js';
 export { handleIssueEvent, getOrCreateIssueThread } from './issue.js';
 export { handleReleaseEvent } from './release.js';
 export { handleDeploymentEvent } from './deployment.js';
+export { handlePushEvent } from './push.js';
 //# sourceMappingURL=index.js.map

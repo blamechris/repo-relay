@@ -5,7 +5,7 @@
  */
 import { Client, GatewayIntentBits, PermissionsBitField } from 'discord.js';
 import { StateDb } from './db/state.js';
-import { handlePrEvent, handleCiEvent, handleReviewEvent, handleCommentEvent, handleIssueEvent, handleReleaseEvent, handleDeploymentEvent, } from './handlers/index.js';
+import { handlePrEvent, handleCiEvent, handleReviewEvent, handleCommentEvent, handleIssueEvent, handleReleaseEvent, handleDeploymentEvent, handlePushEvent, } from './handlers/index.js';
 import { checkForReviews } from './github/reviews.js';
 import { safeErrorMessage } from './utils/errors.js';
 import { REPO_NAME_PATTERN } from './utils/validation.js';
@@ -142,6 +142,9 @@ export class RepoRelay {
             case 'deployment_status':
                 await handleDeploymentEvent(this.client, db, this.config.channelConfig, eventData.payload);
                 break;
+            case 'push':
+                await handlePushEvent(this.client, db, this.config.channelConfig, eventData.payload);
+                break;
             case 'schedule':
                 if (!this.config.githubToken) {
                     console.log('[repo-relay] Skipping scheduled review poll: no GITHUB_TOKEN');
@@ -240,6 +243,7 @@ export class RepoRelay {
             case 'issues':
             case 'release':
             case 'deployment_status':
+            case 'push':
             case 'schedule':
                 repo = eventData.payload.repository.full_name;
                 break;

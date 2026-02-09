@@ -15,6 +15,7 @@ import {
   handleIssueEvent,
   handleReleaseEvent,
   handleDeploymentEvent,
+  handlePushEvent,
   type PrEventPayload,
   type WorkflowRunPayload,
   type PrReviewPayload,
@@ -22,6 +23,7 @@ import {
   type IssueEventPayload,
   type ReleaseEventPayload,
   type DeploymentStatusPayload,
+  type PushEventPayload,
 } from './handlers/index.js';
 import { checkForReviews } from './github/reviews.js';
 import { safeErrorMessage } from './utils/errors.js';
@@ -48,6 +50,7 @@ export type GitHubEventPayload =
   | { event: 'issues'; payload: IssueEventPayload }
   | { event: 'release'; payload: ReleaseEventPayload }
   | { event: 'deployment_status'; payload: DeploymentStatusPayload }
+  | { event: 'push'; payload: PushEventPayload }
   | { event: 'schedule'; payload: { schedule: string; repository: { full_name: string } } };
 
 
@@ -253,6 +256,15 @@ export class RepoRelay {
         );
         break;
 
+      case 'push':
+        await handlePushEvent(
+          this.client,
+          db,
+          this.config.channelConfig,
+          eventData.payload
+        );
+        break;
+
       case 'schedule':
         if (!this.config.githubToken) {
           console.log('[repo-relay] Skipping scheduled review poll: no GITHUB_TOKEN');
@@ -366,6 +378,7 @@ export class RepoRelay {
       case 'issues':
       case 'release':
       case 'deployment_status':
+      case 'push':
       case 'schedule':
         repo = eventData.payload.repository.full_name;
         break;

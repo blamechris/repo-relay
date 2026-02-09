@@ -7,6 +7,7 @@ export interface ProjectFeatures {
   releases: boolean;
   deployments: boolean;
   reviewPolling: boolean;
+  pushEvents: boolean;
 }
 
 export function buildWorkflowTemplate(ciWorkflowName: string, features: ProjectFeatures): string {
@@ -16,6 +17,10 @@ export function buildWorkflowTemplate(ciWorkflowName: string, features: ProjectF
     '  pull_request_review:',
     '    types: [submitted]',
   ];
+
+  if (features.pushEvents) {
+    eventLines.push('  push:', `    branches: [main]`);
+  }
 
   if (features.issues) {
     eventLines.push('  issue_comment:', '    types: [created]');

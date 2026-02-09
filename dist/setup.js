@@ -11,10 +11,10 @@ import { join } from 'path';
 import { safeErrorMessage } from './utils/errors.js';
 import { buildWorkflowTemplate } from './setup/workflow-template.js';
 const PROJECT_TYPES = {
-    library: { issues: true, releases: true, deployments: false, reviewPolling: false },
-    webapp: { issues: true, releases: false, deployments: false, reviewPolling: false },
-    app: { issues: true, releases: false, deployments: true, reviewPolling: false },
-    minimal: { issues: false, releases: false, deployments: false, reviewPolling: false },
+    library: { issues: true, releases: true, deployments: false, reviewPolling: false, pushEvents: false },
+    webapp: { issues: true, releases: false, deployments: false, reviewPolling: false, pushEvents: false },
+    app: { issues: true, releases: false, deployments: true, reviewPolling: false, pushEvents: false },
+    minimal: { issues: false, releases: false, deployments: false, reviewPolling: false, pushEvents: false },
 };
 function getRepoUrl() {
     try {
@@ -94,6 +94,7 @@ async function main() {
                 { title: 'Release notifications', value: 'releases' },
                 { title: 'Deployment notifications', value: 'deployments' },
                 { title: 'Review polling (every 5 min)', value: 'reviewPolling' },
+                { title: 'Push notifications (direct pushes to default branch)', value: 'pushEvents' },
             ],
         });
         if (!customFeatures) {
@@ -105,6 +106,7 @@ async function main() {
             releases: customFeatures.includes('releases'),
             deployments: customFeatures.includes('deployments'),
             reviewPolling: customFeatures.includes('reviewPolling'),
+            pushEvents: customFeatures.includes('pushEvents'),
         };
     }
     else {

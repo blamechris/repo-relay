@@ -13,10 +13,10 @@ import { safeErrorMessage } from './utils/errors.js';
 import { buildWorkflowTemplate, type ProjectFeatures } from './setup/workflow-template.js';
 
 const PROJECT_TYPES: Record<'library' | 'webapp' | 'app' | 'minimal', ProjectFeatures> = {
-  library: { issues: true,  releases: true,  deployments: false, reviewPolling: false },
-  webapp:  { issues: true,  releases: false, deployments: false, reviewPolling: false },
-  app:     { issues: true,  releases: false, deployments: true,  reviewPolling: false },
-  minimal: { issues: false, releases: false, deployments: false, reviewPolling: false },
+  library: { issues: true,  releases: true,  deployments: false, reviewPolling: false, pushEvents: false },
+  webapp:  { issues: true,  releases: false, deployments: false, reviewPolling: false, pushEvents: false },
+  app:     { issues: true,  releases: false, deployments: true,  reviewPolling: false, pushEvents: false },
+  minimal: { issues: false, releases: false, deployments: false, reviewPolling: false, pushEvents: false },
 };
 
 function getRepoUrl(): string | null {
@@ -108,6 +108,7 @@ async function main(): Promise<void> {
         { title: 'Release notifications', value: 'releases' },
         { title: 'Deployment notifications', value: 'deployments' },
         { title: 'Review polling (every 5 min)', value: 'reviewPolling' },
+        { title: 'Push notifications (direct pushes to default branch)', value: 'pushEvents' },
       ],
     });
 
@@ -121,6 +122,7 @@ async function main(): Promise<void> {
       releases: (customFeatures as string[]).includes('releases'),
       deployments: (customFeatures as string[]).includes('deployments'),
       reviewPolling: (customFeatures as string[]).includes('reviewPolling'),
+      pushEvents: (customFeatures as string[]).includes('pushEvents'),
     };
   } else {
     features = PROJECT_TYPES[projectType as keyof typeof PROJECT_TYPES];
