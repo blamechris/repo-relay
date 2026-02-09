@@ -31,18 +31,20 @@ export interface DeploymentStatusPayload {
   };
 }
 
+const TERMINAL_STATES = new Set(['success', 'failure', 'error']);
+
 export async function handleDeploymentEvent(
   client: Client,
   db: StateDb,
   channelConfig: ChannelConfig,
   payload: DeploymentStatusPayload
 ): Promise<void> {
-  const { deployment_status, deployment, repository } = payload;
+  const { deployment_status, repository } = payload;
+  const { ref, sha } = payload.deployment;
   const repo = repository.full_name;
 
   // Only notify for terminal states
-  const terminalStates = ['success', 'failure', 'error'];
-  if (!terminalStates.includes(deployment_status.state)) {
+  if (!TERMINAL_STATES.has(deployment_status.state)) {
     return;
   }
 
@@ -57,8 +59,8 @@ export async function handleDeploymentEvent(
   const embed = buildDeploymentEmbed(
     deployment_status.state,
     deployment_status.environment,
-    deployment.ref,
-    deployment.sha,
+    ref,
+    sha,
     deployment_status.creator.login,
     deployment_status.creator.avatar_url,
     deployment_status.description ?? undefined,
