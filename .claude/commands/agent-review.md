@@ -196,12 +196,24 @@ echo "Created: ${ISSUE_URL}"
 
 See `.claude/skills/agent-review/skill.md` sections 5-8 for the full issue creation workflow.
 
-### 6. Report to User
+### 6. Reconcile Issues Resolved in This PR
+
+After all fixes, check if any created or pre-existing `from-review` issues were already resolved. Close them with a comment linking the PR — every closed issue MUST reference a PR for paper trail.
+
+```bash
+gh issue list --label "from-review" --json number,title,body
+# For each resolved issue:
+gh issue comment ${ISSUE_NUM} --body "Addressed in PR #${PR_NUM} — ${DESCRIPTION}."
+gh issue close ${ISSUE_NUM}
+```
+
+### 7. Report to User
 
 Output:
 - Review verdict
 - Critical issues count (with GitHub issue links)
 - Suggestions: X addressed, Y deferred to issues
 - Nitpicks: X addressed, Y deferred to issues
+- Issues closed as already resolved (with URLs)
 - All created issue links
 - Link to posted review

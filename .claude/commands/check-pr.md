@@ -178,7 +178,18 @@ Valid suggestion. Created ${ISSUE_URL} to track this work.
 git push
 ```
 
-### 5. Verify All Inline Replies Were Posted
+### 5. Cross-Reference Fixes Against Open Issues
+
+After pushing fixes, check if any open `from-review` issues were resolved by the work in this PR. Close them with a comment linking the PR — every closed issue MUST reference a PR for paper trail.
+
+```bash
+gh issue list --label "from-review" --json number,title,body
+# For each resolved issue:
+gh issue comment ${ISSUE_NUM} --body "Addressed in PR #${PR_NUM} — ${DESCRIPTION}."
+gh issue close ${ISSUE_NUM}
+```
+
+### 6. Verify All Inline Replies Were Posted
 
 **This step is MANDATORY. Do NOT skip it.**
 
@@ -196,7 +207,7 @@ echo "Root comments: ${ROOT_COUNT}, Replied: ${REPLIED_COUNT}"
 
 If `REPLIED_COUNT < ROOT_COUNT`, you have UNREPLIED comments. Go back to step 3 and post the missing inline replies BEFORE proceeding. **Do NOT post the summary comment until every thread has a reply.**
 
-### 6. Post Summary Comment
+### 7. Post Summary Comment
 
 After addressing ALL comments, post a summary on the PR. Every row MUST have a commit hash or issue URL in the Commit/Issue column -- no empty cells, no "N/A" for deferred items.
 
@@ -214,17 +225,19 @@ gh pr comment ${PR_NUM} --body "$(cat <<'EOF'
 - Fixed: Y
 - False positives: Z
 - Follow-up issues: W
+- Existing issues closed: A
 EOF
 )"
 ```
 
-### 7. Report to User
+### 8. Report to User
 
 Output:
 - Total comments processed
 - Fixes committed (with hashes)
 - Items dismissed (with reasons)
 - Follow-up issues created (with URLs)
+- Existing issues closed (with URLs)
 - PR ready for re-review: Yes/No
 
 ## Critical Rules

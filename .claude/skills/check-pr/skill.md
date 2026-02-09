@@ -281,7 +281,7 @@ gh api repos/${REPO}/pulls/{pr_number}/comments/{comment_id}/replies \
    b. Evaluate if valid or erroneous
    c. If valid:
       - Make the fix for THIS specific issue
-      - Commit with clear message
+      - Commit with clear message (use "closes #XXX" if it resolves an open issue)
       - Push to PR branch
    d. If erroneous:
       - Document why THIS specific comment is not an issue
@@ -293,18 +293,27 @@ gh api repos/${REPO}/pulls/{pr_number}/comments/{comment_id}/replies \
    f. Resolve the comment thread (via GitHub UI)
    g. Move to next comment
 
-6. Verify all threads resolved:
+6. Cross-reference fixes against open issues (MANDATORY):
+   - Run: gh issue list --label "from-review" --json number,title,body --jq '.[]'
+   - For each fix made, check if an open issue describes the same problem
+   - If a fix resolves an open issue, close it with a comment linking the PR:
+     gh issue comment {issue_number} --body "Addressed in PR #{pr_number} — {description of fix}."
+     gh issue close {issue_number}
+   - Report which issues were closed in the summary
+
+7. Verify all threads resolved:
    - Check PR → Files Changed tab
    - Ensure no unresolved conversations remain
    - This prevents merge blockers
 
-7. Summary to user:
+8. Summary to user:
    - CI status: Passed
    - Copilot review: Completed / Not Requested / Timed Out
    - Total comments found: X
    - Fixed: Y comments
    - Explained as erroneous: Z comments
    - Commit hashes for all fixes
+   - Issues closed: #A, #B (if any)
 ```
 
 ## Example Session
@@ -473,7 +482,8 @@ Before completing check-pr:
 - [ ] **Each reply includes before/after code and rationale for THAT specific issue**
 - [ ] **NO generic "fixed all X issues" replies - each comment gets unique response**
 - [ ] **Resolved all comment threads** (via GitHub UI)
-- [ ] Provided summary to user with commit hashes
+- [ ] **Cross-referenced fixes against open `from-review` issues** — closed any that were resolved
+- [ ] Provided summary to user with commit hashes and closed issue links
 
 ## Troubleshooting
 
@@ -563,6 +573,7 @@ A successful check-pr execution:
 - All review comments addressed (fixed or explained)
 - All fixes committed with clear messages
 - All comments have INLINE replies with commit hashes or explanations
+- **Open `from-review` issues cross-referenced** — any resolved by fixes are closed with PR link
 - User has summary of what was done
 - PR is ready to merge (all concerns addressed, Copilot feedback incorporated)
 
@@ -574,4 +585,5 @@ A successful check-pr execution:
 **Related Skills:** agent-review
 
 ### Changelog
+- **v1.1** (2026-02-09): Added cross-reference step — after fixing Copilot comments, check open `from-review` issues and close any that were resolved, with a comment linking the PR. Ensures paper trail from issue → fix → PR.
 - **v1.0** (2026-02-05): Initial version for repo-relay. Adapted API endpoints, TypeScript code examples, and `testing:` label scheme for this project.

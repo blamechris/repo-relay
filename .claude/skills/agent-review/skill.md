@@ -276,7 +276,22 @@ Minor style/formatting items identified during review:
 *Found during agent review of PR #${PR_NUM}*"
 ```
 
-### 8. Post Follow-up Summary
+### 8. Reconcile Issues Resolved in This PR (MANDATORY)
+
+After all fixes are committed, check whether any issues created during this review (or pre-existing `from-review` issues) were already addressed by fixes in this PR. This commonly happens when:
+- A suggestion is created as an issue, then Copilot feedback triggers the same fix during `/check-pr`
+- A critical issue is created, fixed, but the issue wasn't closed with `closes #XX` in the commit
+
+**For each issue resolved by a fix in this PR:**
+```bash
+# Close with a comment linking the PR for paper trail
+gh issue comment {issue_number} --body "Addressed in PR #${PR_NUM} — {description of how it was fixed}."
+gh issue close {issue_number}
+```
+
+**RULE: Every closed issue MUST reference a PR.** The comment is the paper trail. No silent closes.
+
+### 9. Post Follow-up Summary
 
 After creating all issues, post a summary comment on the PR linking them:
 
@@ -297,7 +312,7 @@ EOF
 )"
 ```
 
-### 9. Report to User
+### 10. Report to User
 
 Output:
 - Review verdict
@@ -357,13 +372,18 @@ Output:
    a. Can fix in seconds? → Fix it now
    b. Otherwise → Create GitHub issue (can batch multiple)
 
-9. Post follow-up comment linking all created issues
+9. Reconcile: check if any created issues were already resolved by
+   fixes in this PR. Close them with a comment linking the PR.
+   Also check pre-existing `from-review` issues.
 
-10. Report to user:
+10. Post follow-up comment linking all created issues
+
+11. Report to user:
     - Verdict (Approve/Request Changes/Comment)
     - Critical issues: X found, X fixed, issues #A, #B
     - Suggestions: X found, Y fixed, Z deferred to issues #C, #D
     - Nitpicks: X found, Y fixed, Z deferred to issue #E
+    - Issues closed as already resolved: #F, #G
     - Link to posted review
 ```
 
@@ -422,6 +442,7 @@ Before completing agent review:
 - [ ] Fixed critical issues and committed with issue references
 - [ ] **Created GitHub issues for ALL non-addressed suggestions**
 - [ ] **Created GitHub issues for ALL non-addressed nitpicks**
+- [ ] **Reconciled: closed any created/pre-existing issues already resolved by fixes in this PR** (with PR-linking comment)
 - [ ] Posted follow-up comment linking all created issues
 - [ ] Provided summary to user with all issue links
 
@@ -484,4 +505,5 @@ A successful agent review:
 **Related Skills:** check-pr
 
 ### Changelog
+- **v1.1** (2026-02-09): Added Step 8 "Reconcile Issues" — after all fixes, cross-reference created and pre-existing `from-review` issues against fixes in this PR. Close any already-resolved issues with a comment linking the PR. Ensures paper trail: every closed issue references a PR.
 - **v1.0** (2026-02-05): Initial version for repo-relay. "Relay Inspector" persona with TypeScript/discord.js/GitHub integration review criteria. Architecture patterns from CLAUDE.md. `testing:` label scheme. All code examples in TypeScript.
