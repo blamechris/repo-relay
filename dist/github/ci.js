@@ -8,7 +8,7 @@ import { safeErrorMessage } from '../utils/errors.js';
  */
 export async function fetchFailedSteps(repo, runId, githubToken) {
     try {
-        const url = `https://api.github.com/repos/${repo}/actions/runs/${runId}/jobs`;
+        const url = `https://api.github.com/repos/${repo}/actions/runs/${runId}/jobs?per_page=100`;
         const res = await fetch(url, {
             headers: {
                 'Authorization': `Bearer ${githubToken}`,
@@ -17,6 +17,7 @@ export async function fetchFailedSteps(repo, runId, githubToken) {
             },
         });
         if (!res.ok) {
+            console.log(`[repo-relay] Warning: Failed to fetch CI failure details: HTTP ${res.status}`);
             return [];
         }
         const data = await res.json();

@@ -22,6 +22,17 @@ export async function handleCiEvent(client, db, channelConfig, payload, githubTo
     if (!channel || !(channel instanceof TextChannel)) {
         throw new Error(`Channel ${channelId} not found or not a text channel`);
     }
+    const ciStatus = {
+        status: mapCiStatus(run.status, run.conclusion),
+        workflowName: run.name,
+        conclusion: run.conclusion ?? undefined,
+        url: run.html_url,
+    };
+    // Fetch failed steps once for the run (shared across all associated PRs)
+    let failedSteps;
+    if (payload.action === 'completed' && ciStatus.status === 'failure' && githubToken) {
+        failedSteps = await fetchFailedSteps(repo, run.id, githubToken);
+    }
     for (const pr of run.pull_requests) {
         console.log(`[repo-relay] Processing CI for PR #${pr.number}`);
         db.logEvent(repo, pr.number, `ci.${payload.action}`, payload);
@@ -31,12 +42,6 @@ export async function handleCiEvent(client, db, channelConfig, payload, githubTo
             continue;
         }
         console.log(`[repo-relay] Found message ${existing.messageId} for PR #${pr.number}`);
-        const ciStatus = {
-            status: mapCiStatus(run.status, run.conclusion),
-            workflowName: run.name,
-            conclusion: run.conclusion ?? undefined,
-            url: run.html_url,
-        };
         // Update CI status in DB
         db.updateCiStatus(repo, pr.number, ciStatus.status, run.name, run.html_url);
         console.log(`[repo-relay] Updated CI status to ${ciStatus.status}`);
@@ -53,14 +58,9 @@ export async function handleCiEvent(client, db, channelConfig, payload, githubTo
             // Only post to thread for completed runs
             if (payload.action === 'completed') {
                 const thread = await getOrCreateThread(channel, db, repo, statusData.prData, existing);
-                let reply;
-                if (ciStatus.status === 'failure' && githubToken) {
-                    const failedSteps = await fetchFailedSteps(repo, run.id, githubToken);
-                    reply = buildCiFailureReply(ciStatus, failedSteps);
-                }
-                else {
-                    reply = buildCiReply(ciStatus);
-                }
+                const reply = failedSteps
+                    ? buildCiFailureReply(ciStatus, failedSteps)
+                    : buildCiReply(ciStatus);
                 await withRetry(() => thread.send(reply));
                 console.log(`[repo-relay] Posted CI update to thread`);
                 db.updatePrMessageTimestamp(repo, pr.number);
