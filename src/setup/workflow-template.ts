@@ -31,6 +31,7 @@ export function buildWorkflowTemplate(ciWorkflowName: string, features: ProjectF
   }
 
   if (features.reviewPolling) {
+    eventLines.push('  # Poll open PRs for review updates every 5 minutes');
     eventLines.push('  schedule:', "    - cron: '*/5 * * * *'");
   }
 

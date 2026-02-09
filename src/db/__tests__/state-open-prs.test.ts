@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { StateDb, type StoredPrData } from '../state.js';
-import { unlinkSync, rmSync } from 'fs';
+import { rmSync } from 'fs';
 import { mkdtempSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';

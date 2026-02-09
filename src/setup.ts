@@ -131,7 +131,7 @@ async function main(): Promise<void> {
     const { enablePolling } = await prompts({
       type: 'confirm',
       name: 'enablePolling',
-      message: 'Enable review polling? (catches Copilot reviews within ~5 min, best with self-hosted runner)',
+      message: 'Enable review polling? (catches Copilot reviews within ~5 min; best with self-hosted runner since ephemeral runners lose state)',
       initial: false,
     });
 

@@ -405,7 +405,7 @@ export class StateDb {
 
   getOpenPrNumbers(repo: string): number[] {
     const stmt = this.db.prepare(
-      'SELECT pr_number FROM pr_data WHERE repo = ? AND state = ?'
+      'SELECT pr_number FROM pr_data WHERE repo = ? AND state = ? ORDER BY pr_number ASC'
     );
     return (stmt.all(repo, 'open') as Array<{ pr_number: number }>).map(r => r.pr_number);
   }

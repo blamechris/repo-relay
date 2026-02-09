@@ -19,6 +19,7 @@ export function buildWorkflowTemplate(ciWorkflowName, features) {
         eventLines.push('  deployment_status:');
     }
     if (features.reviewPolling) {
+        eventLines.push('  # Poll open PRs for review updates every 5 minutes');
         eventLines.push('  schedule:', "    - cron: '*/5 * * * *'");
     }
     const sanitizedName = ciWorkflowName.replace(/"/g, '\\"');
