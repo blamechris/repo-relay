@@ -63,6 +63,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
 ${permissionLines.join('\n')}
+    # Only filter workflow_run events — all other events (PR, issue, deployment, etc.) pass through
     if: github.event_name != 'workflow_run' || github.event.workflow_run.pull_requests[0] != null
 
     steps:
