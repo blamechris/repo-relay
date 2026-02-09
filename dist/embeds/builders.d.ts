@@ -1,7 +1,8 @@
 /**
  * Discord embed builders for various notification types
  */
-import { EmbedBuilder } from 'discord.js';
+import { EmbedBuilder, ButtonBuilder, ActionRowBuilder } from 'discord.js';
+import type { FailedStep } from '../github/ci.js';
 export interface PrData {
     number: number;
     title: string;
@@ -33,8 +34,10 @@ export interface ReviewStatus {
     agentReview: 'pending' | 'approved' | 'changes_requested' | 'none';
 }
 export declare function buildPrEmbed(pr: PrData, ci?: CiStatus, reviews?: ReviewStatus): EmbedBuilder;
+export declare function buildPrComponents(prUrl: string, ciUrl?: string): ActionRowBuilder<ButtonBuilder>;
 export declare function buildPushReply(commitCount: number, author: string, sha: string, compareUrl?: string): string;
 export declare function buildCiReply(ci: CiStatus): string;
+export declare function buildCiFailureReply(ci: CiStatus, failedSteps: FailedStep[]): string;
 export declare function buildReviewReply(type: 'copilot' | 'agent', status: string, comments?: number, url?: string): string;
 export declare function buildMergedReply(mergedBy?: string): string;
 export declare function buildClosedReply(closedBy?: string): string;

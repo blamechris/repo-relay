@@ -2,7 +2,7 @@
  * Pull Request event handler
  */
 import { TextChannel } from 'discord.js';
-import { buildPrEmbed, buildMergedReply, buildClosedReply, buildPushReply } from '../embeds/builders.js';
+import { buildPrEmbed, buildPrComponents, buildMergedReply, buildClosedReply, buildPushReply } from '../embeds/builders.js';
 import { getChannelForEvent } from '../config/channels.js';
 import { getExistingPrMessage } from '../discord/lookup.js';
 import { withRetry } from '../utils/retry.js';
@@ -55,7 +55,8 @@ export async function handlePrEvent(client, db, channelConfig, payload) {
 }
 async function handlePrOpened(channel, db, repo, pr) {
     const embed = buildPrEmbed(pr);
-    const message = await withRetry(() => channel.send({ embeds: [embed] }));
+    const components = [buildPrComponents(pr.url)];
+    const message = await withRetry(() => channel.send({ embeds: [embed], components }));
     // Create a thread for updates
     const thread = await withRetry(() => message.startThread({
         name: `PR #${pr.number}: ${pr.title.substring(0, 90)}`,
@@ -80,7 +81,8 @@ async function handlePrClosed(channel, db, repo, pr) {
             const embed = statusData
                 ? buildPrEmbed(statusData.prData, statusData.ci, statusData.reviews)
                 : buildPrEmbed(pr);
-            await withRetry(() => message.edit({ embeds: [embed] }));
+            const components = [buildPrComponents(pr.url, statusData?.ci.url)];
+            await withRetry(() => message.edit({ embeds: [embed], components }));
             // Post to thread
             const thread = await getOrCreateThread(channel, db, repo, pr, existing);
             const reply = pr.state === 'merged'
@@ -106,7 +108,8 @@ async function handlePrClosed(channel, db, repo, pr) {
     if (!existing) {
         // No existing message, create one showing the final state
         const embed = buildPrEmbed(pr);
-        const message = await withRetry(() => channel.send({ embeds: [embed] }));
+        const components = [buildPrComponents(pr.url)];
+        const message = await withRetry(() => channel.send({ embeds: [embed], components }));
         // Create a thread
         const thread = await withRetry(() => message.startThread({
             name: `PR #${pr.number}: ${pr.title.substring(0, 90)}`,
@@ -140,7 +143,8 @@ async function handlePrPush(channel, db, repo, pr, payload) {
     // If no message exists yet (PR opened before bot was set up), create one
     if (!existing) {
         const embed = buildPrEmbed(pr);
-        const message = await withRetry(() => channel.send({ embeds: [embed] }));
+        const components = [buildPrComponents(pr.url)];
+        const message = await withRetry(() => channel.send({ embeds: [embed], components }));
         // Create a thread for updates
         const thread = await withRetry(() => message.startThread({
             name: `PR #${pr.number}: ${pr.title.substring(0, 90)}`,
@@ -171,7 +175,8 @@ async function handlePrUpdated(channel, db, repo, pr) {
             const messageId = existing.messageId;
             const message = await withRetry(() => channel.messages.fetch(messageId));
             const embed = buildPrEmbed(pr);
-            await withRetry(() => message.edit({ embeds: [embed] }));
+            const components = [buildPrComponents(pr.url)];
+            await withRetry(() => message.edit({ embeds: [embed], components }));
             db.updatePrMessageTimestamp(repo, pr.number);
             savePrDataFromPrData(db, repo, pr);
             return;
@@ -191,7 +196,8 @@ async function handlePrUpdated(channel, db, repo, pr) {
     if (!existing) {
         // No message exists yet (PR opened before bot was set up), create one
         const embed = buildPrEmbed(pr);
-        const message = await withRetry(() => channel.send({ embeds: [embed] }));
+        const components = [buildPrComponents(pr.url)];
+        const message = await withRetry(() => channel.send({ embeds: [embed], components }));
         // Create a thread for updates
         const thread = await withRetry(() => message.startThread({
             name: `PR #${pr.number}: ${pr.title.substring(0, 90)}`,

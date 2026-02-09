@@ -1,7 +1,7 @@
 /**
  * Discord embed builders for various notification types
  */
-import { EmbedBuilder, Colors } from 'discord.js';
+import { EmbedBuilder, Colors, ButtonBuilder, ButtonStyle, ActionRowBuilder } from 'discord.js';
 export function buildPrEmbed(pr, ci, reviews) {
     const emoji = getPrEmoji(pr.state, pr.draft);
     const stateLabel = getPrStateLabel(pr.state, pr.draft);
@@ -60,6 +60,14 @@ export function buildPrEmbed(pr, ci, reviews) {
     }
     return embed;
 }
+export function buildPrComponents(prUrl, ciUrl) {
+    const row = new ActionRowBuilder();
+    row.addComponents(new ButtonBuilder().setLabel('View PR').setStyle(ButtonStyle.Link).setURL(prUrl), new ButtonBuilder().setLabel('View Diff').setStyle(ButtonStyle.Link).setURL(`${prUrl}/files`));
+    if (ciUrl) {
+        row.addComponents(new ButtonBuilder().setLabel('View CI').setStyle(ButtonStyle.Link).setURL(ciUrl));
+    }
+    return row;
+}
 export function buildPushReply(commitCount, author, sha, compareUrl) {
     const shaShort = sha.substring(0, 7);
     const link = compareUrl ? `[${shaShort}](${compareUrl})` : shaShort;
@@ -69,6 +77,17 @@ export function buildPushReply(commitCount, author, sha, compareUrl) {
 export function buildCiReply(ci) {
     const status = getCiStatusText(ci);
     return `🔄 CI: ${status}`;
+}
+export function buildCiFailureReply(ci, failedSteps) {
+    const base = buildCiReply(ci);
+    if (failedSteps.length === 0)
+        return base;
+    const maxDisplay = 5;
+    const lines = failedSteps.slice(0, maxDisplay).map(s => `• \`${s.jobName}\` > \`${s.stepName}\``);
+    if (failedSteps.length > maxDisplay) {
+        lines.push(`...and ${failedSteps.length - maxDisplay} more`);
+    }
+    return `${base}\n**Failed steps:**\n${lines.join('\n')}`;
 }
 export function buildReviewReply(type, status, comments, url) {
     if (type === 'copilot') {

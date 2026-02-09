@@ -2,7 +2,8 @@
  * Discord embed builders for various notification types
  */
 
-import { EmbedBuilder, Colors } from 'discord.js';
+import { EmbedBuilder, Colors, ButtonBuilder, ButtonStyle, ActionRowBuilder } from 'discord.js';
+import type { FailedStep } from '../github/ci.js';
 
 export interface PrData {
   number: number;
@@ -110,6 +111,20 @@ export function buildPrEmbed(
   return embed;
 }
 
+export function buildPrComponents(prUrl: string, ciUrl?: string): ActionRowBuilder<ButtonBuilder> {
+  const row = new ActionRowBuilder<ButtonBuilder>();
+  row.addComponents(
+    new ButtonBuilder().setLabel('View PR').setStyle(ButtonStyle.Link).setURL(prUrl),
+    new ButtonBuilder().setLabel('View Diff').setStyle(ButtonStyle.Link).setURL(`${prUrl}/files`),
+  );
+  if (ciUrl) {
+    row.addComponents(
+      new ButtonBuilder().setLabel('View CI').setStyle(ButtonStyle.Link).setURL(ciUrl),
+    );
+  }
+  return row;
+}
+
 export function buildPushReply(
   commitCount: number,
   author: string,
@@ -125,6 +140,20 @@ export function buildPushReply(
 export function buildCiReply(ci: CiStatus): string {
   const status = getCiStatusText(ci);
   return `🔄 CI: ${status}`;
+}
+
+export function buildCiFailureReply(ci: CiStatus, failedSteps: FailedStep[]): string {
+  const base = buildCiReply(ci);
+  if (failedSteps.length === 0) return base;
+
+  const maxDisplay = 5;
+  const lines = failedSteps.slice(0, maxDisplay).map(
+    s => `• \`${s.jobName}\` > \`${s.stepName}\``
+  );
+  if (failedSteps.length > maxDisplay) {
+    lines.push(`...and ${failedSteps.length - maxDisplay} more`);
+  }
+  return `${base}\n**Failed steps:**\n${lines.join('\n')}`;
 }
 
 export function buildReviewReply(

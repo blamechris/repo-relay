@@ -4,11 +4,12 @@
 
 import { Client, TextChannel } from 'discord.js';
 import { StateDb } from '../db/state.js';
-import { buildCiReply, CiStatus, buildPrEmbed, PrData } from '../embeds/builders.js';
+import { buildCiReply, buildCiFailureReply, CiStatus, buildPrEmbed, buildPrComponents } from '../embeds/builders.js';
 import { getChannelForEvent, ChannelConfig } from '../config/channels.js';
 import { buildEmbedWithStatus, getOrCreateThread } from './pr.js';
 import { getExistingPrMessage } from '../discord/lookup.js';
 import { withRetry } from '../utils/retry.js';
+import { fetchFailedSteps } from '../github/ci.js';
 
 export interface WorkflowRunPayload {
   action: 'completed' | 'requested' | 'in_progress';
@@ -33,7 +34,8 @@ export async function handleCiEvent(
   client: Client,
   db: StateDb,
   channelConfig: ChannelConfig,
-  payload: WorkflowRunPayload
+  payload: WorkflowRunPayload,
+  githubToken?: string
 ): Promise<void> {
   const { workflow_run: run, repository } = payload;
   const repo = repository.full_name;
@@ -52,6 +54,19 @@ export async function handleCiEvent(
     throw new Error(`Channel ${channelId} not found or not a text channel`);
   }
 
+  const ciStatus: CiStatus = {
+    status: mapCiStatus(run.status, run.conclusion),
+    workflowName: run.name,
+    conclusion: run.conclusion ?? undefined,
+    url: run.html_url,
+  };
+
+  // Fetch failed steps once for the run (shared across all associated PRs)
+  let failedSteps: Awaited<ReturnType<typeof fetchFailedSteps>> | undefined;
+  if (payload.action === 'completed' && ciStatus.status === 'failure' && githubToken) {
+    failedSteps = await fetchFailedSteps(repo, run.id, githubToken);
+  }
+
   for (const pr of run.pull_requests) {
     console.log(`[repo-relay] Processing CI for PR #${pr.number}`);
     db.logEvent(repo, pr.number, `ci.${payload.action}`, payload);
@@ -62,13 +77,6 @@ export async function handleCiEvent(
       continue;
     }
     console.log(`[repo-relay] Found message ${existing.messageId} for PR #${pr.number}`);
-
-    const ciStatus: CiStatus = {
-      status: mapCiStatus(run.status, run.conclusion),
-      workflowName: run.name,
-      conclusion: run.conclusion ?? undefined,
-      url: run.html_url,
-    };
 
     // Update CI status in DB
     db.updateCiStatus(repo, pr.number, ciStatus.status, run.name, run.html_url);
@@ -82,13 +90,16 @@ export async function handleCiEvent(
     if (statusData) {
       console.log(`[repo-relay] Rebuilding embed with CI: ${statusData.ci.status}`);
       const embed = buildPrEmbed(statusData.prData, statusData.ci, statusData.reviews);
-      await withRetry(() => message.edit({ embeds: [embed] }));
+      const components = [buildPrComponents(statusData.prData.url, statusData.ci.url)];
+      await withRetry(() => message.edit({ embeds: [embed], components }));
       console.log(`[repo-relay] Embed updated successfully`);
 
       // Only post to thread for completed runs
       if (payload.action === 'completed') {
         const thread = await getOrCreateThread(channel, db, repo, statusData.prData, existing);
-        const reply = buildCiReply(ciStatus);
+        const reply = failedSteps
+          ? buildCiFailureReply(ciStatus, failedSteps)
+          : buildCiReply(ciStatus);
         await withRetry(() => thread.send(reply));
         console.log(`[repo-relay] Posted CI update to thread`);
         db.updatePrMessageTimestamp(repo, pr.number);
