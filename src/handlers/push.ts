@@ -27,6 +27,8 @@ export interface PushEventPayload {
   repository: { full_name: string; default_branch: string };
 }
 
+// Matches GitHub's default merge commit format ("Merge pull request #123 from user/branch").
+// Custom merge commit messages or rebase-merges won't match and will produce a notification.
 const PR_MERGE_COMMIT_PATTERN = /^Merge pull request #\d+/;
 
 export async function handlePushEvent(

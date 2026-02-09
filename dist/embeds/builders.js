@@ -179,7 +179,8 @@ export function buildPushEmbed(branch, commits, sender, senderAvatar, compareUrl
     const commitLines = commits.slice(0, maxDisplay).map(c => {
         const sha = c.id.substring(0, 7);
         const firstLine = c.message.split('\n')[0];
-        return `\`${sha}\` ${firstLine}`;
+        const truncated = firstLine.length > 100 ? firstLine.substring(0, 97) + '...' : firstLine;
+        return `\`${sha}\` ${truncated}`;
     });
     if (commits.length > maxDisplay) {
         commitLines.push(`and ${commits.length - maxDisplay} more...`);
