@@ -371,6 +371,116 @@ describe('shouldSkipEvent', () => {
     }
   );
 
+  // ── dependabot_alert ─────────────────────────────────────────
+
+  it('passes dependabot_alert created', () => {
+    const event: GitHubEventPayload = {
+      event: 'dependabot_alert',
+      payload: {
+        action: 'created',
+        alert: {
+          number: 1, state: 'open',
+          dependency: { package: { ecosystem: 'npm', name: 'lodash' }, scope: 'runtime' },
+          security_advisory: { ghsa_id: 'GHSA-1', cve_id: null, summary: 'x', severity: 'high' },
+          security_vulnerability: { first_patched_version: null },
+          html_url: '',
+        },
+        repository: { full_name: 'owner/repo' },
+      },
+    };
+    expect(shouldSkipEvent(event)).toBeNull();
+  });
+
+  it('skips dependabot_alert dismissed', () => {
+    const event: GitHubEventPayload = {
+      event: 'dependabot_alert',
+      payload: {
+        action: 'dismissed',
+        alert: {
+          number: 1, state: 'dismissed',
+          dependency: { package: { ecosystem: 'npm', name: 'lodash' }, scope: 'runtime' },
+          security_advisory: { ghsa_id: 'GHSA-1', cve_id: null, summary: 'x', severity: 'high' },
+          security_vulnerability: { first_patched_version: null },
+          html_url: '',
+        },
+        repository: { full_name: 'owner/repo' },
+      },
+    };
+    expect(shouldSkipEvent(event)).toBe("dependabot_alert: action 'dismissed' not handled");
+  });
+
+  // ── secret_scanning_alert ──────────────────────────────────
+
+  it('passes secret_scanning_alert created', () => {
+    const event: GitHubEventPayload = {
+      event: 'secret_scanning_alert',
+      payload: {
+        action: 'created',
+        alert: {
+          number: 1, state: 'open', secret_type: 'github_pat',
+          secret_type_display_name: 'GitHub PAT', html_url: '',
+          push_protection_bypassed: null, resolution: null,
+        },
+        repository: { full_name: 'owner/repo' },
+      },
+    };
+    expect(shouldSkipEvent(event)).toBeNull();
+  });
+
+  it('skips secret_scanning_alert resolved', () => {
+    const event: GitHubEventPayload = {
+      event: 'secret_scanning_alert',
+      payload: {
+        action: 'resolved',
+        alert: {
+          number: 1, state: 'resolved', secret_type: 'github_pat',
+          secret_type_display_name: 'GitHub PAT', html_url: '',
+          push_protection_bypassed: null, resolution: 'revoked',
+        },
+        repository: { full_name: 'owner/repo' },
+      },
+    };
+    expect(shouldSkipEvent(event)).toBe("secret_scanning_alert: action 'resolved' not handled");
+  });
+
+  // ── code_scanning_alert ────────────────────────────────────
+
+  it('passes code_scanning_alert created', () => {
+    const event: GitHubEventPayload = {
+      event: 'code_scanning_alert',
+      payload: {
+        action: 'created',
+        alert: {
+          number: 1, state: 'open',
+          rule: { id: 'r1', name: 'Rule', severity: 'error', description: '' },
+          tool: { name: 'CodeQL' },
+          most_recent_instance: { location: { path: 'a.ts', start_line: 1 } },
+          html_url: '',
+        },
+        repository: { full_name: 'owner/repo' },
+      },
+    };
+    expect(shouldSkipEvent(event)).toBeNull();
+  });
+
+  it('skips code_scanning_alert fixed', () => {
+    const event: GitHubEventPayload = {
+      event: 'code_scanning_alert',
+      payload: {
+        action: 'fixed',
+        alert: {
+          number: 1, state: 'fixed',
+          rule: { id: 'r1', name: 'Rule', severity: 'error', description: '' },
+          tool: { name: 'CodeQL' },
+          most_recent_instance: { location: { path: 'a.ts', start_line: 1 } },
+          html_url: '',
+        },
+        repository: { full_name: 'owner/repo' },
+      },
+    };
+    expect(shouldSkipEvent(event)).toBe("code_scanning_alert: action 'fixed' not handled");
+  });
+
   // ── always-process events ─────────────────────────────────────
 
   it('never skips pull_request events', () => {

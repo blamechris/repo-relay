@@ -3,6 +3,7 @@
  */
 import { EmbedBuilder, ButtonBuilder, ActionRowBuilder } from 'discord.js';
 import type { FailedStep } from '../github/ci.js';
+import type { DependabotAlertPayload, SecretScanningAlertPayload, CodeScanningAlertPayload } from '../handlers/security.js';
 export interface PrData {
     number: number;
     title: string;
@@ -63,4 +64,7 @@ export declare function buildPushEmbed(branch: string, commits: Array<{
     message: string;
 }>, sender: string, senderAvatar: string, compareUrl: string): EmbedBuilder;
 export declare function buildForcePushEmbed(branch: string, beforeSha: string, afterSha: string, sender: string, senderAvatar: string, compareUrl: string): EmbedBuilder;
+export declare function buildDependabotAlertEmbed(payload: DependabotAlertPayload): EmbedBuilder;
+export declare function buildSecretScanningAlertEmbed(payload: SecretScanningAlertPayload): EmbedBuilder;
+export declare function buildCodeScanningAlertEmbed(payload: CodeScanningAlertPayload): EmbedBuilder;
 //# sourceMappingURL=builders.d.ts.map

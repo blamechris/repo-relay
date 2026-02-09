@@ -96,6 +96,28 @@ export function shouldSkipEvent(eventData: GitHubEventPayload): string | null {
       return null;
     }
 
+    case 'dependabot_alert': {
+      if (eventData.payload.action !== 'created') {
+        return `dependabot_alert: action '${eventData.payload.action}' not handled`;
+      }
+      return null;
+    }
+
+    case 'secret_scanning_alert': {
+      if (eventData.payload.action !== 'created') {
+        return `secret_scanning_alert: action '${eventData.payload.action}' not handled`;
+      }
+      return null;
+    }
+
+    case 'code_scanning_alert': {
+      const action = eventData.payload.action;
+      if (action !== 'created' && action !== 'appeared_in_branch') {
+        return `code_scanning_alert: action '${action}' not handled`;
+      }
+      return null;
+    }
+
     // pull_request and schedule are always processed
     case 'pull_request':
     case 'schedule':

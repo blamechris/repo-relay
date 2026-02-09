@@ -22,6 +22,9 @@ inputs:
   channel_deployments:
     description: 'Discord channel ID for deployment notifications (defaults to channel_prs)'
     required: false
+  channel_security:
+    description: 'Discord channel ID for security alert notifications (defaults to channel_prs)'
+    required: false
   state_dir:
     description: 'Directory for SQLite state persistence (default: ~/.repo-relay)'
     required: false
@@ -69,6 +72,7 @@ runs:
         DISCORD_CHANNEL_ISSUES: ${{ inputs.channel_issues }}
         DISCORD_CHANNEL_RELEASES: ${{ inputs.channel_releases }}
         DISCORD_CHANNEL_DEPLOYMENTS: ${{ inputs.channel_deployments }}
+        DISCORD_CHANNEL_SECURITY: ${{ inputs.channel_security }}
         GITHUB_TOKEN: ${{ inputs.github_token || github.token }}
         STATE_DIR: ${{ inputs.state_dir }}
       run: node dist/cli.js

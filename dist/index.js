@@ -5,7 +5,7 @@
  */
 import { Client, GatewayIntentBits, PermissionsBitField, REST, Routes } from 'discord.js';
 import { StateDb } from './db/state.js';
-import { handlePrEvent, handleCiEvent, handleReviewEvent, handleCommentEvent, handleIssueEvent, handleReleaseEvent, handleDeploymentEvent, handlePushEvent, } from './handlers/index.js';
+import { handlePrEvent, handleCiEvent, handleReviewEvent, handleCommentEvent, handleIssueEvent, handleReleaseEvent, handleDeploymentEvent, handlePushEvent, handleSecurityAlertEvent, } from './handlers/index.js';
 import { checkForReviews } from './github/reviews.js';
 import { safeErrorMessage } from './utils/errors.js';
 import { REPO_NAME_PATTERN } from './utils/validation.js';
@@ -58,15 +58,15 @@ export class RepoRelay {
                 console.log(`[repo-relay] WARNING: Session budget below 20% (${remaining}/${total})`);
             }
         }
-        catch {
-            console.log('[repo-relay] Could not fetch session budget (non-fatal)');
+        catch (err) {
+            console.log('[repo-relay] Could not fetch session budget (non-fatal):', safeErrorMessage(err));
         }
     }
     async validatePermissions() {
         const requiredNames = REQUIRED_PERMISSIONS.map((p) => p.name).join(', ');
         // Collect unique channel IDs
-        const { prs, issues, releases, deployments } = this.config.channelConfig;
-        const channelIds = [...new Set([prs, issues, releases, deployments].filter(Boolean))];
+        const { prs, issues, releases, deployments, security } = this.config.channelConfig;
+        const channelIds = [...new Set([prs, issues, releases, deployments, security].filter(Boolean))];
         const errors = [];
         for (const channelId of channelIds) {
             let channel;
@@ -163,6 +163,11 @@ export class RepoRelay {
                 break;
             case 'push':
                 await handlePushEvent(this.client, db, this.config.channelConfig, eventData.payload);
+                break;
+            case 'dependabot_alert':
+            case 'secret_scanning_alert':
+            case 'code_scanning_alert':
+                await handleSecurityAlertEvent(this.client, db, this.config.channelConfig, eventData);
                 break;
             case 'schedule':
                 if (!this.config.githubToken) {
@@ -264,6 +269,9 @@ export class RepoRelay {
             case 'release':
             case 'deployment_status':
             case 'push':
+            case 'dependabot_alert':
+            case 'secret_scanning_alert':
+            case 'code_scanning_alert':
             case 'schedule':
                 repo = eventData.payload.repository.full_name;
                 break;

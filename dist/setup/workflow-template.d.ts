@@ -7,6 +7,7 @@ export interface ProjectFeatures {
     deployments: boolean;
     reviewPolling: boolean;
     pushEvents: boolean;
+    securityAlerts?: boolean;
 }
 export declare function buildWorkflowTemplate(ciWorkflowName: string, features: ProjectFeatures): string;
 //# sourceMappingURL=workflow-template.d.ts.map

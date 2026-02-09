@@ -1,8 +1,8 @@
 /**
  * Pre-filter: skip events before Discord gateway connect to save sessions.
  *
- * Each check mirrors the corresponding handler's early-exit so we avoid
- * burning a gateway session for payloads the handler would discard anyway.
+ * These checks approximate the corresponding handlers' early-exit conditions
+ * so we avoid burning a gateway session for payloads likely to be discarded.
  */
 import type { GitHubEventPayload } from './index.js';
 /**

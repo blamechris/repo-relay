@@ -1,8 +1,8 @@
 /**
  * Pre-filter: skip events before Discord gateway connect to save sessions.
  *
- * Each check mirrors the corresponding handler's early-exit so we avoid
- * burning a gateway session for payloads the handler would discard anyway.
+ * These checks approximate the corresponding handlers' early-exit conditions
+ * so we avoid burning a gateway session for payloads likely to be discarded.
  */
 /**
  * Returns a human-readable skip reason if the event can be discarded
@@ -47,6 +47,11 @@ export function shouldSkipEvent(eventData) {
             if (payload.created || payload.deleted) {
                 return 'push: branch creation or deletion event';
             }
+            // push.ts:57 — skip if every commit is a PR merge commit
+            if (payload.commits.length > 0 &&
+                payload.commits.every((c) => /^Merge pull request #\d+/.test(c.message))) {
+                return 'push: all commits are PR merge commits';
+            }
             return null;
         }
         case 'release': {
@@ -64,6 +69,11 @@ export function shouldSkipEvent(eventData) {
             if (eventData.payload.action !== 'submitted') {
                 return `pull_request_review: action '${eventData.payload.action}' not handled`;
             }
+            // review.ts:50-55 — ignore owner comment replies to avoid cascades
+            const { review, repository } = eventData.payload;
+            if (review?.user?.login === repository?.owner?.login && review?.state === 'commented') {
+                return 'pull_request_review: owner comment reply';
+            }
             return null;
         }
         case 'issues': {
@@ -71,6 +81,25 @@ export function shouldSkipEvent(eventData) {
             const action = eventData.payload.action;
             if (action !== 'opened' && action !== 'closed' && action !== 'reopened') {
                 return `issues: action '${action}' not handled`;
+            }
+            return null;
+        }
+        case 'dependabot_alert': {
+            if (eventData.payload.action !== 'created') {
+                return `dependabot_alert: action '${eventData.payload.action}' not handled`;
+            }
+            return null;
+        }
+        case 'secret_scanning_alert': {
+            if (eventData.payload.action !== 'created') {
+                return `secret_scanning_alert: action '${eventData.payload.action}' not handled`;
+            }
+            return null;
+        }
+        case 'code_scanning_alert': {
+            const action = eventData.payload.action;
+            if (action !== 'created' && action !== 'appeared_in_branch') {
+                return `code_scanning_alert: action '${action}' not handled`;
             }
             return null;
         }

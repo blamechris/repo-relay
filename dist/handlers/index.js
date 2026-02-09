@@ -9,4 +9,5 @@ export { handleIssueEvent, getOrCreateIssueThread } from './issue.js';
 export { handleReleaseEvent } from './release.js';
 export { handleDeploymentEvent } from './deployment.js';
 export { handlePushEvent } from './push.js';
+export { handleSecurityAlertEvent, } from './security.js';
 //# sourceMappingURL=index.js.map

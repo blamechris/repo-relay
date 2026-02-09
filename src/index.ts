@@ -16,6 +16,7 @@ import {
   handleReleaseEvent,
   handleDeploymentEvent,
   handlePushEvent,
+  handleSecurityAlertEvent,
   type PrEventPayload,
   type WorkflowRunPayload,
   type PrReviewPayload,
@@ -24,6 +25,10 @@ import {
   type ReleaseEventPayload,
   type DeploymentStatusPayload,
   type PushEventPayload,
+  type DependabotAlertPayload,
+  type SecretScanningAlertPayload,
+  type CodeScanningAlertPayload,
+  type SecurityAlertPayload,
 } from './handlers/index.js';
 import { checkForReviews } from './github/reviews.js';
 import { safeErrorMessage } from './utils/errors.js';
@@ -51,6 +56,9 @@ export type GitHubEventPayload =
   | { event: 'release'; payload: ReleaseEventPayload }
   | { event: 'deployment_status'; payload: DeploymentStatusPayload }
   | { event: 'push'; payload: PushEventPayload }
+  | { event: 'dependabot_alert'; payload: DependabotAlertPayload }
+  | { event: 'secret_scanning_alert'; payload: SecretScanningAlertPayload }
+  | { event: 'code_scanning_alert'; payload: CodeScanningAlertPayload }
   | { event: 'schedule'; payload: { schedule: string; repository: { full_name: string } } };
 
 
@@ -120,8 +128,8 @@ export class RepoRelay {
     const requiredNames = REQUIRED_PERMISSIONS.map((p) => p.name).join(', ');
 
     // Collect unique channel IDs
-    const { prs, issues, releases, deployments } = this.config.channelConfig;
-    const channelIds = [...new Set([prs, issues, releases, deployments].filter(Boolean) as string[])];
+    const { prs, issues, releases, deployments, security } = this.config.channelConfig;
+    const channelIds = [...new Set([prs, issues, releases, deployments, security].filter(Boolean) as string[])];
 
     const errors: string[] = [];
 
@@ -294,6 +302,17 @@ export class RepoRelay {
         );
         break;
 
+      case 'dependabot_alert':
+      case 'secret_scanning_alert':
+      case 'code_scanning_alert':
+        await handleSecurityAlertEvent(
+          this.client,
+          db,
+          this.config.channelConfig,
+          eventData
+        );
+        break;
+
       case 'schedule':
         if (!this.config.githubToken) {
           console.log('[repo-relay] Skipping scheduled review poll: no GITHUB_TOKEN');
@@ -409,6 +428,9 @@ export class RepoRelay {
       case 'release':
       case 'deployment_status':
       case 'push':
+      case 'dependabot_alert':
+      case 'secret_scanning_alert':
+      case 'code_scanning_alert':
       case 'schedule':
         repo = eventData.payload.repository.full_name;
         break;

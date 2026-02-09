@@ -218,6 +218,62 @@ export function buildForcePushEmbed(branch, beforeSha, afterSha, sender, senderA
         .setAuthor({ name: sender, iconURL: senderAvatar })
         .addFields({ name: 'Before', value: `\`${beforeSha.substring(0, 7)}\``, inline: true }, { name: 'After', value: `\`${afterSha.substring(0, 7)}\``, inline: true }, { name: 'Compare', value: `[View changes](${compareUrl})`, inline: false });
 }
+// Security alert embeds
+const SEVERITY_COLORS = {
+    critical: 0x8B0000,
+    high: Colors.Red,
+    error: Colors.Red,
+    medium: Colors.Yellow,
+    warning: Colors.Yellow,
+    low: Colors.Grey,
+    note: Colors.Grey,
+    none: Colors.Grey,
+};
+export function buildDependabotAlertEmbed(payload) {
+    const { alert } = payload;
+    const severity = alert.security_advisory.severity;
+    const pkg = alert.dependency.package.name;
+    const fixVersion = alert.security_vulnerability.first_patched_version?.identifier;
+    const embed = new EmbedBuilder()
+        .setColor(SEVERITY_COLORS[severity] ?? Colors.Grey)
+        .setTitle(truncateTitle(`🔓 Dependabot: ${capitalize(severity)} vulnerability in ${pkg}`))
+        .setURL(alert.html_url)
+        .setDescription(alert.security_advisory.summary)
+        .addFields({ name: 'Severity', value: capitalize(severity), inline: true }, { name: 'Package', value: `\`${pkg}\` (${alert.dependency.package.ecosystem})`, inline: true });
+    if (alert.security_advisory.cve_id) {
+        embed.addFields({ name: 'CVE', value: alert.security_advisory.cve_id, inline: true });
+    }
+    embed.addFields({
+        name: 'Fix Available',
+        value: fixVersion ? `Upgrade to \`${fixVersion}\`` : 'No fix available',
+        inline: true,
+    });
+    return embed;
+}
+export function buildSecretScanningAlertEmbed(payload) {
+    const { alert } = payload;
+    const bypassValue = alert.push_protection_bypassed === true
+        ? '⚠️ Bypassed'
+        : alert.push_protection_bypassed === false
+            ? '✅ Active'
+            : '—';
+    return new EmbedBuilder()
+        .setColor(Colors.Red)
+        .setTitle(truncateTitle(`🔑 Secret Detected: ${alert.secret_type_display_name}`))
+        .setURL(alert.html_url)
+        .addFields({ name: 'Secret Type', value: alert.secret_type_display_name, inline: true }, { name: 'Push Protection', value: bypassValue, inline: true });
+}
+export function buildCodeScanningAlertEmbed(payload) {
+    const { alert } = payload;
+    const severity = alert.rule.severity;
+    const location = alert.most_recent_instance.location;
+    return new EmbedBuilder()
+        .setColor(SEVERITY_COLORS[severity] ?? Colors.Grey)
+        .setTitle(truncateTitle(`🔍 Code Scanning: ${alert.rule.name}`))
+        .setURL(alert.html_url)
+        .setDescription(alert.rule.description.length > 200 ? alert.rule.description.substring(0, 197) + '...' : alert.rule.description)
+        .addFields({ name: 'Rule', value: `\`${alert.rule.id}\``, inline: true }, { name: 'Severity', value: capitalize(severity), inline: true }, { name: 'Tool', value: alert.tool.name, inline: true }, { name: 'Location', value: `\`${location.path}:${location.start_line}\``, inline: true });
+}
 // Helper functions
 function getPrEmoji(state, draft) {
     if (draft)
