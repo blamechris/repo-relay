@@ -156,6 +156,50 @@ describe('schedule handler', () => {
     expect(mockCheckForReviews).not.toHaveBeenCalled();
   });
 
+  it('logs elapsed time after polling', async () => {
+    mockGetOpenPrNumbers.mockReturnValue([1]);
+    const consoleSpy = vi.spyOn(console, 'log');
+    try {
+      relay = new RepoRelay(makeConfig());
+      await relay.connect();
+
+      await relay.handleEvent(makeSchedulePayload());
+
+      const completionLog = consoleSpy.mock.calls.find(
+        (args) => typeof args[0] === 'string' && args[0].includes('Review polling completed')
+      );
+      expect(completionLog).toBeDefined();
+      expect(completionLog![0]).toMatch(/1 PR\(s\) in \d+\.\d+s/);
+    } finally {
+      consoleSpy.mockRestore();
+    }
+  });
+
+  it('logs warning when polling exceeds threshold', async () => {
+    mockGetOpenPrNumbers.mockReturnValue([1]);
+
+    // Stub performance.now to simulate elapsed time > 240s
+    const perfSpy = vi.spyOn(performance, 'now')
+      .mockReturnValueOnce(0)       // startTime
+      .mockReturnValueOnce(250_000); // after polling: 250s > 240s threshold
+    const consoleSpy = vi.spyOn(console, 'log');
+    try {
+      relay = new RepoRelay(makeConfig());
+      await relay.connect();
+
+      await relay.handleEvent(makeSchedulePayload());
+
+      const warningLog = consoleSpy.mock.calls.find(
+        (args) => typeof args[0] === 'string' && args[0].includes('approaching 5-min schedule interval')
+      );
+      expect(warningLog).toBeDefined();
+      expect(warningLog![0]).toMatch(/250\.0s/);
+    } finally {
+      consoleSpy.mockRestore();
+      perfSpy.mockRestore();
+    }
+  });
+
   it('continues polling remaining PRs if one fails', async () => {
     mockGetOpenPrNumbers.mockReturnValue([1, 2, 3]);
     mockCheckForReviews

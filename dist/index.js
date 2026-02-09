@@ -15,6 +15,8 @@ import { TextChannel } from 'discord.js';
 import { getChannelForEvent } from './config/channels.js';
 import { getExistingPrMessage } from './discord/lookup.js';
 export { REPO_NAME_PATTERN };
+/** Warn if scheduled polling exceeds 80% of the 5-min cron interval. */
+const POLL_WARN_THRESHOLD_MS = 240_000;
 const REQUIRED_PERMISSIONS = [
     { flag: PermissionsBitField.Flags.SendMessages, name: 'Send Messages' },
     { flag: PermissionsBitField.Flags.CreatePublicThreads, name: 'Create Public Threads' },
@@ -210,6 +212,7 @@ export class RepoRelay {
             return;
         }
         console.log(`[repo-relay] Polling ${openPrs.length} open PR(s) for review updates`);
+        const startTime = Date.now();
         for (const prNumber of openPrs) {
             try {
                 await this.checkAndUpdateReviews(repo, prNumber);
@@ -217,6 +220,12 @@ export class RepoRelay {
             catch (error) {
                 console.log(`[repo-relay] Warning: Failed to poll PR #${prNumber}: ${safeErrorMessage(error)}`);
             }
+        }
+        const elapsedMs = Date.now() - startTime;
+        const elapsedSec = (elapsedMs / 1000).toFixed(1);
+        console.log(`[repo-relay] Review polling completed: ${openPrs.length} PR(s) in ${elapsedSec}s`);
+        if (elapsedMs > POLL_WARN_THRESHOLD_MS) {
+            console.log(`[repo-relay] Warning: Polling took ${elapsedSec}s, approaching 5-min schedule interval`);
         }
     }
     extractRepo(eventData) {
