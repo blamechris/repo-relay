@@ -232,7 +232,7 @@ If the bot connects but can't post, check the channel-level permissions. The bot
 
 | Aspect | Self-Hosted | GitHub-Hosted |
 |--------|-------------|---------------|
-| **State Persistence** | ✅ SQLite persists in `~/.repo-relay/` | ❌ Lost after each run |
+| **State Persistence** | ✅ SQLite persists in `~/.repo-relay/` | ⚠️ Requires `actions/cache` |
 | **Setup** | Requires runner installation | Zero setup |
 | **Cost** | Your hardware | GitHub Actions minutes |
 | **Speed** | Fast (no cold start) | ~30s cold start |

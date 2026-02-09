@@ -100,14 +100,17 @@ export class StateDb {
 
     // Verify database integrity (catches corruption from incomplete cache restore)
     let integrityOk = false;
+    let integrityDetail = 'unreadable';
     try {
       const integrityResult = this.db.pragma('integrity_check') as Array<{ integrity_check: string }>;
-      integrityOk = integrityResult[0]?.integrity_check === 'ok';
+      const result = integrityResult[0]?.integrity_check;
+      integrityOk = result === 'ok';
+      if (!integrityOk) integrityDetail = result ?? 'unknown';
     } catch {
       // Completely corrupt file — pragma itself throws
     }
     if (!integrityOk) {
-      console.warn('[repo-relay] Database integrity check failed, recreating...');
+      console.warn(`[repo-relay] Database integrity check failed (${integrityDetail}), recreating...`);
       this.db.close();
       for (const suffix of ['', '-wal', '-shm']) {
         try { unlinkSync(dbPath + suffix); } catch { /* may not exist */ }
