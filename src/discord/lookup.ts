@@ -17,7 +17,8 @@ async function findMessageInChannel(
   channel: TextChannel,
   pattern: RegExp,
   repo: string,
-  targetNumber: number
+  targetNumber: number,
+  label: string
 ): Promise<{ messageId: string; threadId: string | null } | null> {
   try {
     const messages = await channel.messages.fetch({ limit: 100 });
@@ -39,7 +40,7 @@ async function findMessageInChannel(
 
     return null;
   } catch (err) {
-    console.error(`[repo-relay] Channel search failed: ${safeErrorMessage(err)}`);
+    console.error(`[repo-relay] Channel search failed for ${label} #${targetNumber}: ${safeErrorMessage(err)}`);
     return null;
   }
 }
@@ -59,7 +60,7 @@ export async function getExistingPrMessage(
   if (cached) return cached;
 
   // Slow path: search Discord channel
-  const found = await findMessageInChannel(channel, PR_TITLE_PATTERN, repo, prNumber);
+  const found = await findMessageInChannel(channel, PR_TITLE_PATTERN, repo, prNumber, 'PR');
   if (!found) return null;
 
   // Cache back to DB and return the saved row
@@ -85,7 +86,7 @@ export async function getExistingIssueMessage(
   if (cached) return cached;
 
   // Slow path: search Discord channel
-  const found = await findMessageInChannel(channel, ISSUE_TITLE_PATTERN, repo, issueNumber);
+  const found = await findMessageInChannel(channel, ISSUE_TITLE_PATTERN, repo, issueNumber, 'Issue');
   if (!found) return null;
 
   // Cache back to DB and return the saved row
