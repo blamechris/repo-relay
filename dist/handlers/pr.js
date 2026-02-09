@@ -10,7 +10,7 @@ export async function handlePrEvent(client, db, channelConfig, payload) {
     const { action, pull_request: pr, repository } = payload;
     const repo = repository.full_name;
     const channelId = getChannelForEvent(channelConfig, 'pr');
-    const channel = await client.channels.fetch(channelId);
+    const channel = await withRetry(() => client.channels.fetch(channelId));
     if (!channel || !(channel instanceof TextChannel)) {
         throw new Error(`Channel ${channelId} not found or not a text channel`);
     }
@@ -73,7 +73,8 @@ async function handlePrClosed(channel, db, repo, pr) {
     if (existing) {
         try {
             // Update the original embed with full status
-            const message = await channel.messages.fetch(existing.messageId);
+            const messageId = existing.messageId;
+            const message = await withRetry(() => channel.messages.fetch(messageId));
             savePrDataFromPrData(db, repo, pr);
             const statusData = buildEmbedWithStatus(db, repo, pr.number);
             const embed = statusData
@@ -121,7 +122,8 @@ async function handlePrPush(channel, db, repo, pr, payload) {
     // Check if existing message is stale (deleted from Discord)
     if (existing) {
         try {
-            await channel.messages.fetch(existing.messageId);
+            const messageId = existing.messageId;
+            await withRetry(() => channel.messages.fetch(messageId));
         }
         catch (error) {
             const errMsg = error instanceof Error ? error.message : String(error);
@@ -166,7 +168,8 @@ async function handlePrUpdated(channel, db, repo, pr) {
     let existing = await getExistingPrMessage(db, channel, repo, pr.number);
     if (existing) {
         try {
-            const message = await channel.messages.fetch(existing.messageId);
+            const messageId = existing.messageId;
+            const message = await withRetry(() => channel.messages.fetch(messageId));
             const embed = buildPrEmbed(pr);
             await withRetry(() => message.edit({ embeds: [embed] }));
             db.updatePrMessageTimestamp(repo, pr.number);
@@ -263,7 +266,7 @@ export async function getOrCreateThread(channel, db, repo, pr, existing) {
             if (thread) {
                 // Unarchive if archived
                 if (thread.archived) {
-                    await withRetry(() => thread.setArchived(false));
+                    await withRetry(async () => { await thread.setArchived(false); });
                 }
                 return thread;
             }
@@ -273,7 +276,7 @@ export async function getOrCreateThread(channel, db, repo, pr, existing) {
         }
     }
     // Create a new thread on the message
-    const message = await channel.messages.fetch(existing.messageId);
+    const message = await withRetry(() => channel.messages.fetch(existing.messageId));
     const thread = await withRetry(() => message.startThread({
         name: `PR #${pr.number}: ${pr.title.substring(0, 90)}`,
         autoArchiveDuration: 1440,

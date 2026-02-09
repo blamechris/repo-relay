@@ -60,7 +60,7 @@ export async function handlePrEvent(
   const repo = repository.full_name;
   const channelId = getChannelForEvent(channelConfig, 'pr');
 
-  const channel = await client.channels.fetch(channelId);
+  const channel = await withRetry(() => client.channels.fetch(channelId));
   if (!channel || !(channel instanceof TextChannel)) {
     throw new Error(`Channel ${channelId} not found or not a text channel`);
   }
@@ -146,7 +146,8 @@ async function handlePrClosed(
   if (existing) {
     try {
       // Update the original embed with full status
-      const message = await channel.messages.fetch(existing.messageId);
+      const messageId = existing.messageId;
+      const message = await withRetry(() => channel.messages.fetch(messageId));
       savePrDataFromPrData(db, repo, pr);
       const statusData = buildEmbedWithStatus(db, repo, pr.number);
       const embed = statusData
@@ -205,7 +206,8 @@ async function handlePrPush(
   // Check if existing message is stale (deleted from Discord)
   if (existing) {
     try {
-      await channel.messages.fetch(existing.messageId);
+      const messageId = existing.messageId;
+      await withRetry(() => channel.messages.fetch(messageId));
     } catch (error: unknown) {
       const errMsg = error instanceof Error ? error.message : String(error);
       if (errMsg.includes('Unknown Message')) {
@@ -267,7 +269,8 @@ async function handlePrUpdated(
 
   if (existing) {
     try {
-      const message = await channel.messages.fetch(existing.messageId);
+      const messageId = existing.messageId;
+      const message = await withRetry(() => channel.messages.fetch(messageId));
       const embed = buildPrEmbed(pr);
       await withRetry(() => message.edit({ embeds: [embed] }));
       db.updatePrMessageTimestamp(repo, pr.number);
@@ -389,7 +392,7 @@ export async function getOrCreateThread(
   }
 
   // Create a new thread on the message
-  const message = await channel.messages.fetch(existing.messageId);
+  const message = await withRetry(() => channel.messages.fetch(existing.messageId));
   const thread = await withRetry(() =>
     message.startThread({
       name: `PR #${pr.number}: ${pr.title.substring(0, 90)}`,

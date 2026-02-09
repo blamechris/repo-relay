@@ -13,7 +13,7 @@ export async function handleReleaseEvent(client, db, channelConfig, payload) {
         return;
     }
     const channelId = getChannelForEvent(channelConfig, 'release');
-    const channel = await client.channels.fetch(channelId);
+    const channel = await withRetry(() => client.channels.fetch(channelId));
     if (!channel || !(channel instanceof TextChannel)) {
         throw new Error(`Channel ${channelId} not found or not a text channel`);
     }
