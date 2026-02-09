@@ -69,7 +69,7 @@ describe('buildWorkflowTemplate', () => {
     expect(result).not.toContain('issues: read');
   });
 
-  it('mobileapp: includes issues + deployments but not releases', () => {
+  it('app: includes issues + deployments but not releases', () => {
     const result = buildWorkflowTemplate('CI', { issues: true, releases: false, deployments: true });
 
     // Has issues events
@@ -133,5 +133,8 @@ describe('buildWorkflowTemplate', () => {
     expect(result).toContain('issues: read');
     expect(result).toContain('pull-requests: read');
     expect(result).toContain('contents: read');
+
+    // If-guard comment explains filtering logic
+    expect(result).toContain('# Skip workflow_run events with no associated PR');
   });
 });

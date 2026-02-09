@@ -12,11 +12,11 @@ import { join } from 'path';
 import { safeErrorMessage } from './utils/errors.js';
 import { buildWorkflowTemplate, type ProjectFeatures } from './setup/workflow-template.js';
 
-const PROJECT_TYPES: Record<'library' | 'webapp' | 'mobileapp' | 'minimal', ProjectFeatures> = {
-  library:   { issues: true,  releases: true,  deployments: false },
-  webapp:    { issues: true,  releases: false, deployments: false },
-  mobileapp: { issues: true,  releases: false, deployments: true },
-  minimal:   { issues: false, releases: false, deployments: false },
+const PROJECT_TYPES: Record<'library' | 'webapp' | 'app' | 'minimal', ProjectFeatures> = {
+  library: { issues: true,  releases: true,  deployments: false },
+  webapp:  { issues: true,  releases: false, deployments: false },
+  app:     { issues: true,  releases: false, deployments: true },
+  minimal: { issues: false, releases: false, deployments: false },
 };
 
 function getRepoUrl(): string | null {
@@ -83,7 +83,7 @@ async function main(): Promise<void> {
     choices: [
       { title: 'Library / Package', description: 'PRs, CI, reviews, issues, releases', value: 'library' },
       { title: 'Web App / Backend', description: 'PRs, CI, reviews, issues', value: 'webapp' },
-      { title: 'Mobile App', description: 'PRs, CI, reviews, issues, deployments', value: 'mobileapp' },
+      { title: 'App / Service', description: 'PRs, CI, reviews, issues, deployments', value: 'app' },
       { title: 'Minimal', description: 'PRs, CI, reviews only', value: 'minimal' },
       { title: 'Custom', description: 'Choose individual features', value: 'custom' },
     ],
