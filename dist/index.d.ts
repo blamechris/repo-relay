@@ -33,6 +33,14 @@ export type GitHubEventPayload = {
 } | {
     event: 'deployment_status';
     payload: DeploymentStatusPayload;
+} | {
+    event: 'schedule';
+    payload: {
+        schedule: string;
+        repository: {
+            full_name: string;
+        };
+    };
 };
 export { REPO_NAME_PATTERN };
 export declare class RepoRelay {
@@ -50,6 +58,7 @@ export declare class RepoRelay {
      * This is the "piggyback" approach - we check for reviews when other events fire
      */
     private checkAndUpdateReviews;
+    private pollOpenPrReviews;
     private extractRepo;
 }
 export { StateDb } from './db/state.js';

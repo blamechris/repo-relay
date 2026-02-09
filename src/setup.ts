@@ -13,10 +13,10 @@ import { safeErrorMessage } from './utils/errors.js';
 import { buildWorkflowTemplate, type ProjectFeatures } from './setup/workflow-template.js';
 
 const PROJECT_TYPES: Record<'library' | 'webapp' | 'app' | 'minimal', ProjectFeatures> = {
-  library: { issues: true,  releases: true,  deployments: false },
-  webapp:  { issues: true,  releases: false, deployments: false },
-  app:     { issues: true,  releases: false, deployments: true },
-  minimal: { issues: false, releases: false, deployments: false },
+  library: { issues: true,  releases: true,  deployments: false, reviewPolling: false },
+  webapp:  { issues: true,  releases: false, deployments: false, reviewPolling: false },
+  app:     { issues: true,  releases: false, deployments: true,  reviewPolling: false },
+  minimal: { issues: false, releases: false, deployments: false, reviewPolling: false },
 };
 
 function getRepoUrl(): string | null {
@@ -107,6 +107,7 @@ async function main(): Promise<void> {
         { title: 'Issue notifications', value: 'issues', selected: true },
         { title: 'Release notifications', value: 'releases' },
         { title: 'Deployment notifications', value: 'deployments' },
+        { title: 'Review polling (every 5 min)', value: 'reviewPolling' },
       ],
     });
 
@@ -119,9 +120,27 @@ async function main(): Promise<void> {
       issues: (customFeatures as string[]).includes('issues'),
       releases: (customFeatures as string[]).includes('releases'),
       deployments: (customFeatures as string[]).includes('deployments'),
+      reviewPolling: (customFeatures as string[]).includes('reviewPolling'),
     };
   } else {
     features = PROJECT_TYPES[projectType as keyof typeof PROJECT_TYPES];
+  }
+
+  // Review polling opt-in (for non-custom types; custom includes it in multiselect)
+  if (projectType !== 'custom') {
+    const { enablePolling } = await prompts({
+      type: 'confirm',
+      name: 'enablePolling',
+      message: 'Enable review polling? (catches Copilot reviews within ~5 min; best with self-hosted runner since ephemeral runners lose state)',
+      initial: false,
+    });
+
+    if (enablePolling === undefined) {
+      console.log('\n❌ Setup cancelled.\n');
+      process.exit(1);
+    } else if (enablePolling) {
+      features = { ...features, reviewPolling: true };
+    }
   }
 
   // Step 4: Channel IDs for enabled features

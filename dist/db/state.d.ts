@@ -84,6 +84,7 @@ export declare class StateDb {
     updateCiStatus(repo: string, prNumber: number, status: 'pending' | 'running' | 'success' | 'failure' | 'cancelled', workflowName?: string, url?: string): void;
     getPrData(repo: string, prNumber: number): StoredPrData | null;
     savePrData(data: StoredPrData): void;
+    getOpenPrNumbers(repo: string): number[];
     getIssueMessage(repo: string, issueNumber: number): IssueMessage | null;
     saveIssueMessage(repo: string, issueNumber: number, channelId: string, messageId: string, threadId?: string): void;
     updateIssueThread(repo: string, issueNumber: number, threadId: string): void;

@@ -6,6 +6,7 @@ export interface ProjectFeatures {
   issues: boolean;
   releases: boolean;
   deployments: boolean;
+  reviewPolling: boolean;
 }
 
 export function buildWorkflowTemplate(ciWorkflowName: string, features: ProjectFeatures): string {
@@ -27,6 +28,11 @@ export function buildWorkflowTemplate(ciWorkflowName: string, features: ProjectF
 
   if (features.deployments) {
     eventLines.push('  deployment_status:');
+  }
+
+  if (features.reviewPolling) {
+    eventLines.push('  # Poll open PRs for review updates every 5 minutes');
+    eventLines.push('  schedule:', "    - cron: '*/5 * * * *'");
   }
 
   const sanitizedName = ciWorkflowName.replace(/"/g, '\\"');

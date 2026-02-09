@@ -18,6 +18,10 @@ export function buildWorkflowTemplate(ciWorkflowName, features) {
     if (features.deployments) {
         eventLines.push('  deployment_status:');
     }
+    if (features.reviewPolling) {
+        eventLines.push('  # Poll open PRs for review updates every 5 minutes');
+        eventLines.push('  schedule:', "    - cron: '*/5 * * * *'");
+    }
     const sanitizedName = ciWorkflowName.replace(/"/g, '\\"');
     eventLines.push('  workflow_run:', `    workflows: ["${sanitizedName}"]`, '    types: [completed]');
     const channelSecrets = ['          channel_prs: ${{ secrets.DISCORD_CHANNEL_PRS }}'];

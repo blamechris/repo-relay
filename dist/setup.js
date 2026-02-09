@@ -11,10 +11,10 @@ import { join } from 'path';
 import { safeErrorMessage } from './utils/errors.js';
 import { buildWorkflowTemplate } from './setup/workflow-template.js';
 const PROJECT_TYPES = {
-    library: { issues: true, releases: true, deployments: false },
-    webapp: { issues: true, releases: false, deployments: false },
-    app: { issues: true, releases: false, deployments: true },
-    minimal: { issues: false, releases: false, deployments: false },
+    library: { issues: true, releases: true, deployments: false, reviewPolling: false },
+    webapp: { issues: true, releases: false, deployments: false, reviewPolling: false },
+    app: { issues: true, releases: false, deployments: true, reviewPolling: false },
+    minimal: { issues: false, releases: false, deployments: false, reviewPolling: false },
 };
 function getRepoUrl() {
     try {
@@ -93,6 +93,7 @@ async function main() {
                 { title: 'Issue notifications', value: 'issues', selected: true },
                 { title: 'Release notifications', value: 'releases' },
                 { title: 'Deployment notifications', value: 'deployments' },
+                { title: 'Review polling (every 5 min)', value: 'reviewPolling' },
             ],
         });
         if (!customFeatures) {
@@ -103,10 +104,23 @@ async function main() {
             issues: customFeatures.includes('issues'),
             releases: customFeatures.includes('releases'),
             deployments: customFeatures.includes('deployments'),
+            reviewPolling: customFeatures.includes('reviewPolling'),
         };
     }
     else {
         features = PROJECT_TYPES[projectType];
+    }
+    // Review polling opt-in (for non-custom types; custom includes it in multiselect)
+    if (projectType !== 'custom') {
+        const { enablePolling } = await prompts({
+            type: 'confirm',
+            name: 'enablePolling',
+            message: 'Enable review polling? (catches Copilot reviews within ~5 min; best with self-hosted runner since ephemeral runners lose state)',
+            initial: false,
+        });
+        if (enablePolling) {
+            features = { ...features, reviewPolling: true };
+        }
     }
     // Step 4: Channel IDs for enabled features
     let channelIssues = '';
