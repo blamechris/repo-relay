@@ -9,6 +9,7 @@ import { readFileSync } from 'fs';
 import { RepoRelay, type GitHubEventPayload } from './index.js';
 import { safeErrorMessage } from './utils/errors.js';
 import { getChannelConfig } from './config/channels.js';
+import { shouldSkipEvent } from './pre-filter.js';
 import type { PrEventPayload } from './handlers/pr.js';
 import type { WorkflowRunPayload } from './handlers/ci.js';
 import type { PrReviewPayload } from './handlers/review.js';
@@ -63,6 +64,13 @@ async function main(): Promise<void> {
   const eventData = mapGitHubEvent(eventName, payload);
   if (!eventData) {
     console.log(`[repo-relay] Event '${eventName}' not handled, skipping`);
+    process.exit(0);
+  }
+
+  // Pre-filter: skip events that handlers would discard, saving a gateway session
+  const skipReason = shouldSkipEvent(eventData);
+  if (skipReason) {
+    console.log(`[repo-relay] Skipping event (pre-filter): ${skipReason}`);
     process.exit(0);
   }
 

@@ -4,25 +4,27 @@ on:
   pull_request:
     types: [opened, closed, reopened, synchronize, edited, ready_for_review, converted_to_draft]
   pull_request_review:
-    types: [submitted, edited, dismissed]
+    types: [submitted]
   workflow_run:
     workflows: ['CI']
-    types: [completed, requested, in_progress]
+    types: [completed]
   issue_comment:
-    types: [created, edited, deleted]
+    types: [created]
   issues:
-    types: [opened, closed, reopened, labeled, unlabeled, edited]
+    types: [opened, closed, reopened]
   release:
-    types: [published, created, edited, deleted]
+    types: [published]
 
 jobs:
   notify:
     runs-on: ubuntu-latest
-    # Skip bots (prevent cascades) and fork PRs (no secrets access)
+    # Skip bots, fork PRs (no secrets), and workflow_runs with no associated PRs
     if: >-
       github.actor != 'github-actions[bot]' &&
       (github.event.pull_request.head.repo.full_name == github.repository ||
-       github.event.pull_request == null)
+       github.event.pull_request == null) &&
+      (github.event_name != 'workflow_run' ||
+       github.event.workflow_run.pull_requests[0] != null)
     steps:
       - uses: blamechris/repo-relay@v1
         with:

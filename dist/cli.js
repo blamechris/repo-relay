@@ -8,6 +8,7 @@ import { readFileSync } from 'fs';
 import { RepoRelay } from './index.js';
 import { safeErrorMessage } from './utils/errors.js';
 import { getChannelConfig } from './config/channels.js';
+import { shouldSkipEvent } from './pre-filter.js';
 async function main() {
     console.log('[repo-relay] Starting...');
     // Validate required environment variables
@@ -49,6 +50,12 @@ async function main() {
     const eventData = mapGitHubEvent(eventName, payload);
     if (!eventData) {
         console.log(`[repo-relay] Event '${eventName}' not handled, skipping`);
+        process.exit(0);
+    }
+    // Pre-filter: skip events that handlers would discard, saving a gateway session
+    const skipReason = shouldSkipEvent(eventData);
+    if (skipReason) {
+        console.log(`[repo-relay] Skipping event (pre-filter): ${skipReason}`);
         process.exit(0);
     }
     // Get optional GitHub token for review detection

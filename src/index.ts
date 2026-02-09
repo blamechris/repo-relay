@@ -4,7 +4,7 @@
  * Entry point for the bot library.
  */
 
-import { Client, GatewayIntentBits, GuildChannel, PermissionsBitField } from 'discord.js';
+import { Client, GatewayIntentBits, GuildChannel, PermissionsBitField, REST, Routes } from 'discord.js';
 import { StateDb } from './db/state.js';
 import { getChannelConfig, type ChannelConfig } from './config/channels.js';
 import {
@@ -84,8 +84,36 @@ export class RepoRelay {
   }
 
   async connect(): Promise<void> {
+    await this.logSessionBudget();
     await this.client.login(this.config.discordToken);
     console.log(`[repo-relay] Connected to Discord as ${this.client.user?.tag}`);
+  }
+
+  private async logSessionBudget(): Promise<void> {
+    try {
+      const rest = new REST().setToken(this.config.discordToken);
+      const data = await rest.get(Routes.gatewayBot()) as {
+        session_start_limit: {
+          total: number;
+          remaining: number;
+          reset_after: number;
+        };
+      };
+      const { remaining, total } = data.session_start_limit;
+      const pct = total > 0 ? Math.round((remaining / total) * 100) : 0;
+      console.log(`[repo-relay] Session budget: ${remaining}/${total} (${pct}%)`);
+
+      if (remaining <= 10) {
+        console.log(`[repo-relay] WARNING: Session budget critically low (${remaining} remaining)`);
+      } else if (pct <= 20) {
+        console.log(`[repo-relay] WARNING: Session budget below 20% (${remaining}/${total})`);
+      }
+    } catch (err) {
+      console.log(
+        '[repo-relay] Could not fetch session budget (non-fatal):',
+        safeErrorMessage(err),
+      );
+    }
   }
 
   async validatePermissions(): Promise<void> {
