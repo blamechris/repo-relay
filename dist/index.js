@@ -11,7 +11,7 @@ import { safeErrorMessage } from './utils/errors.js';
 import { REPO_NAME_PATTERN } from './utils/validation.js';
 import { withRetry } from './utils/retry.js';
 import { buildEmbedWithStatus } from './handlers/pr.js';
-import { buildPrEmbed, buildReviewReply } from './embeds/builders.js';
+import { buildPrEmbed, buildPrComponents, buildReviewReply } from './embeds/builders.js';
 import { TextChannel } from 'discord.js';
 import { getChannelForEvent } from './config/channels.js';
 import { getExistingPrMessage } from './discord/lookup.js';
@@ -119,7 +119,7 @@ export class RepoRelay {
                 }
                 break;
             case 'workflow_run':
-                await handleCiEvent(this.client, db, this.config.channelConfig, eventData.payload);
+                await handleCiEvent(this.client, db, this.config.channelConfig, eventData.payload, this.config.githubToken);
                 // Piggyback: check for reviews on associated PRs
                 if (this.config.githubToken) {
                     for (const pr of eventData.payload.workflow_run.pull_requests) {
@@ -179,7 +179,8 @@ export class RepoRelay {
                 const statusData = buildEmbedWithStatus(this.db, repo, prNumber);
                 if (statusData) {
                     const embed = buildPrEmbed(statusData.prData, statusData.ci, statusData.reviews);
-                    await withRetry(() => message.edit({ embeds: [embed] }));
+                    const components = [buildPrComponents(statusData.prData.url, statusData.ci.url)];
+                    await withRetry(() => message.edit({ embeds: [embed], components }));
                     console.log(`[repo-relay] Updated embed for PR #${prNumber} with detected reviews`);
                     // Post to thread about detected reviews
                     if (existing.threadId) {

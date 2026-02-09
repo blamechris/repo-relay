@@ -4,11 +4,12 @@
 
 import { Client, TextChannel } from 'discord.js';
 import { StateDb } from '../db/state.js';
-import { buildCiReply, CiStatus, buildPrEmbed, PrData } from '../embeds/builders.js';
+import { buildCiReply, buildCiFailureReply, CiStatus, buildPrEmbed, buildPrComponents, PrData } from '../embeds/builders.js';
 import { getChannelForEvent, ChannelConfig } from '../config/channels.js';
 import { buildEmbedWithStatus, getOrCreateThread } from './pr.js';
 import { getExistingPrMessage } from '../discord/lookup.js';
 import { withRetry } from '../utils/retry.js';
+import { fetchFailedSteps } from '../github/ci.js';
 
 export interface WorkflowRunPayload {
   action: 'completed' | 'requested' | 'in_progress';
@@ -33,7 +34,8 @@ export async function handleCiEvent(
   client: Client,
   db: StateDb,
   channelConfig: ChannelConfig,
-  payload: WorkflowRunPayload
+  payload: WorkflowRunPayload,
+  githubToken?: string
 ): Promise<void> {
   const { workflow_run: run, repository } = payload;
   const repo = repository.full_name;
@@ -82,13 +84,20 @@ export async function handleCiEvent(
     if (statusData) {
       console.log(`[repo-relay] Rebuilding embed with CI: ${statusData.ci.status}`);
       const embed = buildPrEmbed(statusData.prData, statusData.ci, statusData.reviews);
-      await withRetry(() => message.edit({ embeds: [embed] }));
+      const components = [buildPrComponents(statusData.prData.url, statusData.ci.url)];
+      await withRetry(() => message.edit({ embeds: [embed], components }));
       console.log(`[repo-relay] Embed updated successfully`);
 
       // Only post to thread for completed runs
       if (payload.action === 'completed') {
         const thread = await getOrCreateThread(channel, db, repo, statusData.prData, existing);
-        const reply = buildCiReply(ciStatus);
+        let reply: string;
+        if (ciStatus.status === 'failure' && githubToken) {
+          const failedSteps = await fetchFailedSteps(repo, run.id, githubToken);
+          reply = buildCiFailureReply(ciStatus, failedSteps);
+        } else {
+          reply = buildCiReply(ciStatus);
+        }
         await withRetry(() => thread.send(reply));
         console.log(`[repo-relay] Posted CI update to thread`);
         db.updatePrMessageTimestamp(repo, pr.number);

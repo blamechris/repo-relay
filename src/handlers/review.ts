@@ -4,7 +4,7 @@
 
 import { Client, TextChannel } from 'discord.js';
 import { StateDb } from '../db/state.js';
-import { buildReviewReply, buildPrEmbed } from '../embeds/builders.js';
+import { buildReviewReply, buildPrEmbed, buildPrComponents } from '../embeds/builders.js';
 import { getChannelForEvent, ChannelConfig } from '../config/channels.js';
 import { buildEmbedWithStatus, getOrCreateThread } from './pr.js';
 import { getExistingPrMessage } from '../discord/lookup.js';
@@ -84,7 +84,8 @@ export async function handleReviewEvent(
     const statusData = buildEmbedWithStatus(db, repo, pr.number);
     if (statusData) {
       const embed = buildPrEmbed(statusData.prData, statusData.ci, statusData.reviews);
-      await withRetry(() => message.edit({ embeds: [embed] }));
+      const components = [buildPrComponents(statusData.prData.url, statusData.ci.url)];
+      await withRetry(() => message.edit({ embeds: [embed], components }));
 
       // Post to thread
       const thread = await getOrCreateThread(channel, db, repo, statusData.prData, existing);

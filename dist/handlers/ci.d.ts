@@ -22,5 +22,5 @@ export interface WorkflowRunPayload {
         full_name: string;
     };
 }
-export declare function handleCiEvent(client: Client, db: StateDb, channelConfig: ChannelConfig, payload: WorkflowRunPayload): Promise<void>;
+export declare function handleCiEvent(client: Client, db: StateDb, channelConfig: ChannelConfig, payload: WorkflowRunPayload, githubToken?: string): Promise<void>;
 //# sourceMappingURL=ci.d.ts.map
