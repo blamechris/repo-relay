@@ -3,7 +3,7 @@
  */
 
 import Database from 'better-sqlite3';
-import { mkdirSync, existsSync } from 'fs';
+import { mkdirSync, existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 
@@ -97,6 +97,22 @@ export class StateDb {
 
     const dbPath = join(repoDir, 'state.db');
     this.db = new Database(dbPath);
+
+    // Verify database integrity (catches corruption from incomplete cache restore)
+    let integrityOk = false;
+    try {
+      const integrityResult = this.db.pragma('integrity_check') as Array<{ integrity_check: string }>;
+      integrityOk = integrityResult[0]?.integrity_check === 'ok';
+    } catch {
+      // Completely corrupt file — pragma itself throws
+    }
+    if (!integrityOk) {
+      console.warn('[repo-relay] Database integrity check failed, recreating...');
+      this.db.close();
+      unlinkSync(dbPath);
+      this.db = new Database(dbPath);
+    }
+
     this.db.pragma('journal_mode = WAL');
     this.initSchema();
     this.runMigrations();
@@ -537,6 +553,7 @@ export class StateDb {
   }
 
   close(): void {
+    this.db.pragma('wal_checkpoint(TRUNCATE)');
     this.db.close();
   }
 }
