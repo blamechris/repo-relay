@@ -159,6 +159,44 @@ describe('shouldSkipEvent', () => {
     expect(shouldSkipEvent(event)).toBe('push: branch creation or deletion event');
   });
 
+  it('skips push where all commits are PR merge commits', () => {
+    const event: GitHubEventPayload = {
+      event: 'push',
+      payload: {
+        ref: 'refs/heads/main', before: 'a', after: 'b', forced: false,
+        compare: '', created: false, deleted: false,
+        commits: [
+          { id: 'c1', message: 'Merge pull request #1 from user/branch', author: { name: 'u' } },
+          { id: 'c2', message: 'Merge pull request #42 from user/other', author: { name: 'u' } },
+        ],
+        head_commit: { id: 'c2', message: 'Merge pull request #42 from user/other' },
+        pusher: { name: 'u' },
+        sender: { login: 'u', avatar_url: '' },
+        repository: { full_name: 'owner/repo', default_branch: 'main' },
+      },
+    };
+    expect(shouldSkipEvent(event)).toBe('push: all commits are PR merge commits');
+  });
+
+  it('passes push with mix of merge and non-merge commits', () => {
+    const event: GitHubEventPayload = {
+      event: 'push',
+      payload: {
+        ref: 'refs/heads/main', before: 'a', after: 'b', forced: false,
+        compare: '', created: false, deleted: false,
+        commits: [
+          { id: 'c1', message: 'Merge pull request #1 from user/branch', author: { name: 'u' } },
+          { id: 'c2', message: 'fix: hotfix', author: { name: 'u' } },
+        ],
+        head_commit: { id: 'c2', message: 'fix: hotfix' },
+        pusher: { name: 'u' },
+        sender: { login: 'u', avatar_url: '' },
+        repository: { full_name: 'owner/repo', default_branch: 'main' },
+      },
+    };
+    expect(shouldSkipEvent(event)).toBeNull();
+  });
+
   it('passes push to default branch with commits', () => {
     const event: GitHubEventPayload = {
       event: 'push',
@@ -241,6 +279,38 @@ describe('shouldSkipEvent', () => {
       },
     };
     expect(shouldSkipEvent(event)).toBe("pull_request_review: action 'dismissed' not handled");
+  });
+
+  it('skips pull_request_review owner comment reply', () => {
+    const event: GitHubEventPayload = {
+      event: 'pull_request_review',
+      payload: {
+        action: 'submitted',
+        review: {
+          id: 1, user: { login: 'owner-user', type: 'User' },
+          body: 'thanks', state: 'commented', html_url: '',
+        },
+        pull_request: { number: 1 },
+        repository: { full_name: 'owner-user/repo', owner: { login: 'owner-user' } },
+      },
+    };
+    expect(shouldSkipEvent(event)).toBe('pull_request_review: owner comment reply');
+  });
+
+  it('passes pull_request_review owner approval (not a comment)', () => {
+    const event: GitHubEventPayload = {
+      event: 'pull_request_review',
+      payload: {
+        action: 'submitted',
+        review: {
+          id: 1, user: { login: 'owner-user', type: 'User' },
+          body: 'lgtm', state: 'approved', html_url: '',
+        },
+        pull_request: { number: 1 },
+        repository: { full_name: 'owner-user/repo', owner: { login: 'owner-user' } },
+      },
+    };
+    expect(shouldSkipEvent(event)).toBeNull();
   });
 
   it('passes pull_request_review with action submitted', () => {

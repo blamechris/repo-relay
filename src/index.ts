@@ -108,8 +108,11 @@ export class RepoRelay {
       } else if (pct <= 20) {
         console.log(`[repo-relay] WARNING: Session budget below 20% (${remaining}/${total})`);
       }
-    } catch {
-      console.log('[repo-relay] Could not fetch session budget (non-fatal)');
+    } catch (err) {
+      console.log(
+        '[repo-relay] Could not fetch session budget (non-fatal):',
+        safeErrorMessage(err),
+      );
     }
   }
 

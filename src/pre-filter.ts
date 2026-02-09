@@ -1,8 +1,8 @@
 /**
  * Pre-filter: skip events before Discord gateway connect to save sessions.
  *
- * Each check mirrors the corresponding handler's early-exit so we avoid
- * burning a gateway session for payloads the handler would discard anyway.
+ * These checks approximate the corresponding handlers' early-exit conditions
+ * so we avoid burning a gateway session for payloads likely to be discarded.
  */
 
 import type { GitHubEventPayload } from './index.js';
@@ -53,6 +53,13 @@ export function shouldSkipEvent(eventData: GitHubEventPayload): string | null {
       if (payload.created || payload.deleted) {
         return 'push: branch creation or deletion event';
       }
+      // push.ts:57 — skip if every commit is a PR merge commit
+      if (
+        payload.commits.length > 0 &&
+        payload.commits.every((c: { message: string }) => /^Merge pull request #\d+/.test(c.message))
+      ) {
+        return 'push: all commits are PR merge commits';
+      }
       return null;
     }
 
@@ -71,6 +78,11 @@ export function shouldSkipEvent(eventData: GitHubEventPayload): string | null {
       // review.ts:45 — only submitted
       if (eventData.payload.action !== 'submitted') {
         return `pull_request_review: action '${eventData.payload.action}' not handled`;
+      }
+      // review.ts:50-55 — ignore owner comment replies to avoid cascades
+      const { review, repository } = eventData.payload;
+      if (review?.user?.login === repository?.owner?.login && review?.state === 'commented') {
+        return 'pull_request_review: owner comment reply';
       }
       return null;
     }
