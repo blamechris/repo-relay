@@ -86,23 +86,33 @@ export async function handleCommentEvent(
     status = 'changes_requested';
   }
 
-  const message = await withRetry(() => channel.messages.fetch(existing.messageId));
-
-  // Update status in DB
+  // Update status in DB (before try so it persists even if message is stale)
   db.updateAgentReviewStatus(repo, prNumber, status);
 
-  // Rebuild and edit the embed with updated status
-  const statusData = buildEmbedWithStatus(db, repo, prNumber);
-  if (statusData) {
-    const embed = buildPrEmbed(statusData.prData, statusData.ci, statusData.reviews);
-    const components = [buildPrComponents(statusData.prData.url, statusData.ci.url)];
-    await withRetry(() => message.edit({ embeds: [embed], components }));
+  try {
+    const message = await withRetry(() => channel.messages.fetch(existing.messageId));
 
-    // Post to thread
-    const thread = await getOrCreateThread(channel, db, repo, statusData.prData, existing);
-    const reply = buildReviewReply('agent', status, undefined, comment.html_url);
-    await withRetry(() => thread.send(reply));
+    // Rebuild and edit the embed with updated status
+    const statusData = buildEmbedWithStatus(db, repo, prNumber);
+    if (statusData) {
+      const embed = buildPrEmbed(statusData.prData, statusData.ci, statusData.reviews);
+      const components = [buildPrComponents(statusData.prData.url, statusData.ci.url)];
+      await withRetry(() => message.edit({ embeds: [embed], components }));
+
+      // Post to thread
+      const thread = await getOrCreateThread(channel, db, repo, statusData.prData, existing);
+      const reply = buildReviewReply('agent', status, undefined, comment.html_url);
+      await withRetry(() => thread.send(reply));
+    }
+
+    db.updatePrMessageTimestamp(repo, prNumber);
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    if (errMsg.includes('Unknown Message')) {
+      console.log(`[repo-relay] Stale message for PR #${prNumber}, clearing DB entry`);
+      db.deletePrMessage(repo, prNumber);
+    } else {
+      throw error;
+    }
   }
-
-  db.updatePrMessageTimestamp(repo, prNumber);
 }

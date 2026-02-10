@@ -483,7 +483,7 @@ describe('shouldSkipEvent', () => {
 
   // ── always-process events ─────────────────────────────────────
 
-  it('never skips pull_request events', () => {
+  it('passes pull_request events with handled actions', () => {
     const event = {
       event: 'pull_request' as const,
       payload: {
@@ -500,6 +500,25 @@ describe('shouldSkipEvent', () => {
       },
     } as GitHubEventPayload;
     expect(shouldSkipEvent(event)).toBeNull();
+  });
+
+  it('skips pull_request events with unhandled actions', () => {
+    const event = {
+      event: 'pull_request' as const,
+      payload: {
+        action: 'labeled',
+        pull_request: {
+          number: 1, title: 'test', html_url: '', state: 'open',
+          draft: false, merged: false, user: { login: 'u', avatar_url: '' },
+          head: { ref: 'feat', sha: 'abc', repo: { full_name: 'owner/repo' } },
+          base: { ref: 'main' }, body: null, created_at: '',
+          additions: 0, deletions: 0, changed_files: 0,
+        },
+        repository: { full_name: 'owner/repo' },
+        sender: { login: 'u' },
+      },
+    } as GitHubEventPayload;
+    expect(shouldSkipEvent(event)).toBe("pull_request: action 'labeled' not handled");
   });
 
   it('never skips schedule events', () => {

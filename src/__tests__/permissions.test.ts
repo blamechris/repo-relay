@@ -6,6 +6,7 @@ const ALL_REQUIRED = [
   PermissionsBitField.Flags.SendMessages,
   PermissionsBitField.Flags.CreatePublicThreads,
   PermissionsBitField.Flags.SendMessagesInThreads,
+  PermissionsBitField.Flags.ManageThreads,
   PermissionsBitField.Flags.EmbedLinks,
   PermissionsBitField.Flags.ReadMessageHistory,
 ];

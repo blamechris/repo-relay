@@ -30,7 +30,7 @@ export async function checkForReviews(db, repo, prNumber, githubToken) {
     };
     // Check for Copilot reviews
     try {
-        const reviewsUrl = `https://api.github.com/repos/${owner}/${repoName}/pulls/${prNumber}/reviews`;
+        const reviewsUrl = `https://api.github.com/repos/${owner}/${repoName}/pulls/${prNumber}/reviews?per_page=100`;
         const reviewsRes = await fetch(reviewsUrl, { headers });
         if (reviewsRes.ok) {
             const reviews = await reviewsRes.json();
@@ -49,7 +49,7 @@ export async function checkForReviews(db, repo, prNumber, githubToken) {
     }
     // Check for agent-review comments
     try {
-        const commentsUrl = `https://api.github.com/repos/${owner}/${repoName}/issues/${prNumber}/comments`;
+        const commentsUrl = `https://api.github.com/repos/${owner}/${repoName}/issues/${prNumber}/comments?per_page=100`;
         const commentsRes = await fetch(commentsUrl, { headers });
         if (commentsRes.ok) {
             const comments = await commentsRes.json();

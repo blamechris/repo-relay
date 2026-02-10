@@ -15,7 +15,7 @@ export interface PrEventPayload {
             login: string;
             html_url: string;
             avatar_url: string;
-        };
+        } | null;
         head: {
             ref: string;
             sha: string;

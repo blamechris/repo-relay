@@ -16,13 +16,14 @@ export async function handlePrEvent(client, db, channelConfig, payload) {
     }
     // Log the event
     db.logEvent(repo, pr.number, `pr.${action}`, payload);
+    const user = pr.user ?? { login: 'ghost', html_url: 'https://github.com/ghost', avatar_url: '' };
     const prData = {
         number: pr.number,
         title: pr.title,
         url: pr.html_url,
-        author: pr.user.login,
-        authorUrl: pr.user.html_url,
-        authorAvatar: pr.user.avatar_url,
+        author: user.login,
+        authorUrl: user.html_url,
+        authorAvatar: user.avatar_url,
         branch: pr.head.ref,
         baseBranch: pr.base.ref,
         additions: pr.additions,

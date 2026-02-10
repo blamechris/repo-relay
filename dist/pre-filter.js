@@ -103,8 +103,14 @@ export function shouldSkipEvent(eventData) {
             }
             return null;
         }
-        // pull_request and schedule are always processed
-        case 'pull_request':
+        case 'pull_request': {
+            const handled = new Set(['opened', 'closed', 'reopened', 'synchronize', 'edited', 'ready_for_review', 'converted_to_draft']);
+            if (!handled.has(eventData.payload.action)) {
+                return `pull_request: action '${eventData.payload.action}' not handled`;
+            }
+            return null;
+        }
+        // schedule is always processed
         case 'schedule':
             return null;
         default:
