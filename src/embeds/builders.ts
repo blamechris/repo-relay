@@ -142,15 +142,13 @@ export function buildPrComponents(prUrl: string, ciUrl?: string): ActionRowBuild
 }
 
 export function buildPushReply(
-  commitCount: number,
   author: string,
   sha: string,
   compareUrl?: string
 ): string {
   const shaShort = sha.substring(0, 7);
   const link = compareUrl ? `[${shaShort}](${compareUrl})` : shaShort;
-  const plural = commitCount === 1 ? 'commit' : 'commits';
-  return `📤 Push: ${commitCount} ${plural} by @${author} (${link})`;
+  return `📤 Push by @${author} (${link})`;
 }
 
 export function buildCiReply(ci: CiStatus): string {
@@ -188,9 +186,9 @@ export function buildReviewReply(
   }
 }
 
-export function buildMergedReply(mergedBy?: string): string {
+export function buildMergedReply(mergedBy?: string, baseBranch?: string): string {
   const byText = mergedBy ? ` by @${mergedBy}` : '';
-  return `🎉 Merged to main${byText}!`;
+  return `🎉 Merged to ${baseBranch ?? 'main'}${byText}!`;
 }
 
 export function buildClosedReply(closedBy?: string): string {

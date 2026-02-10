@@ -160,7 +160,7 @@ async function handlePrClosed(
       // Post to thread
       const thread = await getOrCreateThread(channel, db, repo, pr, existing);
       const reply = pr.state === 'merged'
-        ? buildMergedReply(pr.mergedBy)
+        ? buildMergedReply(pr.mergedBy, pr.baseBranch)
         : buildClosedReply();
 
       await withRetry(() => thread.send(reply));
@@ -249,13 +249,11 @@ async function handlePrPush(
   // Get or create thread
   const thread = await getOrCreateThread(channel, db, repo, pr, existing);
 
-  // Count commits (if before/after available, otherwise assume 1)
-  const commitCount = 1; // GitHub doesn't provide commit count directly in synchronize
+  const sha = payload.after ?? payload.pull_request.head.sha;
 
   const replyText = buildPushReply(
-    commitCount,
     payload.sender.login,
-    pr.branch,
+    sha,
     `${pr.url}/commits`
   );
 
@@ -275,11 +273,14 @@ async function handlePrUpdated(
     try {
       const messageId = existing.messageId;
       const message = await withRetry(() => channel.messages.fetch(messageId));
-      const embed = buildPrEmbed(pr);
-      const components = [buildPrComponents(pr.url)];
+      savePrDataFromPrData(db, repo, pr);
+      const statusData = buildEmbedWithStatus(db, repo, pr.number);
+      const embed = statusData
+        ? buildPrEmbed(statusData.prData, statusData.ci, statusData.reviews)
+        : buildPrEmbed(pr);
+      const components = [buildPrComponents(pr.url, statusData?.ci.url)];
       await withRetry(() => message.edit({ embeds: [embed], components }));
       db.updatePrMessageTimestamp(repo, pr.number);
-      savePrDataFromPrData(db, repo, pr);
       return;
     } catch (error: unknown) {
       const errMsg = error instanceof Error ? error.message : String(error);
