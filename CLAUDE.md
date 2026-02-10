@@ -190,6 +190,18 @@ After merging, update the issue with:
 
 **NEVER commit directly to main.** Always use feature branches and PRs.
 
+### Merge Gate — MANDATORY short-circuit when merge is blocked
+
+When `gh pr merge` fails with "base branch policy prohibits the merge":
+1. **Do NOT investigate, reason about, or run diagnostic commands.** The cause is almost always unresolved review threads.
+2. **Immediately respond with exactly this** (filling in the PR number):
+   > Merge blocked — unresolved review threads. Please resolve them here:
+   > https://github.com/blamechris/repo-relay/pull/{N}/files
+   >
+   > Say "done" when resolved.
+3. **Wait for user confirmation**, then retry `gh pr merge --squash`.
+4. If it fails a second time, THEN check `gh pr checks` for CI failures.
+
 ## Project Structure
 
 ```
