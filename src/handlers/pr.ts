@@ -249,7 +249,7 @@ async function handlePrPush(
   // Get or create thread
   const thread = await getOrCreateThread(channel, db, repo, pr, existing);
 
-  const sha = payload.after ?? pr.branch;
+  const sha = payload.after ?? payload.pull_request.head.sha;
 
   const replyText = buildPushReply(
     payload.sender.login,

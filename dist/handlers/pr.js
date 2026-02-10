@@ -162,7 +162,7 @@ async function handlePrPush(channel, db, repo, pr, payload) {
     }
     // Get or create thread
     const thread = await getOrCreateThread(channel, db, repo, pr, existing);
-    const sha = payload.after ?? pr.branch;
+    const sha = payload.after ?? payload.pull_request.head.sha;
     const replyText = buildPushReply(payload.sender.login, sha, `${pr.url}/commits`);
     await withRetry(() => thread.send(replyText));
     db.updatePrMessageTimestamp(repo, pr.number);
