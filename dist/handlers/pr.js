@@ -86,7 +86,7 @@ async function handlePrClosed(channel, db, repo, pr) {
             // Post to thread
             const thread = await getOrCreateThread(channel, db, repo, pr, existing);
             const reply = pr.state === 'merged'
-                ? buildMergedReply(pr.mergedBy)
+                ? buildMergedReply(pr.mergedBy, pr.baseBranch)
                 : buildClosedReply();
             await withRetry(() => thread.send(reply));
             db.updatePrMessageTimestamp(repo, pr.number);
@@ -162,9 +162,8 @@ async function handlePrPush(channel, db, repo, pr, payload) {
     }
     // Get or create thread
     const thread = await getOrCreateThread(channel, db, repo, pr, existing);
-    // Count commits (if before/after available, otherwise assume 1)
-    const commitCount = 1; // GitHub doesn't provide commit count directly in synchronize
-    const replyText = buildPushReply(commitCount, payload.sender.login, pr.branch, `${pr.url}/commits`);
+    const sha = payload.after ?? pr.branch;
+    const replyText = buildPushReply(payload.sender.login, sha, `${pr.url}/commits`);
     await withRetry(() => thread.send(replyText));
     db.updatePrMessageTimestamp(repo, pr.number);
 }
@@ -174,11 +173,14 @@ async function handlePrUpdated(channel, db, repo, pr) {
         try {
             const messageId = existing.messageId;
             const message = await withRetry(() => channel.messages.fetch(messageId));
-            const embed = buildPrEmbed(pr);
-            const components = [buildPrComponents(pr.url)];
+            savePrDataFromPrData(db, repo, pr);
+            const statusData = buildEmbedWithStatus(db, repo, pr.number);
+            const embed = statusData
+                ? buildPrEmbed(statusData.prData, statusData.ci, statusData.reviews)
+                : buildPrEmbed(pr);
+            const components = [buildPrComponents(pr.url, statusData?.ci.url)];
             await withRetry(() => message.edit({ embeds: [embed], components }));
             db.updatePrMessageTimestamp(repo, pr.number);
-            savePrDataFromPrData(db, repo, pr);
             return;
         }
         catch (error) {

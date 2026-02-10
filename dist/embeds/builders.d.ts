@@ -36,11 +36,11 @@ export interface ReviewStatus {
 }
 export declare function buildPrEmbed(pr: PrData, ci?: CiStatus, reviews?: ReviewStatus): EmbedBuilder;
 export declare function buildPrComponents(prUrl: string, ciUrl?: string): ActionRowBuilder<ButtonBuilder>;
-export declare function buildPushReply(commitCount: number, author: string, sha: string, compareUrl?: string): string;
+export declare function buildPushReply(author: string, sha: string, compareUrl?: string): string;
 export declare function buildCiReply(ci: CiStatus): string;
 export declare function buildCiFailureReply(ci: CiStatus, failedSteps: FailedStep[]): string;
 export declare function buildReviewReply(type: 'copilot' | 'agent', status: string, comments?: number, url?: string): string;
-export declare function buildMergedReply(mergedBy?: string): string;
+export declare function buildMergedReply(mergedBy?: string, baseBranch?: string): string;
 export declare function buildClosedReply(closedBy?: string): string;
 export interface IssueData {
     number: number;

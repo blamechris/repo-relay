@@ -80,7 +80,6 @@ export async function checkForReviews(
     if (reviewsRes.ok) {
       const reviews = await reviewsRes.json() as GitHubReview[];
       const copilotReview = reviews.find(r =>
-        r.user?.login?.toLowerCase().includes('copilot') ||
         r.user?.type === 'Bot' && r.user?.login?.toLowerCase().includes('copilot')
       );
 

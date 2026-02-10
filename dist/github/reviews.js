@@ -34,8 +34,7 @@ export async function checkForReviews(db, repo, prNumber, githubToken) {
         const reviewsRes = await fetch(reviewsUrl, { headers });
         if (reviewsRes.ok) {
             const reviews = await reviewsRes.json();
-            const copilotReview = reviews.find(r => r.user?.login?.toLowerCase().includes('copilot') ||
-                r.user?.type === 'Bot' && r.user?.login?.toLowerCase().includes('copilot'));
+            const copilotReview = reviews.find(r => r.user?.type === 'Bot' && r.user?.login?.toLowerCase().includes('copilot'));
             if (copilotReview && currentStatus?.copilotStatus !== 'reviewed') {
                 console.log(`[repo-relay] Detected Copilot review for PR #${prNumber}`);
                 db.updateCopilotStatus(repo, prNumber, 'reviewed', 0);

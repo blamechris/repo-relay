@@ -82,11 +82,10 @@ export function buildPrComponents(prUrl, ciUrl) {
     }
     return row;
 }
-export function buildPushReply(commitCount, author, sha, compareUrl) {
+export function buildPushReply(author, sha, compareUrl) {
     const shaShort = sha.substring(0, 7);
     const link = compareUrl ? `[${shaShort}](${compareUrl})` : shaShort;
-    const plural = commitCount === 1 ? 'commit' : 'commits';
-    return `📤 Push: ${commitCount} ${plural} by @${author} (${link})`;
+    return `📤 Push by @${author} (${link})`;
 }
 export function buildCiReply(ci) {
     const status = getCiStatusText(ci);
@@ -114,9 +113,9 @@ export function buildReviewReply(type, status, comments, url) {
         return `🔍 Agent review: ${statusEmoji} ${capitalize(status)}${link}`;
     }
 }
-export function buildMergedReply(mergedBy) {
+export function buildMergedReply(mergedBy, baseBranch) {
     const byText = mergedBy ? ` by @${mergedBy}` : '';
-    return `🎉 Merged to main${byText}!`;
+    return `🎉 Merged to ${baseBranch ?? 'main'}${byText}!`;
 }
 export function buildClosedReply(closedBy) {
     const byText = closedBy ? ` by @${closedBy}` : '';
