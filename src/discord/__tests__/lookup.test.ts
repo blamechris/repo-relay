@@ -2,10 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getExistingPrMessage, getExistingIssueMessage } from '../lookup.js';
 import { TextChannel } from 'discord.js';
 
-function makeMockMessage(id: string, title: string, url: string, threadId?: string) {
+function makeMockMessage(id: string, title: string, url: string, threadId?: string, footerText?: string) {
   return {
     id,
-    embeds: [{ title, url }],
+    embeds: [{ title, url, footer: footerText ? { text: footerText } : null }],
     thread: threadId ? { id: threadId } : null,
   };
 }
@@ -27,6 +27,9 @@ function makeMockDb() {
     getPrMessage: vi.fn(() => null),
     savePrMessage: vi.fn(),
     savePrStatus: vi.fn(),
+    updateCiStatus: vi.fn(),
+    updateCopilotStatus: vi.fn(),
+    updateAgentReviewStatus: vi.fn(),
     getIssueMessage: vi.fn(() => null),
     saveIssueMessage: vi.fn(),
   };
@@ -109,6 +112,42 @@ describe('getExistingPrMessage', () => {
 
     expect(result).toBeNull();
     expect(db.savePrMessage).not.toHaveBeenCalled();
+  });
+
+  it('recovers PR status from embed footer metadata', async () => {
+    const db = makeMockDb();
+    const savedRow = { repo: REPO, prNumber: 42, messageId: 'msg-1', threadId: 'thread-1' };
+    db.getPrMessage
+      .mockReturnValueOnce(null)
+      .mockReturnValueOnce(savedRow);
+
+    const footer = 'repo-relay:v1:{"type":"pr","pr":42,"repo":"owner/repo","ci":"success","copilot":"reviewed","copilotComments":3,"agent":"approved"}';
+    const channel = makeMockChannel([
+      makeMockMessage('msg-1', '🔀 PR #42: My PR', PR_URL, 'thread-1', footer),
+    ]);
+
+    await getExistingPrMessage(db as any, channel, REPO, 42);
+
+    expect(db.updateCiStatus).toHaveBeenCalledWith(REPO, 42, 'success');
+    expect(db.updateCopilotStatus).toHaveBeenCalledWith(REPO, 42, 'reviewed', 3);
+    expect(db.updateAgentReviewStatus).toHaveBeenCalledWith(REPO, 42, 'approved');
+  });
+
+  it('skips status recovery when no footer present', async () => {
+    const db = makeMockDb();
+    const savedRow = { repo: REPO, prNumber: 42, messageId: 'msg-1', threadId: null };
+    db.getPrMessage
+      .mockReturnValueOnce(null)
+      .mockReturnValueOnce(savedRow);
+    const channel = makeMockChannel([
+      makeMockMessage('msg-1', '🔀 PR #42: My PR', PR_URL),
+    ]);
+
+    await getExistingPrMessage(db as any, channel, REPO, 42);
+
+    expect(db.savePrMessage).toHaveBeenCalled();
+    expect(db.updateCiStatus).not.toHaveBeenCalled();
+    expect(db.updateCopilotStatus).not.toHaveBeenCalled();
   });
 });
 

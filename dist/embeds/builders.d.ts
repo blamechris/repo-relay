@@ -67,4 +67,20 @@ export declare function buildForcePushEmbed(branch: string, beforeSha: string, a
 export declare function buildDependabotAlertEmbed(payload: DependabotAlertPayload): EmbedBuilder;
 export declare function buildSecretScanningAlertEmbed(payload: SecretScanningAlertPayload): EmbedBuilder;
 export declare function buildCodeScanningAlertEmbed(payload: CodeScanningAlertPayload): EmbedBuilder;
+export interface PrFooterMetadata {
+    type: 'pr';
+    pr: number;
+    repo: string;
+    ci: CiStatus['status'];
+    copilot: ReviewStatus['copilot'];
+    copilotComments?: number;
+    agent: ReviewStatus['agentReview'];
+}
+export interface IssueFooterMetadata {
+    type: 'issue';
+    issue: number;
+    repo: string;
+}
+export type FooterMetadata = PrFooterMetadata | IssueFooterMetadata;
+export declare function parseFooterMetadata(footerText: string): FooterMetadata | null;
 //# sourceMappingURL=builders.d.ts.map

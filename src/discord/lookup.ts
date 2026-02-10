@@ -7,6 +7,7 @@ import { TextChannel } from 'discord.js';
 import { StateDb, PrMessage, IssueMessage } from '../db/state.js';
 import { safeErrorMessage } from '../utils/errors.js';
 import { withRetry } from '../utils/retry.js';
+import { parseFooterMetadata } from '../embeds/builders.js';
 
 const PR_TITLE_PATTERN = /PR #(\d+):/;
 const ISSUE_TITLE_PATTERN = /Issue #(\d+):/;
@@ -20,7 +21,7 @@ async function findMessageInChannel(
   repo: string,
   targetNumber: number,
   label: string
-): Promise<{ messageId: string; threadId: string | null } | null> {
+): Promise<{ messageId: string; threadId: string | null; footerText: string | null } | null> {
   try {
     const messages = await withRetry(() => channel.messages.fetch({ limit: 100 }));
 
@@ -35,6 +36,7 @@ async function findMessageInChannel(
         return {
           messageId: message.id,
           threadId: message.thread?.id ?? null,
+          footerText: embed.footer?.text ?? null,
         };
       }
     }
@@ -67,7 +69,23 @@ export async function getExistingPrMessage(
   // Cache back to DB and return the saved row
   db.savePrMessage(repo, prNumber, channel.id, found.messageId, found.threadId ?? undefined);
   db.savePrStatus(repo, prNumber);
-  console.log(`[repo-relay] Recovered message for PR #${prNumber} from Discord channel`);
+
+  // Recover status from embed footer if available
+  if (found.footerText) {
+    const meta = parseFooterMetadata(found.footerText);
+    if (meta && meta.type === 'pr') {
+      db.updateCiStatus(repo, prNumber, meta.ci);
+      db.updateCopilotStatus(repo, prNumber, meta.copilot, meta.copilotComments ?? 0);
+      if (meta.agent !== 'pending') {
+        db.updateAgentReviewStatus(repo, prNumber, meta.agent);
+      }
+      console.log(`[repo-relay] Recovered message + status for PR #${prNumber} from Discord channel`);
+    } else {
+      console.log(`[repo-relay] Recovered message for PR #${prNumber} from Discord channel`);
+    }
+  } else {
+    console.log(`[repo-relay] Recovered message for PR #${prNumber} from Discord channel`);
+  }
 
   return db.getPrMessage(repo, prNumber);
 }
