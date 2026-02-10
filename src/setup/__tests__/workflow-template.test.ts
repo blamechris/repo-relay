@@ -3,7 +3,7 @@ import { buildWorkflowTemplate } from '../workflow-template.js';
 
 describe('buildWorkflowTemplate', () => {
   it('library: includes issues + releases events, all channel secrets, issues permission', () => {
-    const result = buildWorkflowTemplate('CI', { issues: true, releases: true, deployments: false, reviewPolling: false, pushEvents: false });
+    const result = buildWorkflowTemplate('CI', { issues: true, releases: true, deployments: false, reviewPolling: false, pushEvents: false, securityAlerts: false });
 
     // Events
     expect(result).toContain('pull_request:');
@@ -30,7 +30,7 @@ describe('buildWorkflowTemplate', () => {
   });
 
   it('webapp: includes issues but not releases or deployments', () => {
-    const result = buildWorkflowTemplate('CI', { issues: true, releases: false, deployments: false, reviewPolling: false, pushEvents: false });
+    const result = buildWorkflowTemplate('CI', { issues: true, releases: false, deployments: false, reviewPolling: false, pushEvents: false, securityAlerts: false });
 
     // Has issues events
     expect(result).toContain('issue_comment:');
@@ -46,7 +46,7 @@ describe('buildWorkflowTemplate', () => {
   });
 
   it('minimal: PR-only events, no extra channels or permissions', () => {
-    const result = buildWorkflowTemplate('CI', { issues: false, releases: false, deployments: false, reviewPolling: false, pushEvents: false });
+    const result = buildWorkflowTemplate('CI', { issues: false, releases: false, deployments: false, reviewPolling: false, pushEvents: false, securityAlerts: false });
 
     // Core events present
     expect(result).toContain('pull_request:');
@@ -70,7 +70,7 @@ describe('buildWorkflowTemplate', () => {
   });
 
   it('app: includes issues + deployments but not releases', () => {
-    const result = buildWorkflowTemplate('CI', { issues: true, releases: false, deployments: true, reviewPolling: false, pushEvents: false });
+    const result = buildWorkflowTemplate('CI', { issues: true, releases: false, deployments: true, reviewPolling: false, pushEvents: false, securityAlerts: false });
 
     // Has issues events
     expect(result).toContain('issue_comment:');
@@ -92,7 +92,7 @@ describe('buildWorkflowTemplate', () => {
   });
 
   it('deployments-only: has deployment_status but no issues or releases', () => {
-    const result = buildWorkflowTemplate('CI', { issues: false, releases: false, deployments: true, reviewPolling: false, pushEvents: false });
+    const result = buildWorkflowTemplate('CI', { issues: false, releases: false, deployments: true, reviewPolling: false, pushEvents: false, securityAlerts: false });
 
     // Has deployment events
     expect(result).toContain('deployment_status:');
@@ -113,7 +113,7 @@ describe('buildWorkflowTemplate', () => {
   });
 
   it('all features: issues + releases + deployments all present', () => {
-    const result = buildWorkflowTemplate('Build', { issues: true, releases: true, deployments: true, reviewPolling: false, pushEvents: false });
+    const result = buildWorkflowTemplate('Build', { issues: true, releases: true, deployments: true, reviewPolling: false, pushEvents: false, securityAlerts: false });
 
     // All events
     expect(result).toContain('issue_comment:');
@@ -135,11 +135,11 @@ describe('buildWorkflowTemplate', () => {
     expect(result).toContain('contents: read');
 
     // If-guard comment explains filtering logic
-    expect(result).toContain('# Skip workflow_run events with no associated PR');
+    expect(result).toContain('# Defense-in-depth: skip workflow_run events with no associated PR');
   });
 
   it('reviewPolling enabled: includes schedule trigger with 5-min cron', () => {
-    const result = buildWorkflowTemplate('CI', { issues: false, releases: false, deployments: false, reviewPolling: true, pushEvents: false });
+    const result = buildWorkflowTemplate('CI', { issues: false, releases: false, deployments: false, reviewPolling: true, pushEvents: false, securityAlerts: false });
 
     expect(result).toContain('schedule:');
     expect(result).toContain("cron: '*/5 * * * *'");
@@ -150,7 +150,7 @@ describe('buildWorkflowTemplate', () => {
   });
 
   it('pushEvents enabled: includes push event with branches filter', () => {
-    const result = buildWorkflowTemplate('CI', { issues: false, releases: false, deployments: false, reviewPolling: false, pushEvents: true });
+    const result = buildWorkflowTemplate('CI', { issues: false, releases: false, deployments: false, reviewPolling: false, pushEvents: true, securityAlerts: false });
 
     expect(result).toContain('push:');
     expect(result).toContain('branches: [$default-branch]');
@@ -161,13 +161,13 @@ describe('buildWorkflowTemplate', () => {
   });
 
   it('pushEvents disabled: no push event in output', () => {
-    const result = buildWorkflowTemplate('CI', { issues: false, releases: false, deployments: false, reviewPolling: false, pushEvents: false });
+    const result = buildWorkflowTemplate('CI', { issues: false, releases: false, deployments: false, reviewPolling: false, pushEvents: false, securityAlerts: false });
 
     expect(result).not.toMatch(/^ {2}push:/m);
   });
 
   it('reviewPolling disabled: no schedule or cron in output', () => {
-    const result = buildWorkflowTemplate('CI', { issues: false, releases: false, deployments: false, reviewPolling: false, pushEvents: false });
+    const result = buildWorkflowTemplate('CI', { issues: false, releases: false, deployments: false, reviewPolling: false, pushEvents: false, securityAlerts: false });
 
     expect(result).not.toContain('schedule:');
     expect(result).not.toContain('cron:');
@@ -194,7 +194,7 @@ describe('buildWorkflowTemplate', () => {
   });
 
   it('securityAlerts disabled: no security events in output', () => {
-    const result = buildWorkflowTemplate('CI', { issues: false, releases: false, deployments: false, reviewPolling: false, pushEvents: false });
+    const result = buildWorkflowTemplate('CI', { issues: false, releases: false, deployments: false, reviewPolling: false, pushEvents: false, securityAlerts: false });
 
     expect(result).not.toContain('dependabot_alert:');
     expect(result).not.toContain('secret_scanning_alert:');

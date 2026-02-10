@@ -13,10 +13,10 @@ import { safeErrorMessage } from './utils/errors.js';
 import { buildWorkflowTemplate, type ProjectFeatures } from './setup/workflow-template.js';
 
 const PROJECT_TYPES: Record<'library' | 'webapp' | 'app' | 'minimal', ProjectFeatures> = {
-  library: { issues: true,  releases: true,  deployments: false, reviewPolling: false, pushEvents: false },
-  webapp:  { issues: true,  releases: false, deployments: false, reviewPolling: false, pushEvents: false },
-  app:     { issues: true,  releases: false, deployments: true,  reviewPolling: false, pushEvents: false },
-  minimal: { issues: false, releases: false, deployments: false, reviewPolling: false, pushEvents: false },
+  library: { issues: true,  releases: true,  deployments: false, reviewPolling: false, pushEvents: false, securityAlerts: false },
+  webapp:  { issues: true,  releases: false, deployments: false, reviewPolling: false, pushEvents: false, securityAlerts: false },
+  app:     { issues: true,  releases: false, deployments: true,  reviewPolling: false, pushEvents: false, securityAlerts: false },
+  minimal: { issues: false, releases: false, deployments: false, reviewPolling: false, pushEvents: false, securityAlerts: false },
 };
 
 function getRepoUrl(): string | null {
@@ -109,6 +109,7 @@ async function main(): Promise<void> {
         { title: 'Deployment notifications', value: 'deployments' },
         { title: 'Review polling (every 5 min)', value: 'reviewPolling' },
         { title: 'Push notifications (direct pushes to default branch)', value: 'pushEvents' },
+        { title: 'Security alerts (Dependabot, secret scanning, code scanning)', value: 'securityAlerts' },
       ],
     });
 
@@ -123,6 +124,7 @@ async function main(): Promise<void> {
       deployments: (customFeatures as string[]).includes('deployments'),
       reviewPolling: (customFeatures as string[]).includes('reviewPolling'),
       pushEvents: (customFeatures as string[]).includes('pushEvents'),
+      securityAlerts: (customFeatures as string[]).includes('securityAlerts'),
     };
   } else {
     features = PROJECT_TYPES[projectType as keyof typeof PROJECT_TYPES];

@@ -128,8 +128,7 @@ export function buildIssueEmbed(issue) {
         });
     }
     if (issue.body && issue.body.length > 0) {
-        const truncated = issue.body.length > 200 ? issue.body.substring(0, 197) + '...' : issue.body;
-        embed.setDescription(truncated);
+        embed.setDescription(truncateDescription(issue.body, 200));
     }
     return embed;
 }
@@ -161,8 +160,7 @@ export function buildReleaseEmbed(name, tagName, url, author, authorAvatar, body
         inline: true,
     });
     if (body && body.length > 0) {
-        const truncated = body.length > 500 ? body.substring(0, 497) + '...' : body;
-        embed.setDescription(truncated);
+        embed.setDescription(truncateDescription(body, 500));
     }
     return embed;
 }
@@ -185,8 +183,7 @@ export function buildDeploymentEmbed(state, environment, ref, sha, author, autho
     })
         .addFields({ name: 'Environment', value: environment, inline: true }, { name: 'Ref', value: `\`${ref}\``, inline: true }, { name: 'Commit', value: `\`${sha.substring(0, 7)}\``, inline: true }, { name: 'Status', value: capitalize(state), inline: true });
     if (description) {
-        const truncated = description.length > 500 ? description.substring(0, 497) + '...' : description;
-        embed.setDescription(truncated);
+        embed.setDescription(truncateDescription(description, 500));
     }
     if (targetUrl) {
         embed.setURL(targetUrl);
@@ -271,7 +268,7 @@ export function buildCodeScanningAlertEmbed(payload) {
         .setColor(SEVERITY_COLORS[severity] ?? Colors.Grey)
         .setTitle(truncateTitle(`🔍 Code Scanning: ${alert.rule.name}`))
         .setURL(alert.html_url)
-        .setDescription(alert.rule.description.length > 200 ? alert.rule.description.substring(0, 197) + '...' : alert.rule.description)
+        .setDescription(truncateDescription(alert.rule.description, 200))
         .addFields({ name: 'Rule', value: `\`${alert.rule.id}\``, inline: true }, { name: 'Severity', value: capitalize(severity), inline: true }, { name: 'Tool', value: alert.tool.name, inline: true }, { name: 'Location', value: `\`${location.path}:${location.start_line}\``, inline: true });
 }
 // Helper functions
@@ -344,6 +341,9 @@ function getIssueStateLabel(state, stateReason) {
 }
 function truncateTitle(title) {
     return title.length > 256 ? title.substring(0, 255) + '…' : title;
+}
+function truncateDescription(text, maxLength) {
+    return text.length > maxLength ? text.substring(0, maxLength - 3) + '...' : text;
 }
 function capitalize(str) {
     return str.charAt(0).toUpperCase() + str.slice(1);

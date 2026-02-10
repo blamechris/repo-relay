@@ -108,31 +108,34 @@ describe('handleSecurityAlertEvent', () => {
     expect(db.logEvent).toHaveBeenCalledWith('test/repo', 1, 'dependabot_alert.created', payload);
   });
 
-  it('skips dependabot_alert dismissed', async () => {
+  it('skips dependabot_alert dismissed but still logs', async () => {
     const channel = makeMockChannel();
     const client = makeMockClient(channel);
     const db = makeMockDb();
+    const payload = makeDependabotPayload('dismissed');
 
     await handleSecurityAlertEvent(
       client as any, db as any, { prs: 'channel-1' },
-      { event: 'dependabot_alert', payload: makeDependabotPayload('dismissed') }
+      { event: 'dependabot_alert', payload }
     );
 
     expect(channel.send).not.toHaveBeenCalled();
-    expect(db.logEvent).not.toHaveBeenCalled();
+    expect(db.logEvent).toHaveBeenCalledWith('test/repo', 1, 'dependabot_alert.dismissed', payload);
   });
 
-  it('skips dependabot_alert fixed', async () => {
+  it('skips dependabot_alert fixed but still logs', async () => {
     const channel = makeMockChannel();
     const client = makeMockClient(channel);
     const db = makeMockDb();
+    const payload = makeDependabotPayload('fixed');
 
     await handleSecurityAlertEvent(
       client as any, db as any, { prs: 'channel-1' },
-      { event: 'dependabot_alert', payload: makeDependabotPayload('fixed') }
+      { event: 'dependabot_alert', payload }
     );
 
     expect(channel.send).not.toHaveBeenCalled();
+    expect(db.logEvent).toHaveBeenCalledWith('test/repo', 1, 'dependabot_alert.fixed', payload);
   });
 
   // ── Secret scanning ─────────────────────────────────────────
@@ -152,17 +155,19 @@ describe('handleSecurityAlertEvent', () => {
     expect(db.logEvent).toHaveBeenCalledWith('test/repo', 2, 'secret_scanning_alert.created', payload);
   });
 
-  it('skips secret_scanning_alert resolved', async () => {
+  it('skips secret_scanning_alert resolved but still logs', async () => {
     const channel = makeMockChannel();
     const client = makeMockClient(channel);
     const db = makeMockDb();
+    const payload = makeSecretPayload('resolved');
 
     await handleSecurityAlertEvent(
       client as any, db as any, { prs: 'channel-1' },
-      { event: 'secret_scanning_alert', payload: makeSecretPayload('resolved') }
+      { event: 'secret_scanning_alert', payload }
     );
 
     expect(channel.send).not.toHaveBeenCalled();
+    expect(db.logEvent).toHaveBeenCalledWith('test/repo', 2, 'secret_scanning_alert.resolved', payload);
   });
 
   // ── Code scanning ───────────────────────────────────────────
@@ -196,17 +201,19 @@ describe('handleSecurityAlertEvent', () => {
     expect(channel.send).toHaveBeenCalledWith({ embeds: [{ mock: 'code-embed' }] });
   });
 
-  it('skips code_scanning_alert fixed', async () => {
+  it('skips code_scanning_alert fixed but still logs', async () => {
     const channel = makeMockChannel();
     const client = makeMockClient(channel);
     const db = makeMockDb();
+    const payload = makeCodePayload('fixed');
 
     await handleSecurityAlertEvent(
       client as any, db as any, { prs: 'channel-1' },
-      { event: 'code_scanning_alert', payload: makeCodePayload('fixed') }
+      { event: 'code_scanning_alert', payload }
     );
 
     expect(channel.send).not.toHaveBeenCalled();
+    expect(db.logEvent).toHaveBeenCalledWith('test/repo', 3, 'code_scanning_alert.fixed', payload);
   });
 
   // ── Channel handling ────────────────────────────────────────

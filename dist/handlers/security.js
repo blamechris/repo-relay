@@ -8,6 +8,8 @@ import { withRetry } from '../utils/retry.js';
 export async function handleSecurityAlertEvent(client, db, channelConfig, alertData) {
     const repo = alertData.payload.repository.full_name;
     const alertNumber = alertData.payload.alert.number;
+    // Log all security events for audit trail, including skipped actions
+    db.logEvent(repo, alertNumber, `${alertData.event}.${alertData.payload.action}`, alertData.payload);
     // Defense-in-depth: skip non-actionable actions (pre-filter should catch these)
     switch (alertData.event) {
         case 'dependabot_alert':
@@ -28,7 +30,6 @@ export async function handleSecurityAlertEvent(client, db, channelConfig, alertD
     if (!channel || !(channel instanceof TextChannel)) {
         throw new Error(`Channel ${channelId} not found or not a text channel`);
     }
-    db.logEvent(repo, alertNumber, `${alertData.event}.${alertData.payload.action}`, alertData.payload);
     let embed;
     switch (alertData.event) {
         case 'dependabot_alert':
