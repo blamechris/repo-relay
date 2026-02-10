@@ -35,21 +35,33 @@ export async function handleReviewEvent(client, db, channelConfig, payload) {
     const isCopilot = review.user.type === 'Bot' &&
         review.user.login.toLowerCase().includes('copilot');
     if (isCopilot) {
-        const message = await withRetry(() => channel.messages.fetch(existing.messageId));
-        // Update status in DB
-        db.updateCopilotStatus(repo, pr.number, 'reviewed', 0);
-        // Rebuild and edit the embed with updated status
-        const statusData = buildEmbedWithStatus(db, repo, pr.number);
-        if (statusData) {
-            const embed = buildPrEmbed(statusData.prData, statusData.ci, statusData.reviews);
-            const components = [buildPrComponents(statusData.prData.url, statusData.ci.url)];
-            await withRetry(() => message.edit({ embeds: [embed], components }));
-            // Post to thread
-            const thread = await getOrCreateThread(channel, db, repo, statusData.prData, existing);
-            const reply = buildReviewReply('copilot', 'reviewed', undefined, review.html_url);
-            await withRetry(() => thread.send(reply));
+        try {
+            const message = await withRetry(() => channel.messages.fetch(existing.messageId));
+            // Update status in DB
+            db.updateCopilotStatus(repo, pr.number, 'reviewed', 0);
+            // Rebuild and edit the embed with updated status
+            const statusData = buildEmbedWithStatus(db, repo, pr.number);
+            if (statusData) {
+                const embed = buildPrEmbed(statusData.prData, statusData.ci, statusData.reviews);
+                const components = [buildPrComponents(statusData.prData.url, statusData.ci.url)];
+                await withRetry(() => message.edit({ embeds: [embed], components }));
+                // Post to thread
+                const thread = await getOrCreateThread(channel, db, repo, statusData.prData, existing);
+                const reply = buildReviewReply('copilot', 'reviewed', undefined, review.html_url);
+                await withRetry(() => thread.send(reply));
+            }
+            db.updatePrMessageTimestamp(repo, pr.number);
         }
-        db.updatePrMessageTimestamp(repo, pr.number);
+        catch (error) {
+            const errMsg = error instanceof Error ? error.message : String(error);
+            if (errMsg.includes('Unknown Message')) {
+                console.log(`[repo-relay] Stale message for PR #${pr.number}, clearing DB entry`);
+                db.deletePrMessage(repo, pr.number);
+            }
+            else {
+                throw error;
+            }
+        }
     }
 }
 //# sourceMappingURL=review.js.map

@@ -71,6 +71,7 @@ const REQUIRED_PERMISSIONS = [
   { flag: PermissionsBitField.Flags.SendMessages, name: 'Send Messages' },
   { flag: PermissionsBitField.Flags.CreatePublicThreads, name: 'Create Public Threads' },
   { flag: PermissionsBitField.Flags.SendMessagesInThreads, name: 'Send Messages in Threads' },
+  { flag: PermissionsBitField.Flags.ManageThreads, name: 'Manage Threads' },
   { flag: PermissionsBitField.Flags.EmbedLinks, name: 'Embed Links' },
   { flag: PermissionsBitField.Flags.ReadMessageHistory, name: 'Read Message History' },
 ];
