@@ -219,8 +219,7 @@ export function buildIssueEmbed(issue: IssueData): EmbedBuilder {
   }
 
   if (issue.body && issue.body.length > 0) {
-    const truncated = issue.body.length > 200 ? issue.body.substring(0, 197) + '...' : issue.body;
-    embed.setDescription(truncated);
+    embed.setDescription(truncateDescription(issue.body, 200));
   }
 
   return embed;
@@ -266,8 +265,7 @@ export function buildReleaseEmbed(
     });
 
   if (body && body.length > 0) {
-    const truncated = body.length > 500 ? body.substring(0, 497) + '...' : body;
-    embed.setDescription(truncated);
+    embed.setDescription(truncateDescription(body, 500));
   }
 
   return embed;
@@ -309,8 +307,7 @@ export function buildDeploymentEmbed(
     );
 
   if (description) {
-    const truncated = description.length > 500 ? description.substring(0, 497) + '...' : description;
-    embed.setDescription(truncated);
+    embed.setDescription(truncateDescription(description, 500));
   }
 
   if (targetUrl) {
@@ -436,7 +433,7 @@ export function buildCodeScanningAlertEmbed(payload: CodeScanningAlertPayload): 
     .setColor(SEVERITY_COLORS[severity] ?? Colors.Grey)
     .setTitle(truncateTitle(`🔍 Code Scanning: ${alert.rule.name}`))
     .setURL(alert.html_url)
-    .setDescription(alert.rule.description.length > 200 ? alert.rule.description.substring(0, 197) + '...' : alert.rule.description)
+    .setDescription(truncateDescription(alert.rule.description, 200))
     .addFields(
       { name: 'Rule', value: `\`${alert.rule.id}\``, inline: true },
       { name: 'Severity', value: capitalize(severity), inline: true },
@@ -524,6 +521,10 @@ function getIssueStateLabel(state: 'open' | 'closed', stateReason?: string | nul
 
 function truncateTitle(title: string): string {
   return title.length > 256 ? title.substring(0, 255) + '…' : title;
+}
+
+function truncateDescription(text: string, maxLength: number): string {
+  return text.length > maxLength ? text.substring(0, maxLength - 3) + '...' : text;
 }
 
 function capitalize(str: string): string {

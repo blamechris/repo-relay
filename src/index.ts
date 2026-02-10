@@ -98,6 +98,7 @@ export class RepoRelay {
   }
 
   private async logSessionBudget(): Promise<void> {
+    if (!process.env.REPO_RELAY_LOG_SESSION_BUDGET) return;
     try {
       const rest = new REST().setToken(this.config.discordToken);
       const data = await rest.get(Routes.gatewayBot()) as {

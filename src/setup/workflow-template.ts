@@ -8,7 +8,7 @@ export interface ProjectFeatures {
   deployments: boolean;
   reviewPolling: boolean;
   pushEvents: boolean;
-  securityAlerts?: boolean;
+  securityAlerts: boolean;
 }
 
 export function buildWorkflowTemplate(ciWorkflowName: string, features: ProjectFeatures): string {
@@ -92,7 +92,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
 ${permissionLines.join('\n')}
-    # Skip workflow_run events with no associated PR; other event types always pass
+    # Defense-in-depth: skip workflow_run events with no associated PR.
+    # The pre-filter also catches this, but this guard protects against
+    # direct workflow dispatch where the pre-filter is bypassed.
     # (workflow_run-specific fields resolve to null for non-workflow_run events)
     if: github.event_name != 'workflow_run' || github.event.workflow_run.pull_requests[0] != null
 

@@ -45,6 +45,8 @@ export class RepoRelay {
         console.log(`[repo-relay] Connected to Discord as ${this.client.user?.tag}`);
     }
     async logSessionBudget() {
+        if (!process.env.REPO_RELAY_LOG_SESSION_BUDGET)
+            return;
         try {
             const rest = new REST().setToken(this.config.discordToken);
             const data = await rest.get(Routes.gatewayBot());

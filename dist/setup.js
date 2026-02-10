@@ -11,10 +11,10 @@ import { join } from 'path';
 import { safeErrorMessage } from './utils/errors.js';
 import { buildWorkflowTemplate } from './setup/workflow-template.js';
 const PROJECT_TYPES = {
-    library: { issues: true, releases: true, deployments: false, reviewPolling: false, pushEvents: false },
-    webapp: { issues: true, releases: false, deployments: false, reviewPolling: false, pushEvents: false },
-    app: { issues: true, releases: false, deployments: true, reviewPolling: false, pushEvents: false },
-    minimal: { issues: false, releases: false, deployments: false, reviewPolling: false, pushEvents: false },
+    library: { issues: true, releases: true, deployments: false, reviewPolling: false, pushEvents: false, securityAlerts: false },
+    webapp: { issues: true, releases: false, deployments: false, reviewPolling: false, pushEvents: false, securityAlerts: false },
+    app: { issues: true, releases: false, deployments: true, reviewPolling: false, pushEvents: false, securityAlerts: false },
+    minimal: { issues: false, releases: false, deployments: false, reviewPolling: false, pushEvents: false, securityAlerts: false },
 };
 function getRepoUrl() {
     try {
@@ -95,6 +95,7 @@ async function main() {
                 { title: 'Deployment notifications', value: 'deployments' },
                 { title: 'Review polling (every 5 min)', value: 'reviewPolling' },
                 { title: 'Push notifications (direct pushes to default branch)', value: 'pushEvents' },
+                { title: 'Security alerts (Dependabot, secret scanning, code scanning)', value: 'securityAlerts' },
             ],
         });
         if (!customFeatures) {
@@ -107,6 +108,7 @@ async function main() {
             deployments: customFeatures.includes('deployments'),
             reviewPolling: customFeatures.includes('reviewPolling'),
             pushEvents: customFeatures.includes('pushEvents'),
+            securityAlerts: customFeatures.includes('securityAlerts'),
         };
     }
     else {
