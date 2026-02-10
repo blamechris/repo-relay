@@ -67,6 +67,7 @@ export declare function buildForcePushEmbed(branch: string, beforeSha: string, a
 export declare function buildDependabotAlertEmbed(payload: DependabotAlertPayload): EmbedBuilder;
 export declare function buildSecretScanningAlertEmbed(payload: SecretScanningAlertPayload): EmbedBuilder;
 export declare function buildCodeScanningAlertEmbed(payload: CodeScanningAlertPayload): EmbedBuilder;
+export declare function extractRepoFromUrl(url: string): string | null;
 export interface PrFooterMetadata {
     type: 'pr';
     pr: number;
