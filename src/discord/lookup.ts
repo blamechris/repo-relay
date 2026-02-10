@@ -7,7 +7,7 @@ import { TextChannel } from 'discord.js';
 import { StateDb, PrMessage, IssueMessage } from '../db/state.js';
 import { safeErrorMessage } from '../utils/errors.js';
 import { withRetry } from '../utils/retry.js';
-import { parseFooterMetadata, type PrFooterMetadata } from '../embeds/builders.js';
+import { parseFooterMetadata } from '../embeds/builders.js';
 
 const PR_TITLE_PATTERN = /PR #(\d+):/;
 const ISSUE_TITLE_PATTERN = /Issue #(\d+):/;
@@ -74,11 +74,10 @@ export async function getExistingPrMessage(
   if (found.footerText) {
     const meta = parseFooterMetadata(found.footerText);
     if (meta && meta.type === 'pr') {
-      const prMeta = meta as PrFooterMetadata;
-      db.updateCiStatus(repo, prNumber, prMeta.ci);
-      db.updateCopilotStatus(repo, prNumber, prMeta.copilot, prMeta.copilotComments ?? 0);
-      if (prMeta.agent !== 'pending') {
-        db.updateAgentReviewStatus(repo, prNumber, prMeta.agent);
+      db.updateCiStatus(repo, prNumber, meta.ci);
+      db.updateCopilotStatus(repo, prNumber, meta.copilot, meta.copilotComments ?? 0);
+      if (meta.agent !== 'pending') {
+        db.updateAgentReviewStatus(repo, prNumber, meta.agent);
       }
       console.log(`[repo-relay] Recovered message + status for PR #${prNumber} from Discord channel`);
     } else {
