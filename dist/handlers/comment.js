@@ -40,10 +40,10 @@ export async function handleCommentEvent(client, db, channelConfig, payload) {
     else if (CHANGES_REQUESTED_PATTERNS.some((pattern) => pattern.test(body))) {
         status = 'changes_requested';
     }
+    // Update status in DB (before try so it persists even if message is stale)
+    db.updateAgentReviewStatus(repo, prNumber, status);
     try {
         const message = await withRetry(() => channel.messages.fetch(existing.messageId));
-        // Update status in DB
-        db.updateAgentReviewStatus(repo, prNumber, status);
         // Rebuild and edit the embed with updated status
         const statusData = buildEmbedWithStatus(db, repo, prNumber);
         if (statusData) {
