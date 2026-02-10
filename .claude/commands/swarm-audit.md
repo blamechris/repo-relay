@@ -202,8 +202,8 @@ Output a concise summary:
 ## Examples
 
 ```
-/swarm-audit docs/architecture/proposal.md 8
-/swarm-audit "the WebSocket protocol in src/ws-server.js" 4
-/swarm-audit docs/rfc-push-notifications.md
-/swarm-audit "session management across server restart" 6
+/swarm-audit CLAUDE.md 8
+/swarm-audit "the handler pattern in src/handlers/" 6
+/swarm-audit "stale message recovery flow" 4
+/swarm-audit "piggyback review detection in src/github/reviews.ts"
 ```
