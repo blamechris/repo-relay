@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildPrEmbed, buildIssueEmbed, buildPrComponents, buildCiReply, buildCiFailureReply, CiStatus } from '../builders.js';
+import { buildPrEmbed, buildIssueEmbed, buildPrComponents, buildCiReply, buildCiFailureReply, CiStatus, parseFooterMetadata, type PrFooterMetadata } from '../builders.js';
 import { ButtonStyle } from 'discord.js';
 
 describe('title truncation', () => {
@@ -146,5 +146,98 @@ describe('buildCiFailureReply', () => {
     expect(result).toContain('`job4` > `step4`');
     expect(result).not.toContain('`job5`');
     expect(result).toContain('...and 2 more');
+  });
+});
+
+describe('footer metadata', () => {
+  it('PR embed includes parseable footer with state metadata', () => {
+    const embed = buildPrEmbed(
+      {
+        number: 42,
+        title: 'Test PR',
+        url: 'https://github.com/owner/repo/pull/42',
+        author: 'user',
+        authorUrl: 'https://github.com/user',
+        branch: 'feat/test',
+        baseBranch: 'main',
+        additions: 10,
+        deletions: 5,
+        changedFiles: 3,
+        state: 'open',
+        draft: false,
+        createdAt: new Date().toISOString(),
+      },
+      { status: 'success', workflowName: 'CI' },
+      { copilot: 'reviewed', copilotComments: 3, agentReview: 'approved' }
+    );
+
+    const footerText = embed.data.footer?.text;
+    expect(footerText).toBeDefined();
+    expect(footerText).toMatch(/^repo-relay:v1:/);
+
+    const meta = parseFooterMetadata(footerText!) as PrFooterMetadata;
+    expect(meta).not.toBeNull();
+    expect(meta.type).toBe('pr');
+    expect(meta.pr).toBe(42);
+    expect(meta.repo).toBe('owner/repo');
+    expect(meta.ci).toBe('success');
+    expect(meta.copilot).toBe('reviewed');
+    expect(meta.copilotComments).toBe(3);
+    expect(meta.agent).toBe('approved');
+  });
+
+  it('PR embed defaults to pending when no ci/reviews provided', () => {
+    const embed = buildPrEmbed({
+      number: 1,
+      title: 'Test',
+      url: 'https://github.com/owner/repo/pull/1',
+      author: 'user',
+      authorUrl: 'https://github.com/user',
+      branch: 'feat',
+      baseBranch: 'main',
+      additions: 0,
+      deletions: 0,
+      changedFiles: 0,
+      state: 'open',
+      draft: false,
+      createdAt: new Date().toISOString(),
+    });
+
+    const meta = parseFooterMetadata(embed.data.footer!.text) as PrFooterMetadata;
+    expect(meta.ci).toBe('pending');
+    expect(meta.copilot).toBe('pending');
+    expect(meta.agent).toBe('pending');
+  });
+
+  it('issue embed includes parseable footer', () => {
+    const embed = buildIssueEmbed({
+      number: 10,
+      title: 'Bug report',
+      url: 'https://github.com/owner/repo/issues/10',
+      author: 'user',
+      state: 'open',
+      labels: [],
+      createdAt: new Date().toISOString(),
+    });
+
+    const footerText = embed.data.footer?.text;
+    expect(footerText).toBeDefined();
+
+    const meta = parseFooterMetadata(footerText!);
+    expect(meta).not.toBeNull();
+    expect(meta!.type).toBe('issue');
+    if (meta!.type === 'issue') {
+      expect(meta.issue).toBe(10);
+      expect(meta.repo).toBe('owner/repo');
+    }
+  });
+
+  it('parseFooterMetadata returns null for non-repo-relay footers', () => {
+    expect(parseFooterMetadata('some random text')).toBeNull();
+    expect(parseFooterMetadata('')).toBeNull();
+  });
+
+  it('parseFooterMetadata returns null for invalid JSON', () => {
+    expect(parseFooterMetadata('repo-relay:v1:{invalid')).toBeNull();
   });
 });

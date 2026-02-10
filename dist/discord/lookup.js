@@ -4,6 +4,7 @@
  */
 import { safeErrorMessage } from '../utils/errors.js';
 import { withRetry } from '../utils/retry.js';
+import { parseFooterMetadata } from '../embeds/builders.js';
 const PR_TITLE_PATTERN = /PR #(\d+):/;
 const ISSUE_TITLE_PATTERN = /Issue #(\d+):/;
 /**
@@ -24,6 +25,7 @@ async function findMessageInChannel(channel, pattern, repo, targetNumber, label)
                 return {
                     messageId: message.id,
                     threadId: message.thread?.id ?? null,
+                    footerText: embed.footer?.text ?? null,
                 };
             }
         }
@@ -50,7 +52,25 @@ export async function getExistingPrMessage(db, channel, repo, prNumber) {
     // Cache back to DB and return the saved row
     db.savePrMessage(repo, prNumber, channel.id, found.messageId, found.threadId ?? undefined);
     db.savePrStatus(repo, prNumber);
-    console.log(`[repo-relay] Recovered message for PR #${prNumber} from Discord channel`);
+    // Recover status from embed footer if available
+    if (found.footerText) {
+        const meta = parseFooterMetadata(found.footerText);
+        if (meta && meta.type === 'pr') {
+            const prMeta = meta;
+            db.updateCiStatus(repo, prNumber, prMeta.ci);
+            db.updateCopilotStatus(repo, prNumber, prMeta.copilot, prMeta.copilotComments ?? 0);
+            if (prMeta.agent !== 'pending') {
+                db.updateAgentReviewStatus(repo, prNumber, prMeta.agent);
+            }
+            console.log(`[repo-relay] Recovered message + status for PR #${prNumber} from Discord channel`);
+        }
+        else {
+            console.log(`[repo-relay] Recovered message for PR #${prNumber} from Discord channel`);
+        }
+    }
+    else {
+        console.log(`[repo-relay] Recovered message for PR #${prNumber} from Discord channel`);
+    }
     return db.getPrMessage(repo, prNumber);
 }
 /**

@@ -109,6 +109,21 @@ export function buildPrEmbed(
     });
   }
 
+  // Encode state metadata in footer for recovery
+  const repo = extractRepoFromUrl(pr.url);
+  if (repo) {
+    const footerData: PrFooterMetadata = {
+      type: 'pr',
+      pr: pr.number,
+      repo,
+      ci: ci?.status ?? 'pending',
+      copilot: reviews?.copilot ?? 'pending',
+      copilotComments: reviews?.copilotComments,
+      agent: reviews?.agentReview ?? 'pending',
+    };
+    embed.setFooter({ text: encodeFooter(footerData) });
+  }
+
   return embed;
 }
 
@@ -220,6 +235,17 @@ export function buildIssueEmbed(issue: IssueData): EmbedBuilder {
 
   if (issue.body && issue.body.length > 0) {
     embed.setDescription(truncateDescription(issue.body, 200));
+  }
+
+  // Encode state metadata in footer for recovery
+  const repo = extractRepoFromUrl(issue.url);
+  if (repo) {
+    const footerData: IssueFooterMetadata = {
+      type: 'issue',
+      issue: issue.number,
+      repo,
+    };
+    embed.setFooter({ text: encodeFooter(footerData) });
   }
 
   return embed;
@@ -529,4 +555,44 @@ function truncateDescription(text: string, maxLength: number): string {
 
 function capitalize(str: string): string {
   return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+function extractRepoFromUrl(url: string): string | null {
+  const match = url.match(/github\.com\/([^/]+\/[^/]+)\//);
+  return match ? match[1] : null;
+}
+
+// Footer metadata for state recovery
+
+const FOOTER_PREFIX = 'repo-relay:v1:';
+
+export interface PrFooterMetadata {
+  type: 'pr';
+  pr: number;
+  repo: string;
+  ci: CiStatus['status'];
+  copilot: ReviewStatus['copilot'];
+  copilotComments?: number;
+  agent: ReviewStatus['agentReview'];
+}
+
+export interface IssueFooterMetadata {
+  type: 'issue';
+  issue: number;
+  repo: string;
+}
+
+export type FooterMetadata = PrFooterMetadata | IssueFooterMetadata;
+
+function encodeFooter(data: FooterMetadata): string {
+  return `${FOOTER_PREFIX}${JSON.stringify(data)}`;
+}
+
+export function parseFooterMetadata(footerText: string): FooterMetadata | null {
+  if (!footerText.startsWith(FOOTER_PREFIX)) return null;
+  try {
+    return JSON.parse(footerText.slice(FOOTER_PREFIX.length)) as FooterMetadata;
+  } catch {
+    return null;
+  }
 }
