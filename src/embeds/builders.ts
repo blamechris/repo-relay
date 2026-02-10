@@ -557,7 +557,7 @@ function capitalize(str: string): string {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
-function extractRepoFromUrl(url: string): string | null {
+export function extractRepoFromUrl(url: string): string | null {
   const match = url.match(/github\.com\/([^/]+\/[^/]+)\//);
   return match ? match[1] : null;
 }

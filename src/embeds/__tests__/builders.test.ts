@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildPrEmbed, buildIssueEmbed, buildPrComponents, buildCiReply, buildCiFailureReply, CiStatus, parseFooterMetadata, type PrFooterMetadata } from '../builders.js';
+import { buildPrEmbed, buildIssueEmbed, buildPrComponents, buildCiReply, buildCiFailureReply, CiStatus, parseFooterMetadata, extractRepoFromUrl, type PrFooterMetadata } from '../builders.js';
 import { ButtonStyle } from 'discord.js';
 
 describe('title truncation', () => {
@@ -239,5 +239,23 @@ describe('footer metadata', () => {
 
   it('parseFooterMetadata returns null for invalid JSON', () => {
     expect(parseFooterMetadata('repo-relay:v1:{invalid')).toBeNull();
+  });
+});
+
+describe('extractRepoFromUrl', () => {
+  it('extracts owner/repo from PR URL', () => {
+    expect(extractRepoFromUrl('https://github.com/owner/repo/pull/42')).toBe('owner/repo');
+  });
+
+  it('extracts owner/repo from issue URL', () => {
+    expect(extractRepoFromUrl('https://github.com/owner/repo/issues/10')).toBe('owner/repo');
+  });
+
+  it('returns null for non-GitHub URL', () => {
+    expect(extractRepoFromUrl('https://example.com/foo/bar')).toBeNull();
+  });
+
+  it('returns null for bare GitHub URL without path', () => {
+    expect(extractRepoFromUrl('https://github.com/')).toBeNull();
   });
 });

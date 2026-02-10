@@ -372,7 +372,7 @@ function truncateDescription(text, maxLength) {
 function capitalize(str) {
     return str.charAt(0).toUpperCase() + str.slice(1);
 }
-function extractRepoFromUrl(url) {
+export function extractRepoFromUrl(url) {
     const match = url.match(/github\.com\/([^/]+\/[^/]+)\//);
     return match ? match[1] : null;
 }
