@@ -20,8 +20,8 @@ vi.mock('discord.js', () => {
   Object.setPrototypeOf(mockChannel, TextChannel.prototype);
 
   const mockClient = {
-    login: vi.fn(),
-    once: vi.fn((_event: string, cb: () => void) => cb()),
+    login: vi.fn(() => Promise.resolve('token')),
+    once: vi.fn((_event: string, cb: () => void) => { setTimeout(cb, 0); }),
     destroy: vi.fn(),
     user: { tag: 'test-bot#1234' },
     channels: {
