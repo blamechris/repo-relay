@@ -21,6 +21,7 @@ vi.mock('discord.js', () => {
 
   const mockClient = {
     login: vi.fn(),
+    once: vi.fn((_event: string, cb: () => void) => cb()),
     destroy: vi.fn(),
     user: { tag: 'test-bot#1234' },
     channels: {
