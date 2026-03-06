@@ -51,7 +51,8 @@ export class RepoRelay {
     }
     async connect() {
         await this.logSessionBudget();
-        const maxWaitMs = Math.max(0, parseInt(process.env.REPO_RELAY_SESSION_MAX_WAIT ?? '300000', 10)) || 300_000;
+        const parsed = parseInt(process.env.REPO_RELAY_SESSION_MAX_WAIT ?? '', 10);
+        const maxWaitMs = isNaN(parsed) ? 300_000 : Math.max(0, parsed);
         for (;;) {
             try {
                 await new Promise((resolve, reject) => {
