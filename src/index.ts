@@ -106,7 +106,8 @@ export class RepoRelay {
     const parsed = parseInt(process.env.REPO_RELAY_SESSION_MAX_WAIT ?? '', 10);
     const maxWaitMs = isNaN(parsed) ? 300_000 : Math.max(0, parsed);
 
-    for (;;) {
+    const maxRetries = 3;
+    for (let attempt = 0; ; attempt++) {
       try {
         await new Promise<void>((resolve, reject) => {
           this.client.once('ready', () => resolve());
@@ -117,9 +118,16 @@ export class RepoRelay {
         const resetAt = parseSessionLimitReset(error);
         if (!resetAt) throw error;
 
+        if (attempt >= maxRetries) {
+          throw new Error(
+            `Session limit retry exhausted after ${maxRetries} attempts. ` +
+            `Resets at ${resetAt.toISOString()}. Re-run this job after the reset.`
+          );
+        }
+
         const waitMs = resetAt.getTime() - Date.now();
         if (waitMs <= 0) {
-          console.log('[repo-relay] Session limit reset time has passed, retrying immediately...');
+          console.log(`[repo-relay] Session limit reset time has passed, retrying immediately (attempt ${attempt + 1}/${maxRetries})...`);
           this.client.destroy();
           this.client = new Client({ intents: this.client.options.intents });
           continue;

@@ -136,6 +136,19 @@ describe('session limit retry', () => {
     await expect(relay.connect()).rejects.toThrow(/exceeds max wait/);
   });
 
+  it('throws after max retries when reset time keeps being in the past', async () => {
+    loginImpl = async () => {
+      throw makeSessionLimitError(new Date(Date.now() - 1000));
+    };
+
+    const relay = new RepoRelay({
+      discordToken: 'fake-token',
+      channelConfig: { prs: '123' },
+    });
+
+    await expect(relay.connect()).rejects.toThrow(/retry exhausted after 3 attempts/);
+  });
+
   it('does not retry non-session-limit errors', async () => {
     loginImpl = async () => {
       throw new Error('Invalid token');
