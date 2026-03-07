@@ -76,6 +76,14 @@ const REQUIRED_PERMISSIONS = [
   { flag: PermissionsBitField.Flags.ReadMessageHistory, name: 'Read Message History' },
 ];
 
+function parseSessionLimitReset(error: unknown): Date | null {
+  if (!(error instanceof Error)) return null;
+  const match = error.message.match(/Not enough sessions remaining.*resets at (\S+)/);
+  if (!match) return null;
+  const date = new Date(match[1]);
+  return isNaN(date.getTime()) ? null : date;
+}
+
 export class RepoRelay {
   private client: Client;
   private db: StateDb | null = null;
@@ -94,10 +102,52 @@ export class RepoRelay {
 
   async connect(): Promise<void> {
     await this.logSessionBudget();
-    await new Promise<void>((resolve, reject) => {
-      this.client.once('ready', () => resolve());
-      this.client.login(this.config.discordToken).catch(reject);
-    });
+
+    const parsed = parseInt(process.env.REPO_RELAY_SESSION_MAX_WAIT ?? '', 10);
+    const maxWaitMs = isNaN(parsed) ? 300_000 : Math.max(0, parsed);
+
+    const maxRetries = 3;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await new Promise<void>((resolve, reject) => {
+          this.client.once('ready', () => resolve());
+          this.client.login(this.config.discordToken).catch(reject);
+        });
+        break;
+      } catch (error) {
+        const resetAt = parseSessionLimitReset(error);
+        if (!resetAt) throw error;
+
+        if (attempt >= maxRetries) {
+          throw new Error(
+            `Session limit retry exhausted after ${maxRetries} attempts. ` +
+            `Resets at ${resetAt.toISOString()}. Re-run this job after the reset.`
+          );
+        }
+
+        const waitMs = resetAt.getTime() - Date.now();
+        if (waitMs <= 0) {
+          console.log(`[repo-relay] Session limit reset time has passed, retrying immediately (attempt ${attempt + 1}/${maxRetries})...`);
+          this.client.destroy();
+          this.client = new Client({ intents: this.client.options.intents });
+          continue;
+        }
+
+        if (waitMs > maxWaitMs) {
+          throw new Error(
+            `Session limit exhausted. Resets at ${resetAt.toISOString()} (${Math.ceil(waitMs / 60_000)}min away), ` +
+            `which exceeds max wait of ${Math.ceil(maxWaitMs / 60_000)}min. Re-run this job after the reset.`
+          );
+        }
+
+        const waitMin = (waitMs / 60_000).toFixed(1);
+        console.log(`[repo-relay] Session limit exhausted. Waiting ${waitMin}min until reset at ${resetAt.toISOString()}...`);
+        await new Promise(r => setTimeout(r, waitMs + 1000)); // +1s buffer
+        this.client.destroy();
+        this.client = new Client({ intents: this.client.options.intents });
+      }
+    }
+
     console.log(`[repo-relay] Connected to Discord as ${this.client.user?.tag}`);
   }
 
