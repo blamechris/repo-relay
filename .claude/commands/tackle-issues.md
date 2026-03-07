@@ -40,8 +40,10 @@ Each wave runs the full Phase 1-6 cycle from `/autonomous-dev-flow` for each iss
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 REPO_NAME=$(basename "$REPO")
 SESSION_START=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-BRANCH_PREFIX="auto/"
+BRANCH_PREFIX="auto/"  # Exception to standard feat/fix/ convention — see note below
 ```
+
+> **Note:** The `auto/` branch prefix is an intentional exception to the repo's `feat/`/`fix/` naming convention (CLAUDE.md). Marathon session branches use `auto/` so automation and cleanup tooling can identify them as bot-managed.
 
 Parse `$ARGUMENTS` — same as `/autonomous-dev-flow` but with higher defaults:
 - `max` defaults to 20, hard cap 30
@@ -109,10 +111,10 @@ After each issue, output the wave progress table:
 
 | # | Issue | Branch | PR | Review | Status | Attempt |
 |---|-------|--------|----|--------|--------|---------|
-| 1 | #12 — Add retry logic | 12-add-retry | #45 | Approve | Done | W1 |
+| 1 | #12 — Add retry logic | auto/12-add-retry | #45 | Approve | Done | W1 |
 | 2 | #15 — Leaderboard | — | — | — | Decomposed → #20,#21 | W1 |
-| 3 | #20 — LB data model | 20-lb-model | #46 | Request Changes | Retry (W2) | W1 |
-| 4 | #18 — Auth tests | 18-auth-tests | #47 | Approve | Done | W1 |
+| 3 | #20 — LB data model | auto/20-lb-model | #46 | Request Changes | Retry (W2) | W1 |
+| 4 | #18 — Auth tests | auto/18-auth-tests | #47 | Approve | Done | W1 |
 | 5 | #21 — LB display | — | — | — | In progress | W1 |
 ```
 
@@ -163,6 +165,8 @@ For issues entering Wave 2+, delete the stale branch and PR from the previous at
 
 ```bash
 # For each retry candidate:
+# Safety: only clean up branches with the session's BRANCH_PREFIX and PRs created after SESSION_START
+
 # Close the old PR (it had issues)
 gh pr close ${OLD_PR_NUM} --comment "Closing for retry in Wave ${NEXT_WAVE} — previous attempt had: ${FAILURE_REASON}"
 
@@ -398,4 +402,4 @@ Lines and sections marked with `{{CUSTOMIZE}}` need repo-specific adaptation. Th
 - **Commit scope conventions**
 - **Skip labels** beyond the defaults (`blocked`, `wontfix`)
 
-<\!-- skill-templates: tackle-issues 87ae770 2026-03-06 -->
+<!-- skill-templates: tackle-issues 87ae770 2026-03-06 -->
