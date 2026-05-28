@@ -45,12 +45,12 @@ Choose AGENT_COUNT agents from this roster. Always include the first 4 (core pan
 |-------|----------|------|-----------------|
 | Operator | "Operator" | UX walkthrough, daily experience, error states, accessibility | Target involves user-facing features, UI, or interaction flows |
 | Futurist | "Futurist" | Extensibility, technical debt forecast, plugin architecture | Target involves architecture decisions with long-term implications |
-| Domain Expert | "Expert" | Deep domain knowledge for the specific technology | Target involves specific tech. Name the agent after the domain. |
+| Discord Expert | "Discord Expert" | Discord API limits, embed compliance, channel/thread operations, permission checks | Target involves Discord integration, embed rendering, or thread management |
+| GitHub Expert | "GitHub Expert" | GitHub webhook payload handling, API rate limits, event routing, authentication | Target involves GitHub webhook ingestion or event processing |
+| SQLite Expert | "SQLite Expert" | Concurrency patterns, parameterized queries, transaction safety, better-sqlite3 idioms | Target involves state persistence or database operations |
 | Adversary | "Adversary" | Attack surface, abuse cases, security boundaries | Target involves auth, networking, data handling, or external interfaces |
 | Tester | "Tester" | Testability, edge cases, coverage gaps, test strategy | Target involves complex logic, state machines, or protocol design |
 | Historian | "Historian" | Precedent, prior art, industry patterns, what others have done | Target involves novel architecture or unconventional approaches |
-| Discord Specialist | "Discord" | discord.js 14.x best practices, embed limits, thread lifecycle, permission models, rate limits | Target involves Discord embeds, threads, channel operations, or bot interactions |
-| Webhook Specialist | "Webhook" | GitHub webhook payloads, event sequencing, delivery guarantees, retry semantics | Target involves GitHub event handling, webhook processing, or CI integration |
 
 ### 4. Launch Agent Swarm
 
@@ -184,12 +184,14 @@ Output a concise summary:
 | 2/5 | Concerning. Significant issues that may cause failures. |
 | 1/5 | Fundamentally broken. Needs rethinking, not patching. |
 
-#### Project-Specific Grading Criteria
+### Project-Specific Grading Criteria
 
-- **Guardian** should weight: SQLite WAL integrity, stale message recovery, race conditions in concurrent webhook deliveries, and `safeErrorMessage()` usage for error sanitization
-- **Builder** should weight: handler pattern adherence (`handler → export → handleEvent`), embed limit compliance (title 256, desc 4096, fields 25), and `buildEmbedWithStatus()` / `getOrCreateThread()` usage
-- **Discord Specialist** should weight: thread auto-archive behavior, channel type guards, permission checks, and rate limit handling
-- **Webhook Specialist** should weight: `mapGitHubEvent()` routing correctness, piggyback review detection reliability, and scheduled polling edge cases
+For repo-relay audits, apply these domain-specific standards:
+
+- **Discord Expert** should verify embed compliance (title ≤256 chars, description ≤4096 chars, ≤25 fields per embed) and thread operation correctness (getOrCreateThread() patterns, stale message handling).
+- **GitHub Expert** should validate webhook payload handling against GitHub API docs, event routing via mapGitHubEvent() in cli.ts, and rate limit resilience.
+- **SQLite Expert** should check parameterized statement usage, transaction safety in StateDb, and better-sqlite3 concurrency patterns.
+- **Guardian** should flag race conditions in thread creation, webhook delivery retries, and concurrent state mutations.
 
 ### Agent Behavior Rules
 
@@ -202,8 +204,9 @@ Output a concise summary:
 ## Examples
 
 ```
-/swarm-audit CLAUDE.md 8
-/swarm-audit "the handler pattern in src/handlers/" 6
-/swarm-audit "stale message recovery flow" 4
-/swarm-audit "piggyback review detection in src/github/reviews.ts"
+/swarm-audit docs/architecture/proposal.md 8
+/swarm-audit "the GitHub webhook handler in src/handlers/" 4
+/swarm-audit docs/rfc-thread-management.md
+/swarm-audit "embed rendering and Discord API compliance" 6
 ```
+<!-- skill-templates: swarm-audit 57ceacc 2026-05-27 -->

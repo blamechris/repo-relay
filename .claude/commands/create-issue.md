@@ -48,9 +48,11 @@ Construct the issue body based on available context.
 
 Identified during review of PR #${SOURCE_PR}.
 
+{{If comment URL provided:}}
 **Review comment:** ${COMMENT_URL}
 
-**Location:** `${FILE_PATH}:${LINE_NUMBER}`
+{{If file/line can be extracted from comment:}}
+**Location:** \`${FILE_PATH}:${LINE_NUMBER}\`
 
 ## Description
 
@@ -77,22 +79,22 @@ What needs to be done and why.
 
 ### 4. Determine Labels
 
-Build the label set. **Every issue MUST have `complexity:` and `testing:` labels.**
+Build the label set. **repo-relay requires both complexity and testing labels on all issues:**
 
 ```bash
-LABELS="enhancement"
+LABELS=""
 
 # Always add from-review if this came from a PR review
 if [ -n "$SOURCE_PR" ] || [ -n "$COMMENT_URL" ]; then
-  LABELS="$LABELS,from-review"
+  LABELS="from-review"
 fi
 
-# Add complexity label (REQUIRED — prompt user if not specified)
+# Add complexity label (required)
 if [ -n "$COMPLEXITY" ]; then
   LABELS="$LABELS,complexity:$COMPLEXITY"
 fi
 
-# Add testing label (REQUIRED — prompt user if not specified)
+# Add testing label (required)
 if [ -n "$TESTING" ]; then
   LABELS="$LABELS,testing:$TESTING"
 fi
@@ -101,26 +103,18 @@ fi
 for extra in "${EXTRA_LABELS[@]}"; do
   LABELS="$LABELS,$extra"
 done
+
+# Remove leading comma if present
+LABELS="${LABELS#,}"
 ```
 
-If `--complexity` or `--testing` are not provided, infer reasonable defaults from the issue description:
-
-| Complexity | Criteria |
-|------------|----------|
-| `low` | Single file, clear implementation, < 1 day |
-| `medium` | Multiple files, moderate decisions, 1-3 days |
-| `high` | Architectural changes, new systems, > 3 days |
-
-| Testing | Criteria |
-|---------|----------|
-| `low` | Pure logic, unit testable, no external dependencies |
-| `medium` | Requires Discord bot setup, moderate verification |
-| `high` | Full GitHub Actions integration testing needed |
-
-**Verify labels exist** before using them:
+**Verify labels exist** before using them. If a label doesn't exist in the repo, skip it rather than failing:
 
 ```bash
-gh label list --json name -q '.[].name' | grep -q "^from-review$" || echo "Warning: 'from-review' label not found"
+# Check if label exists
+for label in $(echo "$LABELS" | tr ',' '\n'); do
+  gh label list --json name -q '.[].name' | grep -q "^${label}$" || echo "Warning: '$label' label not found in repo"
+done
 ```
 
 ### 5. Create the Issue
@@ -148,7 +142,7 @@ Output a **summary table** — this is the PRIMARY output:
 ```markdown
 | Issue | Title | Labels | Source |
 |-------|-------|--------|--------|
-| #${ISSUE_NUM} | ${ISSUE_TITLE} | from-review, complexity:low, testing:low | PR #${SOURCE_PR} |
+| #${ISSUE_NUM} | ${ISSUE_TITLE} | complexity:low, testing:low, from-review | PR #${SOURCE_PR} |
 ```
 
 Then below the table:
@@ -159,10 +153,11 @@ Then below the table:
 
 ## Critical Rules
 
-1. **No attribution** — Follow Attribution Policy (sole author).
+1. **NO attribution** — Follow Zero Attribution Policy.
 2. **Check for duplicates** — Always search before creating. Don't create duplicate issues.
 3. **Labels must exist** — Verify labels exist in the repo. Skip missing labels gracefully.
-4. **REQUIRED labels** — Every issue MUST have `complexity:` and `testing:` labels. Infer if not specified.
+4. **Both complexity and testing labels required** — repo-relay triage policy mandates both labels on all issues. Prompt user if either is missing.
 5. **Be specific** — The issue description must be self-contained. Another developer should understand it without reading the review thread.
 6. **Always include acceptance criteria** — Even if just one checkbox. Issues without criteria are hard to close confidently.
 7. **Link to source** — If from a review, always include the PR number and comment URL in the body.
+<!-- skill-templates: create-issue 57ceacc 2026-05-27 -->
