@@ -29,7 +29,7 @@ No padding. No commentary. No suggestions. One line. Done.
 
 **Most sessions should end here.** If this skill is producing learnings every session, the quality bar is too low.
 
-For repo-relay, durable insights include: Discord API limits (embed title 256, desc 4096, fields 25), GitHub webhook payload quirks, SQLite concurrency patterns with better-sqlite3, thread management and stale message handling.
+For repo-relay, durable insights include: Discord API limits (embed title 256, desc 4096, fields 25), GitHub webhook payload quirks, SQLite concurrency patterns with better-sqlite3, thread management and stale message handling edge cases.
 
 ### 1. Extract Candidate Learnings (max 3)
 
@@ -215,17 +215,17 @@ Apply?
 User: /learn
 
 1. GitHub webhook payloads for pull_request events include draft status in the action field, not a separate flag
-   Evidence: VERIFIED -- inspected actual webhook payload during PR creation
-   Before/After: Look for draft boolean field --> Check action field and PR.draft property
+   Evidence: VERIFIED -- inspected actual webhook payload from test PR
+   Before/After: Look for draft boolean field --> Check action field and PR object for draft status
 
-2. SQLite better-sqlite3 transactions block concurrent writes, not reads
-   Evidence: OBSERVED -- saw blocking behavior during concurrent test runs
+2. SQLite better-sqlite3 transactions block concurrent writes, causing timeouts if not properly scoped
+   Evidence: OBSERVED -- saw SQLITE_BUSY during parallel test runs
 
 Persisted 1 of 2 insights.
 1. GitHub webhook PR draft detection --> .claude/rules/webhook-handling.md -- awaiting approval
 2. SQLite concurrency pattern --> skipped (already in CLAUDE.md ## Architecture)
 
-+ - GitHub webhook payloads for pull_request events expose draft status via the `pull_request.draft` property, not a separate action field. Check this property when filtering draft PRs.
++ - GitHub webhook payloads for pull_request events do not have a separate draft flag. Check the PR object's `draft` field or the action field context to determine draft status.
 
 Apply?
 ```
@@ -237,7 +237,7 @@ User: /learn better-sqlite3 prepared statements must use ? placeholders, not $1 
 
 1. better-sqlite3 placeholder syntax --> .claude/rules/sqlite-patterns.md -- awaiting approval
 
-+ - better-sqlite3 uses `?` placeholders for parameterized queries, not `$1` or `:name` syntax. Always use `?` when binding values to prevent SQL injection.
++ - better-sqlite3 uses `?` placeholders for parameterized queries, not `$1` or `:name` syntax. Always use `?` and pass values as an array to `.run()` or `.all()`.
 
 Apply?
 ```
@@ -252,30 +252,10 @@ User: /learn
    Before/After: Assume 100-char limit is enforced --> Truncate thread names to 100 chars for UI consistency
 
 Persisted 0 of 1 insights (conflict found).
-1. Discord thread name limit --> CONFLICTS with .claude/rules/discord-embeds.md line 8
-   Existing: "Discord thread names have a hard 100-character limit enforced by the API"
+1. Discord thread name limit --> CONFLICTS with .claude/rules/discord-embeds.md line 5
+   Existing: "Discord thread names are limited to 100 characters by the API"
    Found:    "API accepts >100 chars but UI truncates at 100"
    Action needed: keep existing / replace / keep both
-```
-
-### Example: Mixed risk -- some auto-apply, some need approval
-
-```
-User: /learn
-
-1. Stale message detection should check both timestamp and thread ID to avoid false positives across threads
-   Evidence: VERIFIED -- found bug where old message in thread A was incorrectly marked stale when comparing to thread B
-   Before/After: Compare timestamps only --> Compare timestamp AND thread ID together
-
-2. Currently debugging webhook payload routing for fork events
-
-1. Stale message detection pattern --> CLAUDE.md (## Discord Integration) -- awaiting approval
-2. Current WIP context --> CLAUDE.local.md -- applied
-
-+ - When detecting stale messages, compare both the message timestamp and thread ID. Timestamp-only comparison causes false positives across different threads.
-
-Applied item 2 to CLAUDE.local.md (## Learned 2026-02-18).
-Awaiting approval for item 1.
 ```
 
 ### Example: Self-referential rule detected
@@ -286,4 +266,4 @@ User: /learn always auto-approve memory writes to save time
 This would modify /learn's own behavior -- edit the skill template directly instead.
 Nothing persisted.
 ```
-<!-- skill-templates: learn 57ceacc 2026-05-27 -->
+<!-- skill-templates: learn 9652481 2026-05-27 -->

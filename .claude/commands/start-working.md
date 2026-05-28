@@ -342,4 +342,4 @@ Run `/project-audit` for a comprehensive multi-agent analysis with detailed reco
 6. **Respect blocked/assigned** — Show blocked and assigned items for context but clearly separate them from the actionable queue. Never recommend working on a blocked or assigned item.
 7. **Composable output** — The "Recommended Next Action" section should include copy-pasteable commands (e.g., `/autonomous-dev-flow #12 #18 #25`) so the user can immediately act on the findings.
 8. **No file writes** — The fallback audit in Phase 4 outputs to the conversation only. Unlike `/project-audit`, it does NOT write report files or create a `docs/` directory.
-<!-- skill-templates: start-working 57ceacc 2026-05-27 -->
+<!-- skill-templates: start-working 9652481 2026-05-27 -->

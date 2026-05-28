@@ -149,6 +149,8 @@ npm run typecheck
 npm run build
 ```
 
+Verify build succeeds and no TypeScript errors are present.
+
 ### Phase 4: Report
 
 ```markdown
@@ -160,7 +162,7 @@ npm run build
 | #456 | fix: resolve crash | Skipped (conflict) |
 
 **Version:** v1.2.3 → v1.2.4
-**Build:** Typecheck and build passed
+**Build:** Succeeded
 ```
 
 ## Error Recovery
@@ -184,6 +186,6 @@ npm run build
 6. **Idempotent** — safe to re-run; already-merged PRs detected and skipped
 7. **No attribution** — Zero Attribution Policy applies to all commits
 8. **Discord embed limits compliance** — verify merged code respects title 256, desc 4096, fields 25 constraints
-9. **GitHub webhook payload robustness** — ensure merged changes handle edge cases in webhook payloads
-10. **SQLite concurrency patterns** — verify better-sqlite3 usage is thread-safe and parameterized
-<!-- skill-templates: merge 57ceacc 2026-05-27 -->
+9. **GitHub webhook payload handling** — ensure merged changes maintain robustness for webhook ingestion
+10. **SQLite concurrency patterns** — verify better-sqlite3 usage remains thread-safe
+<!-- skill-templates: merge 9652481 2026-05-27 -->

@@ -95,11 +95,13 @@ gh api repos/${REPO}/actions/runs/${RUN_ID}/jobs --jq '.jobs[] | select(.conclus
 **Pattern match against known failures:**
 
 Node.js / npm-specific patterns:
-- `npm ERR!` with `ERESOLVE` → dependency conflict, check package-lock.json
+- `npm ERR!` with `ERESOLVE` → dependency conflict, check package-lock.json or npm version
 - `npm ERR! code ENOENT` → missing file or script, verify src/ structure
-- `TypeScript error TS` → type check failure, run `npm run typecheck` locally
-- `Cannot find module` → missing import or build artifact, check tsconfig paths
-- `Discord API error` → webhook payload or rate limiting, check GitHub webhook config
+- `TypeError: Cannot find module` → missing import or build step, run `npm run build`
+- `SyntaxError` in TypeScript → type errors, run `npm run typecheck` locally
+- `Discord API error 50013` (Missing Access) → bot permissions issue, check guild setup
+- `SQLITE_CANTOPEN` → database file path issue, verify StateDb initialization
+- `better-sqlite3` build failure → native module issue, check Node.js version (20+)
 
 Generic patterns (apply to all repos):
 - `rate limit` / `API rate limit exceeded` → RETRIGGER (transient)
@@ -124,11 +126,6 @@ Classify each job into exactly ONE outcome:
 ```bash
 # Preferred: re-run only failed/cancelled jobs (fast, targeted)
 gh run rerun ${RUN_ID} --failed
-
-# Fallback: close and reopen PR to trigger full CI
-gh pr close ${PR_NUM}
-sleep 5
-gh pr reopen ${PR_NUM}
 ```
 
 **One retrigger attempt only.** If the re-run also fails, escalate instead of retrying.
@@ -268,4 +265,5 @@ Start
 5. **Minimal fix scope** — FIX actions should be surgical. Don't refactor code; just fix the CI failure.
 6. **Composable** — Works standalone (`/fix-ci 42`) or from `/full-review` (Phase 2.5).
 7. **Idempotent** — Safe to re-run. If CI is already green, reports success and exits.
-<!-- skill-templates: fix-ci 57ceacc 2026-05-27 -->
+8. **No attribution** — Follow project attribution policy in all commits.
+<!-- skill-templates: fix-ci 9652481 2026-05-27 -->

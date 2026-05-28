@@ -127,11 +127,11 @@ EOF
 Never leave deferred items as just review comments. If it's worth mentioning, it's worth tracking.
 
 ```bash
+# Apply both complexity and testing labels (required by triage policy)
 ISSUE_URL=$(gh issue create \
   --title "Short descriptive title" \
   --label "complexity:low" \
   --label "testing:low" \
-  --label "from-review" \
   --body "$(cat <<'EOF'
 ## Context
 
@@ -157,11 +157,11 @@ EOF
 
 ### 6. Reconcile Issues Resolved in This PR
 
-After all fixes are committed, check whether any issues created during this review — or pre-existing `from-review` issues — were already addressed by fixes in this PR.
+After all fixes are committed, check whether any issues created during this review — or pre-existing issues — were already addressed by fixes in this PR.
 
 ```bash
-# List open from-review issues
-gh issue list --label "from-review" --json number,title,body
+# List open issues
+gh issue list --json number,title,body
 
 # For each issue resolved by a fix in this PR:
 gh issue comment ${ISSUE_NUM} --body "Addressed in PR #${PR_NUM} — ${DESCRIPTION}."
@@ -183,7 +183,7 @@ Output a **summary table** followed by details. The table is the PRIMARY output 
 **Column guide:**
 - **Verdict:** `Approve`, `Request Changes`, or `Comment`
 - **Findings:** Count by severity (omit categories with 0 count)
-- **Issues:** `Created: #X, #Y` for new follow-up issues. `Closed: #Z` for resolved from-review issues. `—` if none.
+- **Issues:** `Created: #X, #Y` for new follow-up issues. `Closed: #Z` for resolved issues. `—` if none.
 
 Then below the table, list:
 - Brief summary of critical issues (if any)
@@ -203,4 +203,4 @@ Mindset: "Will this code reliably deliver GitHub event notifications to Discord 
 3. **Pragmatic over perfect** - Working code first, polish later
 4. **Reliability first** - Always consider error recovery and edge cases
 5. **Keep it simple** - No over-engineering, no premature abstractions
-<!-- skill-templates: agent-review 57ceacc 2026-05-27 -->
+<!-- skill-templates: agent-review 9652481 2026-05-27 -->

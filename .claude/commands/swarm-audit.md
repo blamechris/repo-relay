@@ -46,8 +46,8 @@ Choose AGENT_COUNT agents from this roster. Always include the first 4 (core pan
 | Operator | "Operator" | UX walkthrough, daily experience, error states, accessibility | Target involves user-facing features, UI, or interaction flows |
 | Futurist | "Futurist" | Extensibility, technical debt forecast, plugin architecture | Target involves architecture decisions with long-term implications |
 | Discord Expert | "Discord Expert" | Discord API limits, embed compliance, channel/thread operations, permission checks | Target involves Discord integration, embed rendering, or thread management |
-| GitHub Expert | "GitHub Expert" | GitHub webhook payload handling, API rate limits, event routing, authentication | Target involves GitHub webhook ingestion or event processing |
-| SQLite Expert | "SQLite Expert" | Concurrency patterns, parameterized queries, transaction safety, better-sqlite3 idioms | Target involves state persistence or database operations |
+| GitHub Expert | "GitHub Expert" | GitHub webhook payload handling, event routing, API rate limits, payload validation | Target involves GitHub webhook ingestion or event processing |
+| SQLite Expert | "SQLite Expert" | Concurrency patterns, parameterized statements, transaction safety, better-sqlite3 best practices | Target involves state persistence or database operations |
 | Adversary | "Adversary" | Attack surface, abuse cases, security boundaries | Target involves auth, networking, data handling, or external interfaces |
 | Tester | "Tester" | Testability, edge cases, coverage gaps, test strategy | Target involves complex logic, state machines, or protocol design |
 | Historian | "Historian" | Precedent, prior art, industry patterns, what others have done | Target involves novel architecture or unconventional approaches |
@@ -189,9 +189,9 @@ Output a concise summary:
 For repo-relay audits, apply these domain-specific standards:
 
 - **Discord Expert** should verify embed compliance (title ≤256 chars, description ≤4096 chars, ≤25 fields per embed) and thread operation correctness (getOrCreateThread() patterns, stale message handling).
-- **GitHub Expert** should validate webhook payload handling against GitHub API docs, event routing via mapGitHubEvent() in cli.ts, and rate limit resilience.
-- **SQLite Expert** should check parameterized statement usage, transaction safety in StateDb, and better-sqlite3 concurrency patterns.
-- **Guardian** should flag race conditions in thread creation, webhook delivery retries, and concurrent state mutations.
+- **GitHub Expert** should validate webhook payload handling against GitHub API docs, event routing correctness in cli.ts mapGitHubEvent(), and rate limit resilience.
+- **SQLite Expert** should check parameterized statement usage throughout StateDb, transaction safety in concurrent scenarios, and better-sqlite3 best practices.
+- **Guardian** should prioritize Discord API rate limiting failures and webhook payload validation edge cases as P0 risks.
 
 ### Agent Behavior Rules
 
@@ -207,6 +207,6 @@ For repo-relay audits, apply these domain-specific standards:
 /swarm-audit docs/architecture/proposal.md 8
 /swarm-audit "the GitHub webhook handler in src/handlers/" 4
 /swarm-audit docs/rfc-thread-management.md
-/swarm-audit "embed rendering and Discord API compliance" 6
+/swarm-audit "Discord embed rendering and Discord API compliance" 6
 ```
-<!-- skill-templates: swarm-audit 57ceacc 2026-05-27 -->
+<!-- skill-templates: swarm-audit 9652481 2026-05-27 -->

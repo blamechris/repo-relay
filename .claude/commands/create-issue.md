@@ -82,11 +82,11 @@ What needs to be done and why.
 Build the label set. **repo-relay requires both complexity and testing labels on all issues:**
 
 ```bash
-LABELS=""
+LABELS="enhancement"
 
 # Always add from-review if this came from a PR review
 if [ -n "$SOURCE_PR" ] || [ -n "$COMMENT_URL" ]; then
-  LABELS="from-review"
+  LABELS="$LABELS,from-review"
 fi
 
 # Add complexity label (required)
@@ -103,18 +103,13 @@ fi
 for extra in "${EXTRA_LABELS[@]}"; do
   LABELS="$LABELS,$extra"
 done
-
-# Remove leading comma if present
-LABELS="${LABELS#,}"
 ```
 
 **Verify labels exist** before using them. If a label doesn't exist in the repo, skip it rather than failing:
 
 ```bash
 # Check if label exists
-for label in $(echo "$LABELS" | tr ',' '\n'); do
-  gh label list --json name -q '.[].name' | grep -q "^${label}$" || echo "Warning: '$label' label not found in repo"
-done
+gh label list --json name -q '.[].name' | grep -q "^from-review$" || echo "Warning: 'from-review' label not found in repo"
 ```
 
 ### 5. Create the Issue
@@ -142,7 +137,7 @@ Output a **summary table** — this is the PRIMARY output:
 ```markdown
 | Issue | Title | Labels | Source |
 |-------|-------|--------|--------|
-| #${ISSUE_NUM} | ${ISSUE_TITLE} | complexity:low, testing:low, from-review | PR #${SOURCE_PR} |
+| #${ISSUE_NUM} | ${ISSUE_TITLE} | from-review, complexity:low, testing:low | PR #${SOURCE_PR} |
 ```
 
 Then below the table:
@@ -156,8 +151,8 @@ Then below the table:
 1. **NO attribution** — Follow Zero Attribution Policy.
 2. **Check for duplicates** — Always search before creating. Don't create duplicate issues.
 3. **Labels must exist** — Verify labels exist in the repo. Skip missing labels gracefully.
-4. **Both complexity and testing labels required** — repo-relay triage policy mandates both labels on all issues. Prompt user if either is missing.
-5. **Be specific** — The issue description must be self-contained. Another developer should understand it without reading the review thread.
-6. **Always include acceptance criteria** — Even if just one checkbox. Issues without criteria are hard to close confidently.
-7. **Link to source** — If from a review, always include the PR number and comment URL in the body.
-<!-- skill-templates: create-issue 57ceacc 2026-05-27 -->
+4. **Be specific** — The issue description must be self-contained. Another developer should understand it without reading the review thread.
+5. **Always include acceptance criteria** — Even if just one checkbox. Issues without criteria are hard to close confidently.
+6. **Link to source** — If from a review, always include the PR number and comment URL in the body.
+7. **Require both complexity and testing labels** — repo-relay triage policy mandates both labels on all issues. Prompt the user if either is missing.
+<!-- skill-templates: create-issue 9652481 2026-05-27 -->

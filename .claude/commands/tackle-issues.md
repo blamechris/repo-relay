@@ -384,4 +384,4 @@ This makes the skill **idempotent** — safe to re-run without duplicating work.
 15. **Pre-Skill Checkpoint** — Re-read CLAUDE.md and skill files before running `/full-review` in every wave.
 16. **Sync before every branch** — Always `git checkout main && git pull` before starting each issue in each wave.
 17. **Morning summary is mandatory** — Even if interrupted, output the best summary possible with data collected so far.
-<!-- skill-templates: tackle-issues 57ceacc 2026-05-27 -->
+<!-- skill-templates: tackle-issues 9652481 2026-05-27 -->
