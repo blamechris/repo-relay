@@ -35,15 +35,15 @@ Scan for issues this PR should close. Check THREE sources:
 # Source 1: Issue numbers referenced in commit messages (#NNN)
 git log main..HEAD --format='%s %b' | grep -oE '#[0-9]+' | sort -u
 
-# Source 2: Issue numbers in branch name (e.g., fix/auth-rate-limit-#434 → #434)
+# Source 2: Issue numbers in branch name (e.g., fix/auth-rate-limit-434 → #434)
 echo "$BRANCH" | grep -oE '[0-9]+' | while read num; do
   # Verify it's a real open issue
-  gh issue view "$num" --json number,state,title -q 'select(.state == "OPEN") | "#\(.number // empty): \(.title // empty)"' 2>/dev/null
+  gh issue view "$num" --json state,title -q 'select(.state == "OPEN") | "#\(.number // empty): \(.title // empty)"' 2>/dev/null
 done
 
-# Source 3: Open from-review issues — cross-reference titles/bodies against changed files
+# Source 3: Open from-review issues whose title/body matches changed files
+CHANGED_FILES=$(git diff main --name-only | head -20)
 gh issue list --label "from-review" --state open --json number,title,body --limit 50
-# Compare each issue's title/body against: git diff main --name-only
 ```
 
 **For each candidate issue:** Verify it's open and the PR's changes actually address it. Don't claim to close an issue the commits don't fix.
@@ -75,9 +75,9 @@ ${CLOSES_LINES}
 
 ## Test Plan
 
-- [ ] `npm run typecheck` passes
-- [ ] `npm run build` succeeds
 - [ ] `npm test` passes
+- [ ] `npm run typecheck` passes
+- [ ] Manual verification done
 ```
 
 #### Batch Fix Template
@@ -91,16 +91,17 @@ Brief overview of the batch.
 
 | Issue | What changed | Files |
 |-------|-------------|-------|
-| #434 | Description of change | `src/file.ts` |
-| #447 | Description of change | `src/other.ts` |
+| #434 | Added auth rate limiting | `ws-server.js` |
+| #447 | Added deploy rollback tests | `supervisor.test.js` |
+| #433 | Auto mode confirmation handshake | `ws-server.js`, `connection.ts`, `SettingsBar.tsx` |
 
 ${CLOSES_LINES}
 
 ## Test Plan
 
-- [ ] `npm run typecheck` passes
-- [ ] `npm run build` succeeds
 - [ ] `npm test` passes
+- [ ] `npm run typecheck` passes
+- [ ] Manual smoke test
 ```
 
 **PR Title:** Keep under 70 characters. Use conventional commit format: `type(scope): summary`
@@ -153,7 +154,7 @@ Output a **summary table** — this is the PRIMARY output:
 ```markdown
 | PR | Branch | Closes | Changes |
 |----|--------|--------|---------|
-| #XX | feat/branch-name | #434, #447 | rate limiting, rollback tests |
+| #XX | feat/branch-name | #434, #447, #433 | rate limiting, rollback tests, auto mode confirm |
 ```
 
 Then below the table:
@@ -163,10 +164,11 @@ Then below the table:
 
 ## Critical Rules
 
-1. **No attribution** — No Co-Authored-By, no "Generated with Claude", no AI mentions anywhere.
+1. **NO attribution** — No Co-Authored-By, no "Generated with Claude", no AI mentions. Zero Attribution Policy.
 2. **Auto-detect issues** — Always scan commits, branch name, and from-review issues. Never skip detection.
 3. **Confirm before creating** — Show the user the full PR content and wait for approval.
 4. **Closes tags go in the body** — Use `Closes #N` on its own line in the PR body. GitHub only auto-closes from the body, not the title.
 5. **Verify after creation** — Check that `closingIssuesReferences` matches expected issues.
 6. **Target main** — Always create PRs against `main` unless the user specifies otherwise.
 7. **Don't fabricate** — Only add `Closes #N` for issues the PR's changes actually address. If unsure, ask.
+<!-- skill-templates: create-pr ebdb14e 2026-06-02 -->

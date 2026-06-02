@@ -40,10 +40,9 @@ Each wave runs the full Phase 1-6 cycle from `/autonomous-dev-flow` for each iss
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 REPO_NAME=$(basename "$REPO")
 SESSION_START=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-BRANCH_PREFIX="auto/"  # Exception to standard feat/fix/ convention — see note below
-```
 
-> **Note:** The `auto/` branch prefix is an intentional exception to the repo's `feat/`/`fix/` naming convention (CLAUDE.md). Marathon session branches use `auto/` so automation and cleanup tooling can identify them as bot-managed.
+BRANCH_PREFIX="auto/"
+```
 
 Parse `$ARGUMENTS` — same as `/autonomous-dev-flow` but with higher defaults:
 - `max` defaults to 20, hard cap 30
@@ -111,10 +110,10 @@ After each issue, output the wave progress table:
 
 | # | Issue | Branch | PR | Review | Status | Attempt |
 |---|-------|--------|----|--------|--------|---------|
-| 1 | #12 — Add retry logic | auto/12-add-retry | #45 | Approve | Done | W1 |
+| 1 | #12 — Add retry logic | 12-add-retry | #45 | Approve | Done | W1 |
 | 2 | #15 — Leaderboard | — | — | — | Decomposed → #20,#21 | W1 |
-| 3 | #20 — LB data model | auto/20-lb-model | #46 | Request Changes | Retry (W2) | W1 |
-| 4 | #18 — Auth tests | auto/18-auth-tests | #47 | Approve | Done | W1 |
+| 3 | #20 — LB data model | 20-lb-model | #46 | Request Changes | Retry (W2) | W1 |
+| 4 | #18 — Auth tests | 18-auth-tests | #47 | Approve | Done | W1 |
 | 5 | #21 — LB display | — | — | — | In progress | W1 |
 ```
 
@@ -165,8 +164,6 @@ For issues entering Wave 2+, delete the stale branch and PR from the previous at
 
 ```bash
 # For each retry candidate:
-# Safety: only clean up branches with the session's BRANCH_PREFIX and PRs created after SESSION_START
-
 # Close the old PR (it had issues)
 gh pr close ${OLD_PR_NUM} --comment "Closing for retry in Wave ${NEXT_WAVE} — previous attempt had: ${FAILURE_REASON}"
 
@@ -387,19 +384,4 @@ This makes the skill **idempotent** — safe to re-run without duplicating work.
 15. **Pre-Skill Checkpoint** — Re-read CLAUDE.md and skill files before running `/full-review` in every wave.
 16. **Sync before every branch** — Always `git checkout main && git pull` before starting each issue in each wave.
 17. **Morning summary is mandatory** — Even if interrupted, output the best summary possible with data collected so far.
-
-## Customization Points
-
-Lines and sections marked with `{{CUSTOMIZE}}` need repo-specific adaptation. These mirror `/autonomous-dev-flow` customizations:
-
-- **Branch prefix** for session branches and resume detection
-- **Branch naming convention**
-- **Decomposition trigger label**
-- **Test runner command**
-- **Test file conventions**
-- **Lint/typecheck commands**
-- **PR test plan items**
-- **Commit scope conventions**
-- **Skip labels** beyond the defaults (`blocked`, `wontfix`)
-
-<!-- skill-templates: tackle-issues 87ae770 2026-03-06 -->
+<!-- skill-templates: tackle-issues ebdb14e 2026-06-02 -->
