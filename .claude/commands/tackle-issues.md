@@ -40,10 +40,11 @@ Each wave runs the full Phase 1-6 cycle from `/autonomous-dev-flow` for each iss
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 REPO_NAME=$(basename "$REPO")
 SESSION_START=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-BRANCH_PREFIX="auto/"  # Exception to standard feat/fix/ convention — see note below
-```
 
-> **Note:** The `auto/` branch prefix is an intentional exception to the repo's `feat/`/`fix/` naming convention (CLAUDE.md). Marathon session branches use `auto/` so automation and cleanup tooling can identify them as bot-managed.
+BRANCH_PREFIX="auto/"
+
+BRANCH_PREFIX_RE="^auto/"
+```
 
 Parse `$ARGUMENTS` — same as `/autonomous-dev-flow` but with higher defaults:
 - `max` defaults to 20, hard cap 30
@@ -111,10 +112,10 @@ After each issue, output the wave progress table:
 
 | # | Issue | Branch | PR | Review | Status | Attempt |
 |---|-------|--------|----|--------|--------|---------|
-| 1 | #12 — Add retry logic | auto/12-add-retry | #45 | Approve | Done | W1 |
+| 1 | #12 — Add retry logic | 12-add-retry | #45 | Approve | Done | W1 |
 | 2 | #15 — Leaderboard | — | — | — | Decomposed → #20,#21 | W1 |
-| 3 | #20 — LB data model | auto/20-lb-model | #46 | Request Changes | Retry (W2) | W1 |
-| 4 | #18 — Auth tests | auto/18-auth-tests | #47 | Approve | Done | W1 |
+| 3 | #20 — LB data model | 20-lb-model | #46 | Request Changes | Retry (W2) | W1 |
+| 4 | #18 — Auth tests | 18-auth-tests | #47 | Approve | Done | W1 |
 | 5 | #21 — LB display | — | — | — | In progress | W1 |
 ```
 
@@ -153,8 +154,8 @@ Add new unassigned issues to the queue if they match the original filter criteri
 
 ```bash
 gh pr list --state merged --json number,headRefName,mergedAt --limit 30 \
-  | jq --arg start "$SESSION_START" --arg prefix "$BRANCH_PREFIX" \
-    '[.[] | select(.mergedAt > $start) | select(.headRefName | startswith($prefix))]'
+  | jq --arg start "$SESSION_START" --arg prefix "$BRANCH_PREFIX_RE" \
+    '[.[] | select(.mergedAt > $start) | select(.headRefName | test($prefix))]'
 ```
 
 Note merged PRs. If a merged PR's issue is in the retry queue, remove it — the user handled it.
@@ -165,8 +166,6 @@ For issues entering Wave 2+, delete the stale branch and PR from the previous at
 
 ```bash
 # For each retry candidate:
-# Safety: only clean up branches with the session's BRANCH_PREFIX and PRs created after SESSION_START
-
 # Close the old PR (it had issues)
 gh pr close ${OLD_PR_NUM} --comment "Closing for retry in Wave ${NEXT_WAVE} — previous attempt had: ${FAILURE_REASON}"
 
@@ -355,7 +354,7 @@ This skill uses **GitHub state** for resume — no local state files. Same as `/
 
 If a marathon session is interrupted (crash, timeout, user stops it), re-running with the same arguments will:
 
-1. Query GitHub for existing session branches (matching `BRANCH_PREFIX`) and PRs referencing each issue
+1. Query GitHub for existing session branches (matching `BRANCH_PREFIX_RE`) and PRs referencing each issue
 2. Detect which wave the session was in by counting attempts per issue
 3. Skip issues that already have merged or clean open PRs
 4. Resume from the first unfinished issue in the current wave
@@ -387,19 +386,4 @@ This makes the skill **idempotent** — safe to re-run without duplicating work.
 15. **Pre-Skill Checkpoint** — Re-read CLAUDE.md and skill files before running `/full-review` in every wave.
 16. **Sync before every branch** — Always `git checkout main && git pull` before starting each issue in each wave.
 17. **Morning summary is mandatory** — Even if interrupted, output the best summary possible with data collected so far.
-
-## Customization Points
-
-Lines and sections marked with `{{CUSTOMIZE}}` need repo-specific adaptation. These mirror `/autonomous-dev-flow` customizations:
-
-- **Branch prefix** for session branches and resume detection
-- **Branch naming convention**
-- **Decomposition trigger label**
-- **Test runner command**
-- **Test file conventions**
-- **Lint/typecheck commands**
-- **PR test plan items**
-- **Commit scope conventions**
-- **Skip labels** beyond the defaults (`blocked`, `wontfix`)
-
-<!-- skill-templates: tackle-issues 87ae770 2026-03-06 -->
+<!-- skill-templates: tackle-issues 21fa678 2026-06-03 -->
