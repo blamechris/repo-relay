@@ -2,7 +2,7 @@
  * Issue event handler with threaded embed lifecycle
  */
 import { TextChannel } from 'discord.js';
-import { buildIssueEmbed, buildIssueClosedReply, buildIssueReopenedReply } from '../embeds/builders.js';
+import { buildIssueEmbed, buildIssueClosedReply, buildIssueReopenedReply, buildThreadName } from '../embeds/builders.js';
 import { getChannelForEvent } from '../config/channels.js';
 import { getExistingIssueMessage } from '../discord/lookup.js';
 import { withRetry } from '../utils/retry.js';
@@ -50,7 +50,7 @@ async function handleIssueOpened(channel, db, repo, issue) {
     const embed = buildIssueEmbed(issue);
     const message = await withRetry(() => channel.send({ embeds: [embed] }));
     const thread = await withRetry(() => message.startThread({
-        name: `Issue #${issue.number}: ${issue.title.substring(0, 90)}`,
+        name: buildThreadName('Issue', issue.number, issue.title),
         autoArchiveDuration: 1440,
     }));
     db.saveIssueMessage(repo, issue.number, channel.id, message.id, thread.id);
@@ -84,7 +84,7 @@ async function handleIssueStateChange(channel, db, repo, issue, replyText) {
     const embed = buildIssueEmbed(issue);
     const message = await withRetry(() => channel.send({ embeds: [embed] }));
     const thread = await withRetry(() => message.startThread({
-        name: `Issue #${issue.number}: ${issue.title.substring(0, 90)}`,
+        name: buildThreadName('Issue', issue.number, issue.title),
         autoArchiveDuration: 1440,
     }));
     db.saveIssueMessage(repo, issue.number, channel.id, message.id, thread.id);
@@ -122,7 +122,7 @@ export async function getOrCreateIssueThread(channel, db, repo, issue, existing)
     let thread;
     try {
         thread = await withRetry(() => message.startThread({
-            name: `Issue #${issue.number}: ${issue.title.substring(0, 90)}`,
+            name: buildThreadName('Issue', issue.number, issue.title),
             autoArchiveDuration: 1440,
         }));
     }

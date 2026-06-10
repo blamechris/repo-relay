@@ -1,19 +1,28 @@
 /**
  * Workflow template builder for repo-relay setup wizard
  */
-export function buildWorkflowTemplate(ciWorkflowName, features) {
+export function buildWorkflowTemplate(ciWorkflowName, features, defaultBranch = 'main') {
     const eventLines = [
         '  pull_request:',
         '    types: [opened, synchronize, closed, reopened, edited, ready_for_review, converted_to_draft]',
         '  pull_request_review:',
         '    types: [submitted]',
+        // Always subscribed: issue_comment delivers agent-review detection on PRs,
+        // independent of whether issue notifications are enabled
+        '  issue_comment:',
+        '    types: [created]',
     ];
     if (features.pushEvents) {
-        eventLines.push('  push:', `    branches: [$default-branch]`);
+        // NOTE: $default-branch is only substituted inside org workflow *templates*;
+        // in a generated user workflow it would be a literal, dead branch filter.
+        // Quote + escape the branch name — git refnames allow YAML-significant
+        // characters (quotes, braces, leading specials) that would break the
+        // flow sequence if emitted bare.
+        const escapedBranch = defaultBranch.replace(/(["\\])/g, '\\$1');
+        eventLines.push('  push:', `    branches: ["${escapedBranch}"]`);
     }
     if (features.issues) {
-        eventLines.push('  issue_comment:', '    types: [created]');
-        eventLines.push('  issues:', '    types: [opened, closed]');
+        eventLines.push('  issues:', '    types: [opened, closed, reopened]');
     }
     if (features.releases) {
         eventLines.push('  release:', '    types: [published]');
@@ -50,11 +59,19 @@ export function buildWorkflowTemplate(ciWorkflowName, features) {
     if (features.securityAlerts) {
         permissionLines.push('      security-events: read');
     }
+    // workflow_run is always subscribed; fetchFailedSteps reads the Actions jobs
+    // API, and an explicit permissions block zeroes every unlisted scope
+    permissionLines.push('      actions: read');
     permissionLines.push('      contents: read');
     return `name: Discord Notifications
 
 on:
 ${eventLines.join('\n')}
+
+# Serialize runs — simultaneous events (push + CI completing) can otherwise
+# race and create duplicate embeds or lose status updates
+concurrency:
+  group: repo-relay-\${{ github.repository }}
 
 jobs:
   notify:
@@ -65,9 +82,26 @@ ${permissionLines.join('\n')}
     # The pre-filter also catches this, but this guard protects against
     # direct workflow dispatch where the pre-filter is bypassed.
     # (workflow_run-specific fields resolve to null for non-workflow_run events)
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.pull_requests[0] != null
+    # Also skip fork PRs (no secrets available — the run would always fail red)
+    # and bot actors (prevents notification cascades).
+    if: >-
+      github.actor != 'github-actions[bot]' &&
+      (github.event.pull_request.head.repo.full_name == github.repository ||
+       github.event.pull_request == null) &&
+      (github.event_name != 'workflow_run' ||
+       github.event.workflow_run.pull_requests[0] != null)
 
     steps:
+      # Persist state between runs. The key MUST be unique per run — cache
+      # entries are immutable, so a constant key would freeze state at the
+      # first run forever. restore-keys restores the most recent snapshot.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.repo-relay
+          key: repo-relay-state-\${{ github.repository }}-\${{ github.run_id }}
+          restore-keys: |
+            repo-relay-state-\${{ github.repository }}-
+
       - uses: blamechris/repo-relay@v1
         with:
           discord_bot_token: \${{ secrets.DISCORD_BOT_TOKEN }}
