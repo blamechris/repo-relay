@@ -277,7 +277,8 @@ jobs:
 **Notes:**
 - The `concurrency` group serializes repo-relay runs — without it, simultaneous events (e.g. a push and its CI completing) can race and create duplicate embeds or lose status updates
 - Cache evicts after 7 days of inactivity (fine for active repos)
-- The cached DB stores Discord message IDs plus PR/issue metadata — including issue bodies and logged event payloads. For private repos this means repo content sits in the Actions cache at rest; if that matters for your threat model, skip the cache (the bot falls back to channel search)
+- **Caches are ref-scoped**: runs on a PR's merge ref see that PR's saves plus the default branch's, but not other PRs'. In practice the chatty sequences (pushes, reviews, comments on one PR) share the PR's scope, and default-branch events (issues, releases, `workflow_run`) share the default scope — state written in one scope reaches the other only via channel-search recovery
+- The cached DB stores Discord message IDs plus PR/issue metadata (titles, bodies, branch names). For private repos this means repo content sits in the Actions cache at rest; if that matters for your threat model, skip the cache (the bot falls back to channel search)
 - If cache misses, repo-relay falls back to searching the last 100 channel messages
 
 ## State Storage
