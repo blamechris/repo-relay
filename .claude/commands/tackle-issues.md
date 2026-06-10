@@ -14,7 +14,7 @@ Composes `/autonomous-dev-flow` logic internally but adds multi-wave retry with 
   - If empty, auto-detect: scan open issues sorted by complexity (low first, then medium, skip high)
   - Options: `max:N` (default 20, hard cap 30), `sort:created-asc` (default) or `sort:created-desc`
   - `waves:N` (default 3, max 4) — maximum retry waves
-  - `merge:true` — run `/batch-merge all` after final wave (default: false)
+  - `merge:off` — disable the Unattended Merge Gate; PRs accumulate for user review (default: gated self-merge is ON)
 
 ## Instructions
 
@@ -48,7 +48,7 @@ BRANCH_PREFIX="auto/"  # Exception to standard feat/fix/ convention — see note
 Parse `$ARGUMENTS` — same as `/autonomous-dev-flow` but with higher defaults:
 - `max` defaults to 20, hard cap 30
 - `waves` defaults to 3, max 4
-- `merge` defaults to false
+- gated self-merge defaults to ON (`merge:off` disables it)
 
 Build the initial queue using the same logic as `/autonomous-dev-flow` Phase 0:
 - Fetch issues by label, milestone, explicit list, or auto-detect
@@ -72,7 +72,7 @@ Display the marathon queue:
 | — | #16 — Refactor auth module | enhancement | Assigned to @user (skipped) |
 
 **Mode:** Unattended marathon (up to {W} waves)
-**Merge after:** {Yes/No}
+**Self-merge:** Unattended Merge Gate {ON / off (`merge:off`)}
 **Estimated scope:** {N} issues × {W} max waves
 
 Start marathon session?
@@ -128,7 +128,7 @@ From `MASTER_LOG`, gather issues where the latest attempt was not `Done`:
 
 | Status | Meaning | Retry? |
 |--------|---------|--------|
-| Done | PR created, review clean | No — skip in future waves |
+| Done | PR merged through the Unattended Merge Gate (or review-clean under `merge:off`) | No — skip in future waves |
 | Retry | Tests failing or review found critical issues | Yes — re-attempt |
 | Flagged | 2 fix attempts failed in a wave | Yes — with different strategy |
 | Skipped | Non-automatable (blocked, no criteria, etc.) | No — genuinely blocked |
@@ -265,17 +265,15 @@ After each wave, check for convergence BEFORE entering the next wave:
 **Reason:** {e.g., "3 new completions, 2 retries remaining — continuing" or "0 new completions, same 2 issues failing — converged"}
 ```
 
-### Phase 5: Optional Batch Merge
+### Phase 5: Merge Accounting
 
-If `merge:true` was specified AND at least one PR is ready:
+Merging happens **inline during waves** via the Unattended Merge Gate (see `/unattended-merge`): a PR self-merges the moment /full-review is clean, ALL CI checks (`check (20)`, `check (22)`, `dist-freshness`) pass on the final commit, and ALL review threads are resolved — no `gh pr merge --auto`, no human pause, merge verified `MERGED`, then the `v1` tag is updated per Tag Management. This unblocks dependent queue items mid-marathon. This phase is accounting only:
 
-1. List all PRs created during this session that have clean reviews
-2. Run `/batch-merge` with those PR numbers
-3. Record merge results in the morning summary
-
-If `merge:true` was NOT specified, skip this phase and note in the summary:
+1. Collect every PR merged by the session — each MUST appear as an entry in the Morning Summary's "Merged by this session" table
+2. Any PR that passed review but failed a later gate (e.g. CI red at merge time) stays open — list it under Needs Attention with the failed gate named
+3. If `merge:off` was specified, no self-merges happened; note in the summary:
 ```
-**Ready to merge:** Run `/batch-merge {PR_NUMS}` to merge completed PRs.
+**Ready to merge:** {PR_NUMS} await manual merge (`/batch-merge` if installed).
 ```
 
 ### Phase 6: Morning Summary
@@ -295,7 +293,7 @@ Output a comprehensive summary designed for the user to read when they return. T
 | Metric | Count |
 |--------|-------|
 | Issues attempted | {N} |
-| PRs created (ready to merge) | {M} |
+| PRs merged by the session | {M} |
 | PRs flagged (needs attention) | {K} |
 | Issues decomposed | {D} → {S} sub-issues |
 | Issues blocked (auto) | {B} |
@@ -307,10 +305,20 @@ Output a comprehensive summary designed for the user to read when they return. T
 
 | Issue | PR | Wave | Review | Status |
 |-------|-----|------|--------|--------|
-| #12 — Add retry logic | [#45](url) | W1 | Approve | Ready to merge |
-| #20 — LB data model | [#46](url) | W1→W2 | Approve | Ready to merge (fixed in W2) |
+| #12 — Add retry logic | [#45](url) | W1 | Approve | Merged (`abc1234`) |
+| #20 — LB data model | [#46](url) | W1→W2 | Approve | Merged (`def5678`, fixed in W2) |
 | #18 — Auth tests | [#47](url) | W1 | Request Changes | Needs attention |
-| #21 — LB display | [#48](url) | W1 | Approve | Ready to merge |
+| #21 — LB display | [#48](url) | W1 | Approve | Merged (`9abcdef`) |
+
+### Merged by this session
+
+One entry per self-merged PR — MANDATORY (Unattended Merge Gate rule 6):
+
+| PR | Issue | Review | Checks | Merge SHA |
+|----|-------|--------|--------|-----------|
+| [#45](url) | #12 — Add retry logic | Approve, 0 unresolved | all green | `abc1234` |
+| [#46](url) | #20 — LB data model | Approve, 0 unresolved | all green | `def5678` |
+| [#48](url) | #21 — LB display | Approve, 0 unresolved | all green | `9abcdef` |
 
 ### Needs Attention ({K} PRs)
 
@@ -343,7 +351,7 @@ These issues could not be implemented after {W} waves. Each has a detailed comme
 
 ### Next Steps
 
-1. **Merge ready PRs:** `/batch-merge {PR_NUMS}`
+1. **Audit merged PRs:** review the "Merged by this session" entries (anything left open under `merge:off` awaits manual merge)
 2. **Review flagged PRs:** {list with specific issues to check}
 3. **Address blocked issues:** {list with recommendations}
 4. **New issues created:** {list of sub-issues or follow-up issues}
@@ -374,14 +382,14 @@ This makes the skill **idempotent** — safe to re-run without duplicating work.
 2. **TDD is mandatory** — RED → GREEN → REFACTOR for every issue, every wave. No skipping tests.
 3. **Branch from main every time** — Never stack branches. Fresh branch for every attempt, including retries.
 4. **One confirmation point** — The initial marathon queue approval. Everything after — including all waves and retries — is fully autonomous.
-5. **Never merge (unless merge:true)** — PRs accumulate for user review. Only `/batch-merge` at the end if explicitly requested.
+5. **Merge only through the Unattended Merge Gate** — /full-review clean + ALL checks green on the final commit + ALL review threads resolved. No `gh pr merge --auto`, no protection overrides. `merge:off` disables self-merging. Every self-merged PR MUST appear as an entry in the Morning Summary, and every merge is followed by the `v1` retag.
 6. **Clean up failed attempts** — Close old PRs and delete old branches before retrying. Don't leave orphaned PRs.
 7. **Escalate strategy across waves** — Wave 1: standard approach. Wave 2: fresh context + address failures. Wave 3: alternative approach + scope reduction. Don't repeat the same failing approach.
 8. **Converge, don't loop forever** — If a wave produces zero new completions, stop. Further waves won't help.
 9. **Progress table after every issue** — The user may check in at any time. The table must show wave context.
 10. **Respect the hard cap** — Max 30 issues across all waves (including sub-issues from decomposition). Refuse larger queues.
 11. **Resume from GitHub state** — No local state files. Detect wave progress from closed/open PR counts per issue.
-12. **Compose existing skills** — `/full-review` is called as-is. `/batch-merge` if `merge:true`. Don't reinvent their logic.
+12. **Compose existing skills** — `/full-review` is called as-is. The Unattended Merge Gate (`/unattended-merge`) governs self-merges. Don't reinvent their logic.
 13. **Decompose in Wave 1 only** — High-complexity decomposition happens once. Retries work on the sub-issues, not the parent.
 14. **Comment on blocked issues** — Every issue that fails all waves gets a detailed GitHub comment with what was tried and why it failed.
 15. **Pre-Skill Checkpoint** — Re-read CLAUDE.md and skill files before running `/full-review` in every wave.
@@ -402,4 +410,4 @@ Lines and sections marked with `{{CUSTOMIZE}}` need repo-specific adaptation. Th
 - **Commit scope conventions**
 - **Skip labels** beyond the defaults (`blocked`, `wontfix`)
 
-<!-- skill-templates: tackle-issues 87ae770 2026-03-06 -->
+<!-- skill-templates: tackle-issues d3cd6f5 2026-06-10 -->
