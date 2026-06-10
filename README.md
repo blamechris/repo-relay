@@ -249,26 +249,35 @@ If the bot connects but can't post, check the channel-level permissions. The bot
 Add an `actions/cache` step before repo-relay to persist state between runs. The `key` **must be unique per run** — GitHub cache entries are immutable, so a constant key saves once on the first run and never updates again, silently freezing your state. Use a per-run key with a `restore-keys` prefix so each run restores the most recent snapshot and saves a new one:
 
 ```yaml
+name: Discord Notifications
+
+on:
+  # ... your event triggers ...
+
+# Workflow-level key (NOT inside jobs/steps) — serializes repo-relay runs
 concurrency:
   group: repo-relay-${{ github.repository }}
 
-# ...
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/cache@v4
+        with:
+          path: ~/.repo-relay
+          key: repo-relay-state-${{ github.repository }}-${{ github.run_id }}
+          restore-keys: |
+            repo-relay-state-${{ github.repository }}-
 
-    - uses: actions/cache@v4
-      with:
-        path: ~/.repo-relay
-        key: repo-relay-state-${{ github.repository }}-${{ github.run_id }}
-        restore-keys: |
-          repo-relay-state-${{ github.repository }}-
-
-    - uses: blamechris/repo-relay@v1
-      ...
+      - uses: blamechris/repo-relay@v1
+        with:
+          # ... your inputs ...
 ```
 
 **Notes:**
 - The `concurrency` group serializes repo-relay runs — without it, simultaneous events (e.g. a push and its CI completing) can race and create duplicate embeds or lose status updates
 - Cache evicts after 7 days of inactivity (fine for active repos)
-- No security concern — the state DB contains only Discord message IDs and PR metadata
+- The cached DB stores Discord message IDs plus PR/issue metadata — including issue bodies and logged event payloads. For private repos this means repo content sits in the Actions cache at rest; if that matters for your threat model, skip the cache (the bot falls back to channel search)
 - If cache misses, repo-relay falls back to searching the last 100 channel messages
 
 ## State Storage
