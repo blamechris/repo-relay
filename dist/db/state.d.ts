@@ -46,25 +46,13 @@ export interface IssueMessage {
     createdAt: string;
     lastUpdated: string;
 }
-export interface StoredIssueData {
-    repo: string;
-    issueNumber: number;
-    title: string;
-    url: string;
-    author: string;
-    authorAvatar: string | null;
-    state: string;
-    stateReason: string | null;
-    labels: string;
-    body: string | null;
-    issueCreatedAt: string;
-}
 export interface EventLogEntry {
     id: number;
     repo: string;
     entityNumber: number | null;
     eventType: string;
-    payload: string;
+    /** Always null since the slimming change — payloads are no longer persisted. */
+    payload: string | null;
     createdAt: string;
 }
 export declare class StateDb {
@@ -90,9 +78,7 @@ export declare class StateDb {
     updateIssueThread(repo: string, issueNumber: number, threadId: string): void;
     updateIssueMessageTimestamp(repo: string, issueNumber: number): void;
     deleteIssueMessage(repo: string, issueNumber: number): void;
-    getIssueData(repo: string, issueNumber: number): StoredIssueData | null;
-    saveIssueData(data: StoredIssueData): void;
-    logEvent(repo: string, entityNumber: number | null, eventType: string, payload: object): void;
+    logEvent(repo: string, entityNumber: number | null, eventType: string, _payload: object): void;
     getRecentEvents(repo: string, entityNumber?: number, limit?: number): EventLogEntry[];
     close(): void;
 }

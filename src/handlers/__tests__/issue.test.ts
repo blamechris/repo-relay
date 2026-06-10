@@ -85,8 +85,6 @@ function makeMockDb() {
     deleteIssueMessage: vi.fn(),
     updateIssueThread: vi.fn(),
     updateIssueMessageTimestamp: vi.fn(),
-    getIssueData: vi.fn(() => null),
-    saveIssueData: vi.fn(),
   };
 }
 
@@ -126,14 +124,6 @@ describe('handleIssueEvent', () => {
       // Saves message and data to DB
       expect(db.saveIssueMessage).toHaveBeenCalledWith(
         'test/repo', 42, 'channel-1', 'msg-1', 'thread-1'
-      );
-      expect(db.saveIssueData).toHaveBeenCalledWith(
-        expect.objectContaining({
-          repo: 'test/repo',
-          issueNumber: 42,
-          title: 'Test issue',
-          state: 'open',
-        })
       );
 
       // Posts initial message in thread
@@ -178,8 +168,6 @@ describe('handleIssueEvent', () => {
       // Updates timestamp
       expect(db.updateIssueMessageTimestamp).toHaveBeenCalledWith('test/repo', 42);
 
-      // Saves updated issue data
-      expect(db.saveIssueData).toHaveBeenCalled();
     });
 
     it('handles stale message by creating new embed', async () => {
@@ -214,7 +202,6 @@ describe('handleIssueEvent', () => {
 
       // Saves new DB entries
       expect(db.saveIssueMessage).toHaveBeenCalled();
-      expect(db.saveIssueData).toHaveBeenCalled();
     });
 
     it('creates new embed and posts close reply when no existing message', async () => {

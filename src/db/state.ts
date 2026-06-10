@@ -56,26 +56,13 @@ export interface IssueMessage {
   lastUpdated: string;
 }
 
-export interface StoredIssueData {
-  repo: string;
-  issueNumber: number;
-  title: string;
-  url: string;
-  author: string;
-  authorAvatar: string | null;
-  state: string;
-  stateReason: string | null;
-  labels: string;
-  body: string | null;
-  issueCreatedAt: string;
-}
-
 export interface EventLogEntry {
   id: number;
   repo: string;
   entityNumber: number | null;
   eventType: string;
-  payload: string;
+  /** Always null since the slimming change — payloads are no longer persisted. */
+  payload: string | null;
   createdAt: string;
 }
 
@@ -198,21 +185,6 @@ export class StateDb {
         PRIMARY KEY (repo, issue_number)
       );
 
-      CREATE TABLE IF NOT EXISTS issue_data (
-        repo TEXT NOT NULL,
-        issue_number INTEGER NOT NULL,
-        title TEXT NOT NULL,
-        url TEXT NOT NULL,
-        author TEXT NOT NULL,
-        author_avatar TEXT,
-        state TEXT DEFAULT 'open',
-        state_reason TEXT,
-        labels TEXT DEFAULT '[]',
-        body TEXT,
-        issue_created_at TEXT NOT NULL,
-        PRIMARY KEY (repo, issue_number)
-      );
-
       CREATE TABLE IF NOT EXISTS event_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         repo TEXT NOT NULL,
@@ -225,6 +197,10 @@ export class StateDb {
       CREATE INDEX IF NOT EXISTS idx_event_log_repo_entity
         ON event_log(repo, entity_number);
     `);
+
+    // Retention: the event log is a debugging affordance, not an archive —
+    // unbounded growth bloats the actions/cache artifact on hosted runners
+    this.db.exec("DELETE FROM event_log WHERE created_at < datetime('now', '-30 days')");
   }
 
   getPrMessage(repo: string, prNumber: number): PrMessage | null {
@@ -487,49 +463,22 @@ export class StateDb {
     stmt.run(repo, issueNumber);
   }
 
-  getIssueData(repo: string, issueNumber: number): StoredIssueData | null {
-    const stmt = this.db.prepare(`
-      SELECT repo, issue_number as issueNumber, title, url, author,
-             author_avatar as authorAvatar, state, state_reason as stateReason,
-             labels, body, issue_created_at as issueCreatedAt
-      FROM issue_data
-      WHERE repo = ? AND issue_number = ?
-    `);
-    return (stmt.get(repo, issueNumber) as StoredIssueData) ?? null;
-  }
-
-  saveIssueData(data: StoredIssueData): void {
-    const stmt = this.db.prepare(`
-      INSERT INTO issue_data (repo, issue_number, title, url, author,
-                             author_avatar, state, state_reason, labels,
-                             body, issue_created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(repo, issue_number) DO UPDATE SET
-        title = excluded.title,
-        url = excluded.url,
-        state = excluded.state,
-        state_reason = excluded.state_reason,
-        labels = excluded.labels,
-        body = excluded.body
-    `);
-    stmt.run(
-      data.repo, data.issueNumber, data.title, data.url, data.author,
-      data.authorAvatar, data.state, data.stateReason, data.labels,
-      data.body, data.issueCreatedAt
-    );
-  }
 
   logEvent(
     repo: string,
     entityNumber: number | null,
     eventType: string,
-    payload: object
+    _payload: object
   ): void {
+    // Payloads are deliberately NOT persisted: full event JSON (30-80KB each)
+    // grew the actions/cache artifact unboundedly and put private-repo content
+    // at rest in the cache. Actions logs already record every payload; the
+    // parameter is kept so the 9 handler call sites stay untouched.
     const stmt = this.db.prepare(`
       INSERT INTO event_log (repo, entity_number, event_type, payload)
-      VALUES (?, ?, ?, ?)
+      VALUES (?, ?, ?, NULL)
     `);
-    stmt.run(repo, entityNumber, eventType, JSON.stringify(payload));
+    stmt.run(repo, entityNumber, eventType);
   }
 
   getRecentEvents(

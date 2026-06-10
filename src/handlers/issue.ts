@@ -110,7 +110,6 @@ async function handleIssueOpened(
   }));
 
   db.saveIssueMessage(repo, issue.number, channel.id, message.id, thread.id);
-  saveIssueDataFromIssueData(db, repo, issue);
 
   await withRetry(() => thread.send(`📋 Updates for Issue #${issue.number} will appear here.`));
 }
@@ -127,7 +126,6 @@ async function handleIssueStateChange(
   if (existing) {
     try {
       const message = await withRetry(() => channel.messages.fetch(existing.messageId));
-      saveIssueDataFromIssueData(db, repo, issue);
       const embed = buildIssueEmbed(issue);
       await withRetry(() => message.edit({ embeds: [embed] }));
 
@@ -156,25 +154,8 @@ async function handleIssueStateChange(
   }));
 
   db.saveIssueMessage(repo, issue.number, channel.id, message.id, thread.id);
-  saveIssueDataFromIssueData(db, repo, issue);
   await withRetry(() => thread.send(replyText));
   db.updateIssueMessageTimestamp(repo, issue.number);
-}
-
-function saveIssueDataFromIssueData(db: StateDb, repo: string, issue: IssueData): void {
-  db.saveIssueData({
-    repo,
-    issueNumber: issue.number,
-    title: issue.title,
-    url: issue.url,
-    author: issue.author,
-    authorAvatar: issue.authorAvatar ?? null,
-    state: issue.state,
-    stateReason: issue.stateReason ?? null,
-    labels: JSON.stringify(issue.labels),
-    body: issue.body ?? null,
-    issueCreatedAt: issue.createdAt,
-  });
 }
 
 export async function getOrCreateIssueThread(
