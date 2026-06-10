@@ -61,7 +61,8 @@ export interface EventLogEntry {
   repo: string;
   entityNumber: number | null;
   eventType: string;
-  /** Always null since the slimming change — payloads are no longer persisted. */
+  /** Null for rows written after the slimming change; rows from older DBs may
+   * still carry payloads until the 30-day retention prunes them. */
   payload: string | null;
   createdAt: string;
 }
