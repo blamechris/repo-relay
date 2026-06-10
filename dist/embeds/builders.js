@@ -28,7 +28,7 @@ export function buildPrEmbed(pr, ci, reviews) {
     const reviewLines = [];
     if (reviews) {
         const copilotStatus = reviews.copilot === 'reviewed'
-            ? `✅ Reviewed (${reviews.copilotComments ?? 0} comments)`
+            ? '✅ Reviewed'
             : '⏳ Pending';
         reviewLines.push(`• Copilot: ${copilotStatus}`);
         const agentStatus = getAgentReviewStatus(reviews.agentReview);
