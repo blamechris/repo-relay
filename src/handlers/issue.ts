@@ -103,6 +103,23 @@ async function handleIssueOpened(
   repo: string,
   issue: IssueData
 ): Promise<void> {
+  await createIssueMessageWithThread(
+    channel, db, repo, issue,
+    `📋 Updates for Issue #${issue.number} will appear here.`
+  );
+}
+
+/**
+ * Send a fresh issue embed, attach its updates thread, persist the message
+ * row, and post `threadMessage` to the new thread.
+ */
+async function createIssueMessageWithThread(
+  channel: TextChannel,
+  db: StateDb,
+  repo: string,
+  issue: IssueData,
+  threadMessage: string
+): Promise<void> {
   const embed = buildIssueEmbed(issue);
   const message = await withRetry(() => channel.send({ embeds: [embed] }));
 
@@ -113,7 +130,7 @@ async function handleIssueOpened(
 
   db.saveIssueMessage(repo, issue.number, channel.id, message.id, thread.id);
 
-  await withRetry(() => thread.send(`📋 Updates for Issue #${issue.number} will appear here.`));
+  await withRetry(() => thread.send(threadMessage));
 }
 
 async function handleIssueStateChange(
@@ -146,16 +163,7 @@ async function handleIssueStateChange(
   }
 
   // No existing message (or stale message was cleared) — create new embed
-  const embed = buildIssueEmbed(issue);
-  const message = await withRetry(() => channel.send({ embeds: [embed] }));
-
-  const thread = await withRetry(() => message.startThread({
-    name: buildThreadName('Issue', issue.number, issue.title),
-    autoArchiveDuration: 1440,
-  }));
-
-  db.saveIssueMessage(repo, issue.number, channel.id, message.id, thread.id);
-  await withRetry(() => thread.send(replyText));
+  await createIssueMessageWithThread(channel, db, repo, issue, replyText);
   db.updateIssueMessageTimestamp(repo, issue.number);
 }
 
