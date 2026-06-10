@@ -41,6 +41,8 @@ export interface PrStatus {
   copilotStatus: 'pending' | 'reviewed';
   copilotComments: number;
   agentReviewStatus: 'pending' | 'approved' | 'changes_requested' | 'none';
+  humanReviewStatus: 'approved' | 'changes_requested' | 'none';
+  humanReviewLogin: string | null;
   ciStatus: 'pending' | 'running' | 'success' | 'failure' | 'cancelled';
   ciWorkflowName: string | null;
   ciUrl: string | null;
@@ -129,6 +131,15 @@ export class StateDb {
       this.db.exec("DROP INDEX IF EXISTS idx_event_log_repo_pr");
       this.db.exec("CREATE INDEX IF NOT EXISTS idx_event_log_repo_entity ON event_log(repo, entity_number)");
     }
+
+    // Migration: Add human review columns to pr_status (#146)
+    // Guard: table may not exist yet on a fresh DB (initSchema runs after)
+    const statusColumns = this.db.prepare("PRAGMA table_info(pr_status)").all() as Array<{ name: string }>;
+    if (statusColumns.length > 0 && !statusColumns.some(col => col.name === 'human_review_status')) {
+      console.log('[repo-relay] Running migration: Adding human review columns to pr_status');
+      this.db.exec("ALTER TABLE pr_status ADD COLUMN human_review_status TEXT DEFAULT 'none'");
+      this.db.exec("ALTER TABLE pr_status ADD COLUMN human_review_login TEXT");
+    }
   }
 
   private initSchema(): void {
@@ -150,6 +161,8 @@ export class StateDb {
         copilot_status TEXT DEFAULT 'pending',
         copilot_comments INTEGER DEFAULT 0,
         agent_review_status TEXT DEFAULT 'pending',
+        human_review_status TEXT DEFAULT 'none',
+        human_review_login TEXT,
         ci_status TEXT DEFAULT 'pending',
         ci_workflow_name TEXT,
         ci_url TEXT,
@@ -266,6 +279,8 @@ export class StateDb {
              copilot_status as copilotStatus,
              copilot_comments as copilotComments,
              agent_review_status as agentReviewStatus,
+             human_review_status as humanReviewStatus,
+             human_review_login as humanReviewLogin,
              ci_status as ciStatus,
              ci_workflow_name as ciWorkflowName,
              ci_url as ciUrl
@@ -311,6 +326,21 @@ export class StateDb {
       WHERE repo = ? AND pr_number = ?
     `);
     stmt.run(status, repo, prNumber);
+  }
+
+  updateHumanReviewStatus(
+    repo: string,
+    prNumber: number,
+    status: 'approved' | 'changes_requested' | 'none',
+    login: string | null
+  ): void {
+    this.savePrStatus(repo, prNumber);
+    const stmt = this.db.prepare(`
+      UPDATE pr_status
+      SET human_review_status = ?, human_review_login = ?
+      WHERE repo = ? AND pr_number = ?
+    `);
+    stmt.run(status, login, repo, prNumber);
   }
 
   updateCiStatus(

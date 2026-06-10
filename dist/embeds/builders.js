@@ -33,6 +33,9 @@ export function buildPrEmbed(pr, ci, reviews) {
         reviewLines.push(`• Copilot: ${copilotStatus}`);
         const agentStatus = getAgentReviewStatus(reviews.agentReview);
         reviewLines.push(`• Agent Review: ${agentStatus}`);
+        if (reviews.humanReview && reviews.humanReview !== 'none') {
+            reviewLines.push(`• Human: ${getHumanReviewStatus(reviews.humanReview, reviews.humanReviewer)}`);
+        }
     }
     else {
         reviewLines.push('• Copilot: ⏳ Pending');
@@ -70,6 +73,10 @@ export function buildPrEmbed(pr, ci, reviews) {
             copilotComments: reviews?.copilotComments,
             agent: reviews?.agentReview ?? 'pending',
         };
+        if (reviews?.humanReview && reviews.humanReview !== 'none') {
+            footerData.human = reviews.humanReview;
+            footerData.humanBy = reviews.humanReviewer;
+        }
         embed.setFooter({ text: encodeFooter(footerData) });
     }
     return embed;
@@ -106,16 +113,18 @@ export function buildCiFailureReply(ci, failedSteps) {
     // Belt-and-suspenders: never exceed the message limit regardless of inputs
     return reply.length > MESSAGE_LIMIT ? reply.substring(0, MESSAGE_LIMIT - 1) + '…' : reply;
 }
-export function buildReviewReply(type, status, comments, url) {
+export function buildReviewReply(type, status, comments, url, reviewer) {
     if (type === 'copilot') {
         const commentText = comments ? ` (${comments} comments)` : '';
         return `🤖 Copilot reviewed${commentText}`;
     }
-    else {
-        const statusEmoji = status === 'approved' ? '✅' : '⚠️';
-        const link = url ? ` [View](${url})` : '';
-        return `🔍 Agent review: ${statusEmoji} ${capitalize(status)}${link}`;
+    const statusEmoji = status === 'approved' ? '✅' : '⚠️';
+    const link = url ? ` [View](${url})` : '';
+    if (type === 'human') {
+        const label = status === 'changes_requested' ? 'Changes requested' : capitalize(status);
+        return `👤 Review by @${reviewer}: ${statusEmoji} ${label}${link}`;
     }
+    return `🔍 Agent review: ${statusEmoji} ${capitalize(status)}${link}`;
 }
 export function buildMergedReply(mergedBy, baseBranch) {
     const byText = mergedBy ? ` by @${mergedBy}` : '';
@@ -331,6 +340,10 @@ function getPrColor(state, draft) {
         case 'closed':
             return Colors.Red;
     }
+}
+function getHumanReviewStatus(status, reviewer) {
+    const label = status === 'approved' ? '✅ Approved' : '⚠️ Changes requested';
+    return reviewer ? `${label} by @${reviewer}` : label;
 }
 function getAgentReviewStatus(status) {
     switch (status) {

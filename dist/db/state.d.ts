@@ -33,6 +33,8 @@ export interface PrStatus {
     copilotStatus: 'pending' | 'reviewed';
     copilotComments: number;
     agentReviewStatus: 'pending' | 'approved' | 'changes_requested' | 'none';
+    humanReviewStatus: 'approved' | 'changes_requested' | 'none';
+    humanReviewLogin: string | null;
     ciStatus: 'pending' | 'running' | 'success' | 'failure' | 'cancelled';
     ciWorkflowName: string | null;
     ciUrl: string | null;
@@ -70,6 +72,7 @@ export declare class StateDb {
     savePrStatus(repo: string, prNumber: number): void;
     updateCopilotStatus(repo: string, prNumber: number, status: 'pending' | 'reviewed', comments: number): void;
     updateAgentReviewStatus(repo: string, prNumber: number, status: 'pending' | 'approved' | 'changes_requested' | 'none'): void;
+    updateHumanReviewStatus(repo: string, prNumber: number, status: 'approved' | 'changes_requested' | 'none', login: string | null): void;
     updateCiStatus(repo: string, prNumber: number, status: 'pending' | 'running' | 'success' | 'failure' | 'cancelled', workflowName?: string, url?: string): void;
     getPrData(repo: string, prNumber: number): StoredPrData | null;
     savePrData(data: StoredPrData): void;

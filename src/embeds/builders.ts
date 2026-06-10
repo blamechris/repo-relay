@@ -37,6 +37,10 @@ export interface ReviewStatus {
   copilot: 'pending' | 'reviewed';
   copilotComments?: number;
   agentReview: 'pending' | 'approved' | 'changes_requested' | 'none';
+  /** Latest human verdict (#146). Unlike bot reviews there is no 'pending'
+   * state — most PRs never receive one, so 'none'/undefined hides the line. */
+  humanReview?: 'approved' | 'changes_requested' | 'none';
+  humanReviewer?: string;
 }
 
 export function buildPrEmbed(
@@ -81,6 +85,10 @@ export function buildPrEmbed(
 
     const agentStatus = getAgentReviewStatus(reviews.agentReview);
     reviewLines.push(`• Agent Review: ${agentStatus}`);
+
+    if (reviews.humanReview && reviews.humanReview !== 'none') {
+      reviewLines.push(`• Human: ${getHumanReviewStatus(reviews.humanReview, reviews.humanReviewer)}`);
+    }
   } else {
     reviewLines.push('• Copilot: ⏳ Pending');
     reviewLines.push('• Agent Review: ⏳ Pending');
@@ -121,6 +129,10 @@ export function buildPrEmbed(
       copilotComments: reviews?.copilotComments,
       agent: reviews?.agentReview ?? 'pending',
     };
+    if (reviews?.humanReview && reviews.humanReview !== 'none') {
+      footerData.human = reviews.humanReview;
+      footerData.humanBy = reviews.humanReviewer;
+    }
     embed.setFooter({ text: encodeFooter(footerData) });
   }
 
@@ -176,19 +188,23 @@ export function buildCiFailureReply(ci: CiStatus, failedSteps: FailedStep[]): st
 }
 
 export function buildReviewReply(
-  type: 'copilot' | 'agent',
+  type: 'copilot' | 'agent' | 'human',
   status: string,
   comments?: number,
-  url?: string
+  url?: string,
+  reviewer?: string
 ): string {
   if (type === 'copilot') {
     const commentText = comments ? ` (${comments} comments)` : '';
     return `🤖 Copilot reviewed${commentText}`;
-  } else {
-    const statusEmoji = status === 'approved' ? '✅' : '⚠️';
-    const link = url ? ` [View](${url})` : '';
-    return `🔍 Agent review: ${statusEmoji} ${capitalize(status)}${link}`;
   }
+  const statusEmoji = status === 'approved' ? '✅' : '⚠️';
+  const link = url ? ` [View](${url})` : '';
+  if (type === 'human') {
+    const label = status === 'changes_requested' ? 'Changes requested' : capitalize(status);
+    return `👤 Review by @${reviewer}: ${statusEmoji} ${label}${link}`;
+  }
+  return `🔍 Agent review: ${statusEmoji} ${capitalize(status)}${link}`;
 }
 
 export function buildMergedReply(mergedBy?: string, baseBranch?: string): string {
@@ -510,6 +526,14 @@ function getPrColor(
   }
 }
 
+function getHumanReviewStatus(
+  status: 'approved' | 'changes_requested',
+  reviewer?: string
+): string {
+  const label = status === 'approved' ? '✅ Approved' : '⚠️ Changes requested';
+  return reviewer ? `${label} by @${reviewer}` : label;
+}
+
 function getAgentReviewStatus(status: ReviewStatus['agentReview']): string {
   switch (status) {
     case 'approved':
@@ -630,6 +654,9 @@ export interface PrFooterMetadata {
   copilot: ReviewStatus['copilot'];
   copilotComments?: number;
   agent: ReviewStatus['agentReview'];
+  /** Present only when a human verdict exists — pre-#146 footers lack it. */
+  human?: 'approved' | 'changes_requested';
+  humanBy?: string;
 }
 
 export interface IssueFooterMetadata {

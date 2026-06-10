@@ -233,6 +233,8 @@ export function buildEmbedWithStatus(db, repo, prNumber) {
         copilot: status?.copilotStatus ?? 'pending',
         copilotComments: status?.copilotComments ?? 0,
         agentReview: status?.agentReviewStatus ?? 'pending',
+        humanReview: status?.humanReviewStatus ?? 'none',
+        humanReviewer: status?.humanReviewLogin ?? undefined,
     };
     const ci = {
         status: status?.ciStatus ?? 'pending',

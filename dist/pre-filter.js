@@ -4,6 +4,7 @@
  * These checks approximate the corresponding handlers' early-exit conditions
  * so we avoid burning a gateway session for payloads likely to be discarded.
  */
+import { CASCADE_REVIEW_ASSOCIATIONS } from './handlers/review.js';
 /**
  * Returns a human-readable skip reason if the event can be discarded
  * without connecting to Discord, or `null` if it should be processed.
@@ -91,10 +92,15 @@ export function shouldSkipEvent(eventData) {
             if (!eventData.payload.review || !eventData.payload.pull_request || !eventData.payload.repository) {
                 return 'pull_request_review: malformed payload';
             }
-            // Ignore owner comment replies to avoid notification cascades
-            const { review, repository } = eventData.payload;
-            if (review.user?.login === repository.owner?.login && review.state === 'commented') {
-                return 'pull_request_review: owner comment reply';
+            // Ignore collaborator comment replies to avoid notification cascades
+            // (#13, #146) — Bot reviews (Copilot) always pass through. Optional
+            // chaining: a malformed payload (missing user) must skip the filter
+            // cleanly, not throw before Discord connect.
+            const { review } = eventData.payload;
+            if (review.state === 'commented' &&
+                review.user?.type === 'User' &&
+                CASCADE_REVIEW_ASSOCIATIONS.has(review.author_association)) {
+                return 'pull_request_review: collaborator comment reply';
             }
             return null;
         }

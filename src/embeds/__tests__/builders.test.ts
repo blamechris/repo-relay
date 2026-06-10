@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildPrEmbed, buildIssueEmbed, buildPrComponents, buildCiReply, buildCiFailureReply, CiStatus, parseFooterMetadata, extractRepoFromUrl, type PrFooterMetadata } from '../builders.js';
+import { buildPrEmbed, buildIssueEmbed, buildPrComponents, buildCiReply, buildCiFailureReply, buildReviewReply, CiStatus, ReviewStatus, parseFooterMetadata, extractRepoFromUrl, type PrFooterMetadata, type PrData } from '../builders.js';
 import { ButtonStyle } from 'discord.js';
 
 describe('title truncation', () => {
@@ -239,6 +239,101 @@ describe('footer metadata', () => {
 
   it('parseFooterMetadata returns null for invalid JSON', () => {
     expect(parseFooterMetadata('repo-relay:v1:{invalid')).toBeNull();
+  });
+});
+
+describe('human review display (#146)', () => {
+  const basePr: PrData = {
+    number: 8,
+    title: 'Test PR',
+    url: 'https://github.com/owner/repo/pull/8',
+    author: 'user',
+    authorUrl: 'https://github.com/user',
+    branch: 'feat/x',
+    baseBranch: 'main',
+    additions: 1,
+    deletions: 1,
+    changedFiles: 1,
+    state: 'open',
+    draft: false,
+    createdAt: new Date().toISOString(),
+  };
+
+  function reviewsField(reviews?: ReviewStatus): string {
+    const embed = buildPrEmbed(basePr, undefined, reviews);
+    return embed.data.fields!.find(f => f.name === '📋 Reviews')!.value;
+  }
+
+  it('shows an approved human review with the reviewer login', () => {
+    const value = reviewsField({
+      copilot: 'pending',
+      agentReview: 'pending',
+      humanReview: 'approved',
+      humanReviewer: 'alice',
+    });
+    expect(value).toContain('• Human: ✅ Approved by @alice');
+  });
+
+  it('shows a changes-requested human review with the reviewer login', () => {
+    const value = reviewsField({
+      copilot: 'pending',
+      agentReview: 'pending',
+      humanReview: 'changes_requested',
+      humanReviewer: 'bob',
+    });
+    expect(value).toContain('• Human: ⚠️ Changes requested by @bob');
+  });
+
+  it('omits the reviewer suffix when no login is known', () => {
+    const value = reviewsField({
+      copilot: 'pending',
+      agentReview: 'pending',
+      humanReview: 'approved',
+    });
+    expect(value).toContain('• Human: ✅ Approved');
+    expect(value).not.toContain('by @');
+  });
+
+  it('omits the human line when no human review exists', () => {
+    expect(reviewsField({ copilot: 'pending', agentReview: 'pending' })).not.toContain('Human');
+    expect(reviewsField({ copilot: 'pending', agentReview: 'pending', humanReview: 'none' })).not.toContain('Human');
+    expect(reviewsField(undefined)).not.toContain('Human');
+  });
+
+  it('encodes the human review in the footer metadata', () => {
+    const embed = buildPrEmbed(basePr, undefined, {
+      copilot: 'pending',
+      agentReview: 'pending',
+      humanReview: 'changes_requested',
+      humanReviewer: 'alice',
+    });
+    const meta = parseFooterMetadata(embed.data.footer!.text) as PrFooterMetadata;
+    expect(meta.human).toBe('changes_requested');
+    expect(meta.humanBy).toBe('alice');
+  });
+
+  it('omits human fields from the footer when no human review exists', () => {
+    const embed = buildPrEmbed(basePr, undefined, { copilot: 'pending', agentReview: 'pending' });
+    const meta = parseFooterMetadata(embed.data.footer!.text) as PrFooterMetadata;
+    expect(meta.human).toBeUndefined();
+    expect(meta.humanBy).toBeUndefined();
+  });
+});
+
+describe('buildReviewReply human variant (#146)', () => {
+  it('formats an approved review with reviewer and link', () => {
+    const reply = buildReviewReply('human', 'approved', undefined, 'https://github.com/o/r/pull/8#review-1', 'alice');
+    expect(reply).toBe('👤 Review by @alice: ✅ Approved [View](https://github.com/o/r/pull/8#review-1)');
+  });
+
+  it('formats a changes-requested review', () => {
+    const reply = buildReviewReply('human', 'changes_requested', undefined, 'https://github.com/o/r/pull/8#review-2', 'bob');
+    expect(reply).toBe('👤 Review by @bob: ⚠️ Changes requested [View](https://github.com/o/r/pull/8#review-2)');
+  });
+
+  it('omits the link when no URL is given', () => {
+    const reply = buildReviewReply('human', 'approved', undefined, undefined, 'alice');
+    expect(reply).toBe('👤 Review by @alice: ✅ Approved');
   });
 });
 

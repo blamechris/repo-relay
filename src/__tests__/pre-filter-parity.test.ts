@@ -169,6 +169,7 @@ describe('pre-filter / handler parity', () => {
         body: 'lgtm',
         state: 'approved',
         html_url: 'https://github.com/owner/repo/pull/7#review-1',
+        author_association: 'CONTRIBUTOR',
       },
       pull_request: { number: 7 },
       repository: { full_name: 'owner/repo', owner: { login: 'owner' } },

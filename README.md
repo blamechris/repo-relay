@@ -7,7 +7,7 @@ GitHub-Discord integration bot that tracks PRs, CI, issues, and releases with th
 - **PR Notifications** - Creates a Discord embed per PR with a thread for updates
 - **Threaded Updates** - All updates (pushes, CI, reviews, merge) go to the PR's thread
 - **CI Status** - Shows workflow status (pending, running, passed, failed)
-- **Review Detection** - Detects Copilot and agent-review via piggyback on push/CI events
+- **Review Detection** - Detects Copilot and agent-review via piggyback on push/CI events; human `approved`/`changes_requested` reviews post to the thread and update the embed
 - **Issue & Release Notifications** - Separate channels for different event types
 - **Persistent State** - SQLite tracks PR ↔ message mappings
 - **Stale Message Handling** - Gracefully recovers if Discord messages are deleted
@@ -302,7 +302,7 @@ jobs:
 
 **Symptom:** Replying to Copilot review comments triggers more notifications.
 
-**Fix:** On **personal repos**, this is handled automatically — the review handler filters out `pull_request_review` events where the reviewer is the repo owner and the review state is `commented`. On **org-owned repos** the automatic filter does not apply (the repo owner is the org, never a human reviewer), so add a workflow-level `if` filter for now — see [#13](https://github.com/blamechris/repo-relay/issues/13) and [#146](https://github.com/blamechris/repo-relay/issues/146).
+**Fix:** Handled automatically on both personal and org-owned repos — the bot drops `pull_request_review` events where the review state is `commented` and the reviewer's `author_association` is `OWNER`, `MEMBER`, or `COLLABORATOR` (the events GitHub fires when someone with write access replies to review comments). No workflow-level `if` filter is needed. Human `approved`/`changes_requested` reviews are never filtered — they post to the PR thread and update the embed. See [#13](https://github.com/blamechris/repo-relay/issues/13) and [#146](https://github.com/blamechris/repo-relay/issues/146).
 
 ### First PR Shows Red X
 

@@ -62,6 +62,9 @@ export async function getExistingPrMessage(db, channel, repo, prNumber) {
             if (meta.agent !== 'pending') {
                 db.updateAgentReviewStatus(repo, prNumber, meta.agent);
             }
+            if (meta.human) {
+                db.updateHumanReviewStatus(repo, prNumber, meta.human, meta.humanBy ?? null);
+            }
             recoveredStatus = true;
         }
     }
