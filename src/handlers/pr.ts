@@ -2,8 +2,8 @@
  * Pull Request event handler
  */
 
-import { Client, TextChannel, ThreadChannel, ChannelType } from 'discord.js';
-import { StateDb, StoredPrData, PrMessage } from '../db/state.js';
+import { Client, TextChannel, ThreadChannel } from 'discord.js';
+import { StateDb, PrMessage } from '../db/state.js';
 import { buildPrEmbed, buildPrComponents, buildMergedReply, buildClosedReply, buildPushReply, PrData, ReviewStatus, CiStatus } from '../embeds/builders.js';
 import { getChannelForEvent, ChannelConfig } from '../config/channels.js';
 import { getExistingPrMessage } from '../discord/lookup.js';

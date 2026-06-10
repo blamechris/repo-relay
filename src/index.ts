@@ -6,7 +6,7 @@
 
 import { Client, GatewayIntentBits, GuildChannel, PermissionsBitField, REST, Routes } from 'discord.js';
 import { StateDb } from './db/state.js';
-import { getChannelConfig, type ChannelConfig } from './config/channels.js';
+import { type ChannelConfig } from './config/channels.js';
 import {
   handlePrEvent,
   handleCiEvent,
@@ -28,7 +28,6 @@ import {
   type DependabotAlertPayload,
   type SecretScanningAlertPayload,
   type CodeScanningAlertPayload,
-  type SecurityAlertPayload,
 } from './handlers/index.js';
 import { checkForReviews } from './github/reviews.js';
 import { safeErrorMessage } from './utils/errors.js';
