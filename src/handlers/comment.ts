@@ -4,12 +4,11 @@
 
 import { Client, TextChannel } from 'discord.js';
 import { StateDb } from '../db/state.js';
-import { buildReviewReply, buildPrEmbed, buildPrComponents } from '../embeds/builders.js';
+import { buildReviewReply } from '../embeds/builders.js';
 import { getChannelForEvent, ChannelConfig } from '../config/channels.js';
-import { buildEmbedWithStatus, getOrCreateThread } from './pr.js';
+import { updatePrEmbedAndNotify } from './pr.js';
 import { getExistingPrMessage } from '../discord/lookup.js';
 import { withRetry } from '../utils/retry.js';
-import { isUnknownMessageError } from '../utils/discord-errors.js';
 import {
   AGENT_REVIEW_PATTERNS,
   APPROVED_PATTERNS,
@@ -97,32 +96,14 @@ export async function handleCommentEvent(
     status = 'changes_requested';
   }
 
-  // Update status in DB (before try so it persists even if message is stale)
+  // Update status in DB first so it persists even if the message is stale
   db.updateAgentReviewStatus(repo, prNumber, status);
 
-  try {
-    const message = await withRetry(() => channel.messages.fetch(existing.messageId));
-
-    // Rebuild and edit the embed with updated status
-    const statusData = buildEmbedWithStatus(db, repo, prNumber);
-    if (statusData) {
-      const embed = buildPrEmbed(statusData.prData, statusData.ci, statusData.reviews);
-      const components = [buildPrComponents(statusData.prData.url, statusData.ci.url)];
-      await withRetry(() => message.edit({ embeds: [embed], components }));
-
-      // Post to thread
-      const thread = await getOrCreateThread(channel, db, repo, statusData.prData, existing);
-      const reply = buildReviewReply('agent', status, undefined, comment.html_url);
-      await withRetry(() => thread.send(reply));
-    }
-
+  const result = await updatePrEmbedAndNotify(
+    channel, db, repo, prNumber, existing,
+    buildReviewReply('agent', status, undefined, comment.html_url)
+  );
+  if (!result.stale) {
     db.updatePrMessageTimestamp(repo, prNumber);
-  } catch (error: unknown) {
-    if (isUnknownMessageError(error)) {
-      console.log(`[repo-relay] Stale message for PR #${prNumber}, clearing DB entry`);
-      db.deletePrMessage(repo, prNumber);
-    } else {
-      throw error;
-    }
   }
 }

@@ -2,13 +2,17 @@
  * Pull Request event handler
  */
 
-import { Client, TextChannel, ThreadChannel } from 'discord.js';
+import { Client, Message, TextChannel, ThreadChannel } from 'discord.js';
 import { StateDb, PrMessage } from '../db/state.js';
 import { buildPrEmbed, buildPrComponents, buildMergedReply, buildClosedReply, buildPushReply, buildThreadName, PrData, ReviewStatus, CiStatus } from '../embeds/builders.js';
 import { getChannelForEvent, ChannelConfig } from '../config/channels.js';
 import { getExistingPrMessage } from '../discord/lookup.js';
+import { getOrCreateMessageThread } from '../discord/threads.js';
 import { withRetry } from '../utils/retry.js';
-import { isThreadAlreadyCreatedError, isUnknownMessageError } from '../utils/discord-errors.js';
+import { isUnknownMessageError } from '../utils/discord-errors.js';
+
+// Re-exported for compatibility (historically defined here)
+export { fetchAndUnarchiveThread } from '../discord/threads.js';
 
 export interface PrEventPayload {
   action: 'opened' | 'closed' | 'reopened' | 'synchronize' | 'edited' | 'ready_for_review' | 'converted_to_draft';
@@ -125,49 +129,11 @@ async function handlePrOpened(
   // cycles all route here — reuse the existing embed instead of creating a
   // duplicate (which would orphan the original message and thread forever)
   const existing = await getExistingPrMessage(db, channel, repo, pr.number);
-  if (existing) {
-    try {
-      const message = await withRetry(() => channel.messages.fetch(existing.messageId));
-      savePrDataFromPrData(db, repo, pr);
-      db.savePrStatus(repo, pr.number);
-      const statusData = buildEmbedWithStatus(db, repo, pr.number);
-      const embed = statusData
-        ? buildPrEmbed(statusData.prData, statusData.ci, statusData.reviews)
-        : buildPrEmbed(pr);
-      const components = [buildPrComponents(pr.url, statusData?.ci.url)];
-      await withRetry(() => message.edit({ embeds: [embed], components }));
-      db.updatePrMessageTimestamp(repo, pr.number);
-      return;
-    } catch (error: unknown) {
-      // Message was deleted from Discord - clear stale DB entry
-      const errMsg = error instanceof Error ? error.message : String(error);
-      if (errMsg.includes('Unknown Message')) {
-        console.log(`[repo-relay] Stale message for PR #${pr.number}, creating new one`);
-        db.deletePrMessage(repo, pr.number);
-      } else {
-        throw error;
-      }
-    }
+  if (existing && await editExistingPrMessage(channel, db, repo, pr, existing, { saveStatus: true })) {
+    return;
   }
 
-  const embed = buildPrEmbed(pr);
-  const components = [buildPrComponents(pr.url)];
-  const message = await withRetry(() => channel.send({ embeds: [embed], components }));
-
-  // Create a thread for updates
-  const thread = await withRetry(() => message.startThread({
-    name: buildThreadName('PR', pr.number, pr.title),
-    autoArchiveDuration: 1440, // 24 hours
-  }));
-
-  db.savePrMessage(repo, pr.number, channel.id, message.id, thread.id);
-
-  // Save PR data for future embed rebuilding
-  savePrDataFromPrData(db, repo, pr);
-  db.savePrStatus(repo, pr.number);
-
-  // Post initial message in thread
-  await withRetry(() => thread.send(`📋 Updates for PR #${pr.number} will appear here.`));
+  await createPrMessageWithThread(channel, db, repo, pr);
 }
 
 async function handlePrClosed(
@@ -176,58 +142,19 @@ async function handlePrClosed(
   repo: string,
   pr: PrData
 ): Promise<void> {
-  let existing = await getExistingPrMessage(db, channel, repo, pr.number);
+  const existing = await getExistingPrMessage(db, channel, repo, pr.number);
 
-  if (existing) {
-    try {
-      // Update the original embed with full status
-      const messageId = existing.messageId;
-      const message = await withRetry(() => channel.messages.fetch(messageId));
-      savePrDataFromPrData(db, repo, pr);
-      const statusData = buildEmbedWithStatus(db, repo, pr.number);
-      const embed = statusData
-        ? buildPrEmbed(statusData.prData, statusData.ci, statusData.reviews)
-        : buildPrEmbed(pr);
-      const components = [buildPrComponents(pr.url, statusData?.ci.url)];
-      await withRetry(() => message.edit({ embeds: [embed], components }));
-
-      // Post to thread
-      const thread = await getOrCreateThread(channel, db, repo, pr, existing);
-      const reply = pr.state === 'merged'
-        ? buildMergedReply(pr.mergedBy, pr.baseBranch)
-        : buildClosedReply();
-
-      await withRetry(() => thread.send(reply));
-      db.updatePrMessageTimestamp(repo, pr.number);
-      return;
-    } catch (error: unknown) {
-      // Message was deleted from Discord - clear stale DB entry
-      if (isUnknownMessageError(error)) {
-        console.log(`[repo-relay] Stale message for PR #${pr.number}, creating new one`);
-        db.deletePrMessage(repo, pr.number);
-        existing = null;
-      } else {
-        throw error;
-      }
-    }
+  // Update the original embed with full status, and post the close/merge
+  // reply to the thread
+  const reply = pr.state === 'merged'
+    ? buildMergedReply(pr.mergedBy, pr.baseBranch)
+    : buildClosedReply();
+  if (existing && await editExistingPrMessage(channel, db, repo, pr, existing, { threadReply: reply })) {
+    return;
   }
 
-  if (!existing) {
-    // No existing message, create one showing the final state
-    const embed = buildPrEmbed(pr);
-    const components = [buildPrComponents(pr.url)];
-    const message = await withRetry(() => channel.send({ embeds: [embed], components }));
-
-    // Create a thread
-    const thread = await withRetry(() => message.startThread({
-      name: buildThreadName('PR', pr.number, pr.title),
-      autoArchiveDuration: 1440,
-    }));
-
-    db.savePrMessage(repo, pr.number, channel.id, message.id, thread.id);
-    savePrDataFromPrData(db, repo, pr);
-    db.savePrStatus(repo, pr.number);
-  }
+  // No existing message (or it was stale), create one showing the final state
+  await createPrMessageWithThread(channel, db, repo, pr, { seedThread: false });
 }
 
 async function handlePrPush(
@@ -257,22 +184,8 @@ async function handlePrPush(
 
   // If no message exists yet (PR opened before bot was set up), create one
   if (!existing) {
-    const embed = buildPrEmbed(pr);
-    const components = [buildPrComponents(pr.url)];
-    const message = await withRetry(() => channel.send({ embeds: [embed], components }));
-
-    // Create a thread for updates
-    const thread = await withRetry(() => message.startThread({
-      name: buildThreadName('PR', pr.number, pr.title),
-      autoArchiveDuration: 1440,
-    }));
-
-    db.savePrMessage(repo, pr.number, channel.id, message.id, thread.id);
-    savePrDataFromPrData(db, repo, pr);
-    db.savePrStatus(repo, pr.number);
+    const { message, thread } = await createPrMessageWithThread(channel, db, repo, pr);
     existing = { repo, prNumber: pr.number, channelId: channel.id, messageId: message.id, threadId: thread.id, createdAt: '', lastUpdated: '' };
-
-    await withRetry(() => thread.send(`📋 Updates for PR #${pr.number} will appear here.`));
   } else {
     // Update PR data for future rebuilds
     savePrDataFromPrData(db, repo, pr);
@@ -299,50 +212,95 @@ async function handlePrUpdated(
   repo: string,
   pr: PrData
 ): Promise<void> {
-  let existing = await getExistingPrMessage(db, channel, repo, pr.number);
-
-  if (existing) {
-    try {
-      const messageId = existing.messageId;
-      const message = await withRetry(() => channel.messages.fetch(messageId));
-      savePrDataFromPrData(db, repo, pr);
-      const statusData = buildEmbedWithStatus(db, repo, pr.number);
-      const embed = statusData
-        ? buildPrEmbed(statusData.prData, statusData.ci, statusData.reviews)
-        : buildPrEmbed(pr);
-      const components = [buildPrComponents(pr.url, statusData?.ci.url)];
-      await withRetry(() => message.edit({ embeds: [embed], components }));
-      db.updatePrMessageTimestamp(repo, pr.number);
-      return;
-    } catch (error: unknown) {
-      if (isUnknownMessageError(error)) {
-        console.log(`[repo-relay] Stale message for PR #${pr.number}, creating new one`);
-        db.deletePrMessage(repo, pr.number);
-        existing = null;
-      } else {
-        throw error;
-      }
-    }
+  const existing = await getExistingPrMessage(db, channel, repo, pr.number);
+  if (existing && await editExistingPrMessage(channel, db, repo, pr, existing)) {
+    return;
   }
 
-  if (!existing) {
-    // No message exists yet (PR opened before bot was set up), create one
-    const embed = buildPrEmbed(pr);
-    const components = [buildPrComponents(pr.url)];
-    const message = await withRetry(() => channel.send({ embeds: [embed], components }));
+  // No message exists yet (PR opened before bot was set up), create one
+  await createPrMessageWithThread(channel, db, repo, pr);
+}
 
-    // Create a thread for updates
-    const thread = await withRetry(() => message.startThread({
-      name: buildThreadName('PR', pr.number, pr.title),
-      autoArchiveDuration: 1440,
-    }));
-
-    db.savePrMessage(repo, pr.number, channel.id, message.id, thread.id);
+/**
+ * Edit an existing PR embed in place (rebuilding from DB status when
+ * available, falling back to the payload data) and bump its timestamp.
+ * Returns false if the message was stale (deleted on Discord) — the DB
+ * entry has been cleared and the caller should recreate the message.
+ */
+async function editExistingPrMessage(
+  channel: TextChannel,
+  db: StateDb,
+  repo: string,
+  pr: PrData,
+  existing: PrMessage,
+  options: { saveStatus?: boolean; threadReply?: string } = {}
+): Promise<boolean> {
+  try {
+    const message = await withRetry(() => channel.messages.fetch(existing.messageId));
     savePrDataFromPrData(db, repo, pr);
-    db.savePrStatus(repo, pr.number);
+    if (options.saveStatus) {
+      db.savePrStatus(repo, pr.number);
+    }
+    const statusData = buildEmbedWithStatus(db, repo, pr.number);
+    const embed = statusData
+      ? buildPrEmbed(statusData.prData, statusData.ci, statusData.reviews)
+      : buildPrEmbed(pr);
+    const components = [buildPrComponents(pr.url, statusData?.ci.url)];
+    await withRetry(() => message.edit({ embeds: [embed], components }));
 
+    const reply = options.threadReply;
+    if (reply) {
+      const thread = await getOrCreateThread(channel, db, repo, pr, existing);
+      await withRetry(() => thread.send(reply));
+    }
+
+    db.updatePrMessageTimestamp(repo, pr.number);
+    return true;
+  } catch (error: unknown) {
+    // Message was deleted from Discord - clear stale DB entry
+    if (isUnknownMessageError(error)) {
+      console.log(`[repo-relay] Stale message for PR #${pr.number}, creating new one`);
+      db.deletePrMessage(repo, pr.number);
+      return false;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Send a fresh PR embed, attach its updates thread, and persist the
+ * message/data/status rows. Pass `seedThread: false` to skip the initial
+ * thread message (e.g. closed PRs that get no further updates).
+ */
+async function createPrMessageWithThread(
+  channel: TextChannel,
+  db: StateDb,
+  repo: string,
+  pr: PrData,
+  options: { seedThread?: boolean } = {}
+): Promise<{ message: Message; thread: ThreadChannel }> {
+  const embed = buildPrEmbed(pr);
+  const components = [buildPrComponents(pr.url)];
+  const message = await withRetry(() => channel.send({ embeds: [embed], components }));
+
+  // Create a thread for updates
+  const thread = await withRetry(() => message.startThread({
+    name: buildThreadName('PR', pr.number, pr.title),
+    autoArchiveDuration: 1440, // 24 hours
+  }));
+
+  db.savePrMessage(repo, pr.number, channel.id, message.id, thread.id);
+
+  // Save PR data for future embed rebuilding
+  savePrDataFromPrData(db, repo, pr);
+  db.savePrStatus(repo, pr.number);
+
+  if (options.seedThread !== false) {
+    // Post initial message in thread
     await withRetry(() => thread.send(`📋 Updates for PR #${pr.number} will appear here.`));
   }
+
+  return { message, thread };
 }
 
 // Helper to save PR data from PrData interface
@@ -405,6 +363,59 @@ export function buildEmbedWithStatus(db: StateDb, repo: string, prNumber: number
   return { prData, reviews, ci };
 }
 
+export interface PrEmbedUpdateResult {
+  /** The Discord message was deleted; the stale DB entry has been cleared. */
+  stale: boolean;
+  /** A thread message was posted. */
+  posted: boolean;
+}
+
+/**
+ * Fetch a PR's Discord message, rebuild its embed from current DB status,
+ * and optionally post `threadMessage` to the PR's thread. `beforeRebuild`
+ * runs between the message fetch and the embed rebuild, so status writes
+ * land in the rebuilt embed. A stale message (deleted on Discord) clears
+ * the DB entry; any other error propagates.
+ */
+export async function updatePrEmbedAndNotify(
+  channel: TextChannel,
+  db: StateDb,
+  repo: string,
+  prNumber: number,
+  existing: PrMessage,
+  threadMessage?: string,
+  beforeRebuild?: () => void
+): Promise<PrEmbedUpdateResult> {
+  try {
+    const message = await withRetry(() => channel.messages.fetch(existing.messageId));
+    beforeRebuild?.();
+
+    // Rebuild and edit the embed with updated status
+    const statusData = buildEmbedWithStatus(db, repo, prNumber);
+    let posted = false;
+    if (statusData) {
+      const embed = buildPrEmbed(statusData.prData, statusData.ci, statusData.reviews);
+      const components = [buildPrComponents(statusData.prData.url, statusData.ci.url)];
+      await withRetry(() => message.edit({ embeds: [embed], components }));
+
+      if (threadMessage) {
+        // Post to thread
+        const thread = await getOrCreateThread(channel, db, repo, statusData.prData, existing);
+        await withRetry(() => thread.send(threadMessage));
+        posted = true;
+      }
+    }
+    return { stale: false, posted };
+  } catch (error: unknown) {
+    if (isUnknownMessageError(error)) {
+      console.log(`[repo-relay] Stale message for PR #${prNumber}, clearing DB entry`);
+      db.deletePrMessage(repo, prNumber);
+      return { stale: true, posted: false };
+    }
+    throw error;
+  }
+}
+
 // Helper to get existing thread or create one if it doesn't exist
 export async function getOrCreateThread(
   channel: TextChannel,
@@ -413,61 +424,11 @@ export async function getOrCreateThread(
   pr: PrData,
   existing: PrMessage
 ): Promise<ThreadChannel> {
-  // A message thread's ID equals its parent message's ID, so even when the
-  // DB has no threadId (channel-search recovery can't see archived threads —
-  // Message#thread is cache-only), the thread is still fetchable directly.
-  const threadId = existing.threadId ?? existing.messageId;
-  const recovered = await fetchAndUnarchiveThread(channel, threadId);
-  if (recovered) {
-    if (!existing.threadId) {
-      db.updatePrThread(repo, pr.number, recovered.id);
-    }
-    return recovered;
-  }
-
-  // Create a new thread on the message
-  const message = await withRetry(() => channel.messages.fetch(existing.messageId));
-  let thread: ThreadChannel;
-  try {
-    thread = await withRetry(() =>
-      message.startThread({
-        name: buildThreadName('PR', pr.number, pr.title),
-        autoArchiveDuration: 1440,
-      })
-    );
-  } catch (error: unknown) {
-    // 160004: the message already has a thread we couldn't see — fetch it
-    if (isThreadAlreadyCreatedError(error)) {
-      const fallback = await fetchAndUnarchiveThread(channel, existing.messageId);
-      if (fallback) {
-        db.updatePrThread(repo, pr.number, fallback.id);
-        return fallback;
-      }
-    }
-    throw error;
-  }
-
-  // Update the database with the new thread ID
-  db.updatePrThread(repo, pr.number, thread.id);
-
-  await withRetry(() => thread.send(`📋 Updates for PR #${pr.number} will appear here.`));
-
-  return thread;
-}
-
-/** Fetch a thread by ID and unarchive it; null if it doesn't exist. */
-export async function fetchAndUnarchiveThread(
-  channel: TextChannel,
-  threadId: string
-): Promise<ThreadChannel | null> {
-  try {
-    const thread = await withRetry(() => channel.threads.fetch(threadId));
-    if (!thread) return null;
-    if (thread.archived) {
-      await withRetry(async () => { await thread.setArchived(false); });
-    }
-    return thread;
-  } catch {
-    return null;
-  }
+  return getOrCreateMessageThread(
+    channel,
+    existing,
+    buildThreadName('PR', pr.number, pr.title),
+    `📋 Updates for PR #${pr.number} will appear here.`,
+    (threadId) => db.updatePrThread(repo, pr.number, threadId)
+  );
 }

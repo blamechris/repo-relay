@@ -2,12 +2,11 @@
  * CI/Workflow event handler
  */
 import { TextChannel } from 'discord.js';
-import { buildCiReply, buildCiFailureReply, buildPrEmbed, buildPrComponents } from '../embeds/builders.js';
+import { buildCiReply, buildCiFailureReply } from '../embeds/builders.js';
 import { getChannelForEvent } from '../config/channels.js';
-import { buildEmbedWithStatus, getOrCreateThread } from './pr.js';
+import { updatePrEmbedAndNotify } from './pr.js';
 import { getExistingPrMessage } from '../discord/lookup.js';
 import { withRetry } from '../utils/retry.js';
-import { isUnknownMessageError } from '../utils/discord-errors.js';
 import { fetchFailedSteps } from '../github/ci.js';
 export async function handleCiEvent(client, db, channelConfig, payload, githubToken) {
     const { workflow_run: run, repository } = payload;
@@ -46,40 +45,13 @@ export async function handleCiEvent(client, db, channelConfig, payload, githubTo
         // Update CI status in DB
         db.updateCiStatus(repo, pr.number, ciStatus.status, run.name, run.html_url);
         console.log(`[repo-relay] Updated CI status to ${ciStatus.status}`);
-        try {
-            const message = await withRetry(() => channel.messages.fetch(existing.messageId));
-            console.log(`[repo-relay] Fetched Discord message`);
-            // Rebuild and edit the embed with updated status
-            const statusData = buildEmbedWithStatus(db, repo, pr.number);
-            if (statusData) {
-                console.log(`[repo-relay] Rebuilding embed with CI: ${statusData.ci.status}`);
-                const embed = buildPrEmbed(statusData.prData, statusData.ci, statusData.reviews);
-                const components = [buildPrComponents(statusData.prData.url, statusData.ci.url)];
-                await withRetry(() => message.edit({ embeds: [embed], components }));
-                console.log(`[repo-relay] Embed updated successfully`);
-                // Only post to thread for completed runs
-                if (payload.action === 'completed') {
-                    const thread = await getOrCreateThread(channel, db, repo, statusData.prData, existing);
-                    const reply = failedSteps
-                        ? buildCiFailureReply(ciStatus, failedSteps)
-                        : buildCiReply(ciStatus);
-                    await withRetry(() => thread.send(reply));
-                    console.log(`[repo-relay] Posted CI update to thread`);
-                    db.updatePrMessageTimestamp(repo, pr.number);
-                }
-            }
-            else {
-                console.log(`[repo-relay] No PR data found, cannot rebuild embed`);
-            }
-        }
-        catch (error) {
-            if (isUnknownMessageError(error)) {
-                console.log(`[repo-relay] Stale message for PR #${pr.number}, clearing DB entry`);
-                db.deletePrMessage(repo, pr.number);
-            }
-            else {
-                throw error;
-            }
+        // Only post to thread for completed runs
+        const result = await updatePrEmbedAndNotify(channel, db, repo, pr.number, existing, payload.action === 'completed'
+            ? (failedSteps ? buildCiFailureReply(ciStatus, failedSteps) : buildCiReply(ciStatus))
+            : undefined);
+        if (result.posted) {
+            console.log(`[repo-relay] Posted CI update to thread`);
+            db.updatePrMessageTimestamp(repo, pr.number);
         }
     }
 }

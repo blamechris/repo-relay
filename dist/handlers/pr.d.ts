@@ -5,6 +5,7 @@ import { Client, TextChannel, ThreadChannel } from 'discord.js';
 import { StateDb, PrMessage } from '../db/state.js';
 import { PrData, ReviewStatus, CiStatus } from '../embeds/builders.js';
 import { ChannelConfig } from '../config/channels.js';
+export { fetchAndUnarchiveThread } from '../discord/threads.js';
 export interface PrEventPayload {
     action: 'opened' | 'closed' | 'reopened' | 'synchronize' | 'edited' | 'ready_for_review' | 'converted_to_draft';
     pull_request: {
@@ -51,7 +52,19 @@ export declare function buildEmbedWithStatus(db: StateDb, repo: string, prNumber
     reviews: ReviewStatus;
     ci: CiStatus;
 } | null;
+export interface PrEmbedUpdateResult {
+    /** The Discord message was deleted; the stale DB entry has been cleared. */
+    stale: boolean;
+    /** A thread message was posted. */
+    posted: boolean;
+}
+/**
+ * Fetch a PR's Discord message, rebuild its embed from current DB status,
+ * and optionally post `threadMessage` to the PR's thread. `beforeRebuild`
+ * runs between the message fetch and the embed rebuild, so status writes
+ * land in the rebuilt embed. A stale message (deleted on Discord) clears
+ * the DB entry; any other error propagates.
+ */
+export declare function updatePrEmbedAndNotify(channel: TextChannel, db: StateDb, repo: string, prNumber: number, existing: PrMessage, threadMessage?: string, beforeRebuild?: () => void): Promise<PrEmbedUpdateResult>;
 export declare function getOrCreateThread(channel: TextChannel, db: StateDb, repo: string, pr: PrData, existing: PrMessage): Promise<ThreadChannel>;
-/** Fetch a thread by ID and unarchive it; null if it doesn't exist. */
-export declare function fetchAndUnarchiveThread(channel: TextChannel, threadId: string): Promise<ThreadChannel | null>;
 //# sourceMappingURL=pr.d.ts.map
