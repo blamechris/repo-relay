@@ -133,4 +133,100 @@ describe('checkForReviews', () => {
     expect(db.updateAgentReviewStatus).not.toHaveBeenCalled();
     expect(result.changed).toBe(false);
   });
+
+  it('status flip: approved → changes_requested when a newer trusted comment arrives', async () => {
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(jsonResponse([]) as never)
+      .mockResolvedValueOnce(jsonResponse([
+        // Older approval first — the newer changes-requested verdict must win
+        agentComment(1, '## Code Review Summary\n**Verdict:** Approved', '2024-01-01T00:00:00Z'),
+        agentComment(2, '## Code Review Summary\n**Verdict:** Changes requested', '2024-02-01T00:00:00Z'),
+      ]) as never);
+    const db = makeDb({ agentReviewStatus: 'approved' });
+
+    const result = await checkForReviews(db as never, 'test/repo', 7, 'token');
+
+    expect(db.updateAgentReviewStatus).toHaveBeenCalledWith('test/repo', 7, 'changes_requested');
+    expect(result.agentReviewStatus).toBe('changes_requested');
+    expect(result.changed).toBe(true);
+  });
+
+  it('most-recent comment wins regardless of array order', async () => {
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(jsonResponse([]) as never)
+      .mockResolvedValueOnce(jsonResponse([
+        // Newest delivered first — sort must still pick it by created_at
+        agentComment(2, '## Code Review Summary\n**Verdict:** Approved', '2024-02-01T00:00:00Z'),
+        agentComment(1, '## Code Review Summary\n**Verdict:** Changes requested', '2024-01-01T00:00:00Z'),
+      ]) as never);
+    const db = makeDb();
+
+    const result = await checkForReviews(db as never, 'test/repo', 7, 'token');
+
+    expect(db.updateAgentReviewStatus).toHaveBeenCalledWith('test/repo', 7, 'approved');
+    expect(result.changed).toBe(true);
+  });
+
+  it('ignores pattern-matching comments from untrusted authors', async () => {
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(jsonResponse([]) as never)
+      .mockResolvedValueOnce(jsonResponse([
+        {
+          id: 1,
+          user: { login: 'drive-by-user', type: 'User' },
+          author_association: 'NONE',
+          body: '## Code Review Summary\n**Verdict:** Approved',
+          html_url: 'https://github.com/test/repo/pull/7#comment-1',
+          created_at: '2024-01-01T00:00:00Z',
+        },
+      ]) as never);
+    const db = makeDb();
+
+    const result = await checkForReviews(db as never, 'test/repo', 7, 'token');
+
+    expect(db.updateAgentReviewStatus).not.toHaveBeenCalled();
+    expect(result.agentReviewStatus).toBe('pending');
+    expect(result.changed).toBe(false);
+  });
+
+  it('throws on invalid repo format before making any API calls', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const db = makeDb();
+
+    await expect(checkForReviews(db as never, 'not-a-repo', 7, 'token')).rejects.toThrow(
+      'Invalid repo format: expected "owner/name", got "not-a-repo"'
+    );
+    await expect(checkForReviews(db as never, 'a/b/c', 7, 'token')).rejects.toThrow('Invalid repo format');
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('network failure on both endpoints: logs warnings, resolves unchanged, never throws', async () => {
+    const logSpy = vi.spyOn(console, 'log');
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('ECONNRESET'));
+    const db = makeDb();
+
+    const result = await checkForReviews(db as never, 'test/repo', 7, 'token');
+
+    expect(result.changed).toBe(false);
+    expect(db.updateCopilotStatus).not.toHaveBeenCalled();
+    expect(db.updateAgentReviewStatus).not.toHaveBeenCalled();
+    const messages = logSpy.mock.calls.map((args) => String(args[0]));
+    expect(messages.some((m) => m.includes('Failed to check Copilot reviews'))).toBe(true);
+    expect(messages.some((m) => m.includes('Failed to check agent-review comments'))).toBe(true);
+    logSpy.mockRestore();
+  });
+
+  it('reviews endpoint failing does not stop agent-review comment detection', async () => {
+    vi.spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(new Error('boom')) // reviews
+      .mockResolvedValueOnce(jsonResponse([
+        agentComment(1, '## Code Review Summary\n**Verdict:** Approved', '2024-01-01T00:00:00Z'),
+      ]) as never);
+    const db = makeDb();
+
+    const result = await checkForReviews(db as never, 'test/repo', 7, 'token');
+
+    expect(db.updateAgentReviewStatus).toHaveBeenCalledWith('test/repo', 7, 'approved');
+    expect(result.changed).toBe(true);
+  });
 });
