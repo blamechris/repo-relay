@@ -378,8 +378,9 @@ const THREAD_NAME_LIMIT = 100; // Discord hard cap — exceeding it is an API 40
 export function buildThreadName(kind, number, title) {
     const prefix = `${kind} #${number}: `;
     const room = THREAD_NAME_LIMIT - prefix.length;
-    const fitted = title.length > room ? title.substring(0, room - 1) + '…' : title;
-    return prefix + fitted;
+    const fitted = title.length > room ? title.substring(0, Math.max(room - 1, 0)) + '…' : title;
+    // Unconditional clamp: an absurdly large entity number could leave no room
+    return (prefix + fitted).substring(0, THREAD_NAME_LIMIT);
 }
 const FIELD_VALUE_LIMIT = 1024; // Discord embed field value hard cap
 /** Join backtick-wrapped labels, capping at the field limit with a "+N more" tail. */
@@ -388,16 +389,19 @@ function formatLabelsField(labels) {
     let length = 0;
     for (let i = 0; i < labels.length; i++) {
         const piece = `\`${labels[i]}\``;
-        // Reserve room for the separator and a worst-case "+NN more" tail
-        const reserve = i < labels.length - 1 ? 12 : 0;
+        // Reserve room for the separator and the actual "+N more" tail
+        const tail = `+${labels.length - i} more`;
+        const reserve = i < labels.length - 1 ? tail.length + 1 : 0;
         if (length + piece.length + 1 + reserve > FIELD_VALUE_LIMIT) {
-            parts.push(`+${labels.length - i} more`);
+            parts.push(tail);
             break;
         }
         parts.push(piece);
         length += piece.length + 1;
     }
-    return parts.join(' ');
+    // Unconditional clamp — the cap must hold for any inputs
+    const joined = parts.join(' ');
+    return joined.length > FIELD_VALUE_LIMIT ? joined.substring(0, FIELD_VALUE_LIMIT) : joined;
 }
 function truncateDescription(text, maxLength) {
     return text.length > maxLength ? text.substring(0, maxLength - 3) + '...' : text;
