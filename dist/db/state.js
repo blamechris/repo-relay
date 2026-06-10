@@ -283,6 +283,8 @@ export class StateDb {
       ON CONFLICT(repo, pr_number) DO UPDATE SET
         title = excluded.title,
         url = excluded.url,
+        branch = excluded.branch,
+        base_branch = excluded.base_branch,
         additions = excluded.additions,
         deletions = excluded.deletions,
         changed_files = excluded.changed_files,
