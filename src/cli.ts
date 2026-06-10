@@ -5,7 +5,8 @@
  * Reads GitHub event from GITHUB_EVENT_PATH and processes it.
  */
 
-import { readFileSync } from 'fs';
+import { readFileSync, realpathSync } from 'fs';
+import { fileURLToPath } from 'url';
 import { RepoRelay, type GitHubEventPayload } from './index.js';
 import { safeErrorMessage } from './utils/errors.js';
 import { getChannelConfig } from './config/channels.js';
@@ -105,7 +106,7 @@ async function main(): Promise<void> {
   }
 }
 
-function mapGitHubEvent(
+export function mapGitHubEvent(
   eventName: string,
   payload: unknown
 ): GitHubEventPayload | null {
@@ -163,7 +164,24 @@ function mapGitHubEvent(
   }
 }
 
-main().catch((error) => {
-  console.error('[repo-relay] Unhandled error:', safeErrorMessage(error));
-  process.exit(1);
-});
+/**
+ * Only run main() when cli.js is the process entry point (the GitHub Action
+ * runs `node dist/cli.js`). Importing this module (e.g. from tests) must not
+ * trigger execution. realpath both sides so npm bin symlinks still match.
+ */
+function isEntryPoint(): boolean {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  try {
+    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (isEntryPoint()) {
+  main().catch((error) => {
+    console.error('[repo-relay] Unhandled error:', safeErrorMessage(error));
+    process.exit(1);
+  });
+}

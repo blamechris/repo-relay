@@ -77,7 +77,9 @@ export async function handlePrEvent(
     url: pr.html_url,
     author: user.login,
     authorUrl: user.html_url,
-    authorAvatar: user.avatar_url,
+    // Empty string is rejected by EmbedBuilder.setAuthor's iconURL validation
+    // (the ghost fallback has no avatar) — omit instead
+    authorAvatar: user.avatar_url || undefined,
     branch: pr.head.ref,
     baseBranch: pr.base.ref,
     additions: pr.additions,
