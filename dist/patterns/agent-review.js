@@ -28,4 +28,16 @@ export const CHANGES_REQUESTED_PATTERNS = [
     /needs.*changes/i,
     /\[x\].*request changes/i,
 ];
+/** Author associations allowed to set review state (besides bots). */
+const TRUSTED_AUTHOR_ASSOCIATIONS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
+/**
+ * Gate agent-review detection on the comment author. Without this, any
+ * commenter on a public repo can mark a PR "Agent Review: ✅ Approved" with
+ * one pattern-matching comment — poisoning the merge-readiness signal.
+ */
+export function isTrustedReviewAuthor(user, authorAssociation) {
+    if (user?.type === 'Bot')
+        return true;
+    return authorAssociation !== undefined && TRUSTED_AUTHOR_ASSOCIATIONS.has(authorAssociation);
+}
 //# sourceMappingURL=agent-review.js.map

@@ -61,6 +61,7 @@ export declare class RepoRelay {
     private config;
     private repo;
     constructor(config: RepoRelayConfig);
+    private createClient;
     connect(): Promise<void>;
     private logSessionBudget;
     validatePermissions(): Promise<void>;

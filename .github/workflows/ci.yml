@@ -6,12 +6,37 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20, 22]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run typecheck
+
+  dist-freshness:
+    # Consumers execute the committed dist/ via action.yml — verify it matches src/
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npm test
-      - run: npm run typecheck
+      - run: npm run build
+      - name: Verify committed dist/ matches src/
+        run: |
+          # --porcelain catches modified AND untracked outputs; plain diff misses new files
+          if [ -n "$(git status --porcelain dist/)" ]; then
+            echo "::error::dist/ is stale — run 'npm run build' and commit the result"
+            git status --porcelain dist/
+            git diff dist/ | head -100
+            exit 1
+          fi
