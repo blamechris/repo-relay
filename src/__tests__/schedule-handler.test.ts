@@ -22,6 +22,7 @@ vi.mock('discord.js', () => {
   const mockClient = {
     login: vi.fn(() => Promise.resolve('token')),
     once: vi.fn((_event: string, cb: () => void) => { setTimeout(cb, 0); }),
+    on: vi.fn(),
     destroy: vi.fn(),
     user: { tag: 'test-bot#1234' },
     channels: {
@@ -32,6 +33,7 @@ vi.mock('discord.js', () => {
   return {
     Client: vi.fn(() => mockClient),
     GatewayIntentBits: { Guilds: 1, GuildMessages: 2 },
+    Events: { ClientReady: 'clientReady', Error: 'error', Warn: 'warn' },
     TextChannel,
     PermissionsBitField: { Flags: {} },
     GuildChannel: class {},
