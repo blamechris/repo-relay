@@ -3,14 +3,14 @@
  *
  * Entry point for the bot library.
  */
-import { Client, GatewayIntentBits, PermissionsBitField, REST, Routes } from 'discord.js';
+import { Client, Events, GatewayIntentBits, PermissionsBitField, REST, Routes } from 'discord.js';
 import { StateDb } from './db/state.js';
 import { handlePrEvent, handleCiEvent, handleReviewEvent, handleCommentEvent, handleIssueEvent, handleReleaseEvent, handleDeploymentEvent, handlePushEvent, handleSecurityAlertEvent, } from './handlers/index.js';
 import { checkForReviews } from './github/reviews.js';
 import { safeErrorMessage } from './utils/errors.js';
 import { REPO_NAME_PATTERN } from './utils/validation.js';
 import { withRetry } from './utils/retry.js';
-import { buildEmbedWithStatus } from './handlers/pr.js';
+import { buildEmbedWithStatus, getOrCreateThread } from './handlers/pr.js';
 import { buildPrEmbed, buildPrComponents, buildReviewReply } from './embeds/builders.js';
 import { TextChannel } from 'discord.js';
 import { getChannelForEvent } from './config/channels.js';
@@ -18,6 +18,8 @@ import { getExistingPrMessage } from './discord/lookup.js';
 export { REPO_NAME_PATTERN };
 /** Warn if scheduled polling exceeds 80% of the 5-min cron interval. */
 const POLL_WARN_THRESHOLD_MS = 4 * 60_000;
+/** Hard deadline for the gateway ready event after login. */
+const READY_TIMEOUT_MS = 60_000;
 const REQUIRED_PERMISSIONS = [
     { flag: PermissionsBitField.Flags.SendMessages, name: 'Send Messages' },
     { flag: PermissionsBitField.Flags.CreatePublicThreads, name: 'Create Public Threads' },
@@ -42,12 +44,23 @@ export class RepoRelay {
     repo = null;
     constructor(config) {
         this.config = config;
-        this.client = new Client({
-            intents: [
-                GatewayIntentBits.Guilds,
-                GatewayIntentBits.GuildMessages,
-            ],
+        this.client = this.createClient();
+    }
+    createClient() {
+        // Guilds alone suffices: the bot consumes no message gateway events and
+        // all reads/writes go through REST
+        const client = new Client({
+            intents: [GatewayIntentBits.Guilds],
         });
+        // A listener-less 'error' emit crashes the process with a raw stack,
+        // bypassing safeErrorMessage — always keep sanitized listeners attached
+        client.on(Events.Error, (err) => {
+            console.error(`[repo-relay] Discord client error: ${safeErrorMessage(err)}`);
+        });
+        client.on(Events.Warn, (msg) => {
+            console.log(`[repo-relay] Discord client warning: ${msg}`);
+        });
+        return client;
     }
     async connect() {
         await this.logSessionBudget();
@@ -57,8 +70,17 @@ export class RepoRelay {
         for (let attempt = 0;; attempt++) {
             try {
                 await new Promise((resolve, reject) => {
-                    this.client.once('ready', () => resolve());
-                    this.client.login(this.config.discordToken).catch(reject);
+                    // Hard deadline: if login resolves but ready never fires (gateway
+                    // flap), a fire-once CLI must fail fast, not hang to the job timeout
+                    const timeout = setTimeout(() => reject(new Error(`Discord ready event not received within ${READY_TIMEOUT_MS / 1000}s`)), READY_TIMEOUT_MS);
+                    this.client.once(Events.ClientReady, () => {
+                        clearTimeout(timeout);
+                        resolve();
+                    });
+                    this.client.login(this.config.discordToken).catch((err) => {
+                        clearTimeout(timeout);
+                        reject(err);
+                    });
                 });
                 break;
             }
@@ -73,8 +95,8 @@ export class RepoRelay {
                 const waitMs = resetAt.getTime() - Date.now();
                 if (waitMs <= 0) {
                     console.log(`[repo-relay] Session limit reset time has passed, retrying immediately (attempt ${attempt + 1}/${maxRetries})...`);
-                    this.client.destroy();
-                    this.client = new Client({ intents: this.client.options.intents });
+                    await this.client.destroy();
+                    this.client = this.createClient();
                     continue;
                 }
                 if (waitMs > maxWaitMs) {
@@ -84,8 +106,8 @@ export class RepoRelay {
                 const waitMin = (waitMs / 60_000).toFixed(1);
                 console.log(`[repo-relay] Session limit exhausted. Waiting ${waitMin}min until reset at ${resetAt.toISOString()}...`);
                 await new Promise(r => setTimeout(r, waitMs + 1000)); // +1s buffer
-                this.client.destroy();
-                this.client = new Client({ intents: this.client.options.intents });
+                await this.client.destroy();
+                this.client = this.createClient();
             }
         }
         console.log(`[repo-relay] Connected to Discord as ${this.client.user?.tag}`);
@@ -159,7 +181,9 @@ export class RepoRelay {
     }
     async disconnect() {
         this.db?.close();
-        this.client.destroy();
+        // destroy() is async — exiting before the gateway close handshake wastes
+        // a resumable session, which matters against the 1000/day identify budget
+        await this.client.destroy();
         console.log('[repo-relay] Disconnected from Discord');
     }
     async handleEvent(eventData) {
@@ -254,25 +278,24 @@ export class RepoRelay {
                     const components = [buildPrComponents(statusData.prData.url, statusData.ci.url)];
                     await withRetry(() => message.edit({ embeds: [embed], components }));
                     console.log(`[repo-relay] Updated embed for PR #${prNumber} with detected reviews`);
-                    // Post to thread about detected reviews
-                    if (existing.threadId) {
-                        try {
-                            const threadId = existing.threadId;
-                            const thread = await withRetry(() => channel.threads.fetch(threadId));
-                            if (thread) {
-                                if (result.copilotReviewed && result.copilotUrl) {
-                                    const reply = buildReviewReply('copilot', 'reviewed', undefined, result.copilotUrl);
-                                    await withRetry(() => thread.send(reply));
-                                }
-                                if (result.agentReviewStatus !== 'pending' && result.agentReviewUrl) {
-                                    const reply = buildReviewReply('agent', result.agentReviewStatus, undefined, result.agentReviewUrl);
-                                    await withRetry(() => thread.send(reply));
-                                }
-                            }
+                    // Post to thread about detected reviews. getOrCreateThread handles
+                    // unarchiving — these are exactly the quiet PRs whose threads have
+                    // auto-archived, and a raw thread.send would fail (50083) silently.
+                    try {
+                        const thread = await getOrCreateThread(channel, this.db, repo, statusData.prData, existing);
+                        if (result.copilotReviewed && result.copilotUrl) {
+                            const reply = buildReviewReply('copilot', 'reviewed', undefined, result.copilotUrl);
+                            await withRetry(() => thread.send(reply));
                         }
-                        catch {
-                            // Thread might be archived or deleted
+                        if (result.agentReviewStatus !== 'pending' && result.agentReviewUrl) {
+                            const reply = buildReviewReply('agent', result.agentReviewStatus, undefined, result.agentReviewUrl);
+                            await withRetry(() => thread.send(reply));
                         }
+                    }
+                    catch (threadError) {
+                        // The status is already persisted, so a dropped send won't retry —
+                        // make the loss visible instead of swallowing it
+                        console.log(`[repo-relay] Warning: Failed to post review update to thread for PR #${prNumber}: ${safeErrorMessage(threadError)}`);
                     }
                 }
             }

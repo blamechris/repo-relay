@@ -7,6 +7,7 @@ import { getChannelForEvent } from '../config/channels.js';
 import { buildEmbedWithStatus, getOrCreateThread } from './pr.js';
 import { getExistingPrMessage } from '../discord/lookup.js';
 import { withRetry } from '../utils/retry.js';
+import { isUnknownMessageError } from '../utils/discord-errors.js';
 import { fetchFailedSteps } from '../github/ci.js';
 export async function handleCiEvent(client, db, channelConfig, payload, githubToken) {
     const { workflow_run: run, repository } = payload;
@@ -72,8 +73,7 @@ export async function handleCiEvent(client, db, channelConfig, payload, githubTo
             }
         }
         catch (error) {
-            const errMsg = error instanceof Error ? error.message : String(error);
-            if (errMsg.includes('Unknown Message')) {
+            if (isUnknownMessageError(error)) {
                 console.log(`[repo-relay] Stale message for PR #${pr.number}, clearing DB entry`);
                 db.deletePrMessage(repo, pr.number);
             }
@@ -83,17 +83,29 @@ export async function handleCiEvent(client, db, channelConfig, payload, githubTo
         }
     }
 }
-function mapCiStatus(status, conclusion) {
+export function mapCiStatus(status, conclusion) {
     if (status === 'completed') {
         switch (conclusion) {
             case 'success':
+            case 'neutral':
+            case 'skipped':
+                // Informational outcomes deliberately render as success
                 return 'success';
             case 'failure':
+            case 'timed_out':
+            case 'startup_failure':
                 return 'failure';
             case 'cancelled':
+            case 'stale':
                 return 'cancelled';
+            case 'action_required':
+                // Blocked waiting on approval — not a pass, not a fail
+                return 'pending';
             default:
-                return 'success'; // neutral, skipped treated as success
+                // Fail safe: a completed run with an unrecognized (or null) conclusion
+                // must never render as "✅ Passed"
+                console.warn(`[repo-relay] Unknown workflow_run conclusion "${conclusion}" — treating as failure`);
+                return 'failure';
         }
     }
     if (status === 'in_progress') {

@@ -53,8 +53,11 @@ describe('buildWorkflowTemplate', () => {
     expect(result).toContain('pull_request_review:');
     expect(result).toContain('workflow_run:');
 
-    // No issue/release/deployment events
-    expect(result).not.toContain('issue_comment:');
+    // issue_comment is ALWAYS subscribed — it's the delivery path for
+    // agent-review detection on PRs, independent of the issues feature
+    expect(result).toContain('issue_comment:');
+
+    // No issues/release/deployment events
     expect(result).not.toMatch(/^ {2}issues:/m);
     expect(result).not.toContain('release:');
     expect(result).not.toContain('deployment_status:');
@@ -98,8 +101,7 @@ describe('buildWorkflowTemplate', () => {
     expect(result).toContain('deployment_status:');
     expect(result).toContain('channel_deployments:');
 
-    // No issues or releases
-    expect(result).not.toContain('issue_comment:');
+    // No issues or releases (issue_comment is always present for agent-review detection)
     expect(result).not.toMatch(/^ {2}issues:/m);
     expect(result).not.toContain('release:');
     expect(result).not.toContain('channel_issues:');
@@ -138,6 +140,29 @@ describe('buildWorkflowTemplate', () => {
     expect(result).toContain('# Defense-in-depth: skip workflow_run events with no associated PR');
   });
 
+  it('always: actions read permission, fork guard, issues reopened, cache, and concurrency', () => {
+    const result = buildWorkflowTemplate('CI', { issues: true, releases: false, deployments: false, reviewPolling: false, pushEvents: false, securityAlerts: false });
+
+    // fetchFailedSteps calls the Actions jobs API — an explicit permissions
+    // block zeroes unlisted scopes, so actions: read must be present
+    expect(result).toContain('actions: read');
+
+    // Fork PRs run without secrets — guard prevents a guaranteed red X
+    expect(result).toContain('github.event.pull_request.head.repo.full_name == github.repository');
+
+    // Handlers and pre-filter support issue reopens
+    expect(result).toContain('types: [opened, closed, reopened]');
+
+    // State persistence: per-run cache key + restore-keys prefix
+    expect(result).toContain('actions/cache@v4');
+    expect(result).toContain('key: repo-relay-state-${{ github.repository }}-${{ github.run_id }}');
+    expect(result).toContain('restore-keys:');
+
+    // Serialize runs to avoid duplicate embeds from racing events
+    expect(result).toContain('concurrency:');
+    expect(result).toContain('group: repo-relay-${{ github.repository }}');
+  });
+
   it('reviewPolling enabled: includes schedule trigger with 5-min cron', () => {
     const result = buildWorkflowTemplate('CI', { issues: false, releases: false, deployments: false, reviewPolling: true, pushEvents: false, securityAlerts: false });
 
@@ -149,15 +174,25 @@ describe('buildWorkflowTemplate', () => {
     expect(result).toContain('workflow_run:');
   });
 
-  it('pushEvents enabled: includes push event with branches filter', () => {
+  it('pushEvents enabled: includes push event with resolved default branch', () => {
     const result = buildWorkflowTemplate('CI', { issues: false, releases: false, deployments: false, reviewPolling: false, pushEvents: true, securityAlerts: false });
 
     expect(result).toContain('push:');
-    expect(result).toContain('branches: [$default-branch]');
+    // $default-branch is a workflow-template-only macro — it must never appear
+    // in a generated user workflow (it would be treated as a literal branch name)
+    expect(result).not.toContain('$default-branch');
+    expect(result).toContain('branches: ["main"]');
 
     // Core events still present
     expect(result).toContain('pull_request:');
     expect(result).toContain('workflow_run:');
+  });
+
+  it('pushEvents enabled with custom default branch: uses the provided branch', () => {
+    const result = buildWorkflowTemplate('CI', { issues: false, releases: false, deployments: false, reviewPolling: false, pushEvents: true, securityAlerts: false }, 'develop');
+
+    expect(result).toContain('branches: ["develop"]');
+    expect(result).not.toContain('$default-branch');
   });
 
   it('pushEvents disabled: no push event in output', () => {
