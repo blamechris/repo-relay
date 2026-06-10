@@ -4,7 +4,7 @@
 
 import { Client, TextChannel, ThreadChannel } from 'discord.js';
 import { StateDb, IssueMessage } from '../db/state.js';
-import { buildIssueEmbed, buildIssueClosedReply, buildIssueReopenedReply, IssueData } from '../embeds/builders.js';
+import { buildIssueEmbed, buildIssueClosedReply, buildIssueReopenedReply, buildThreadName, IssueData } from '../embeds/builders.js';
 import { getChannelForEvent, ChannelConfig } from '../config/channels.js';
 import { getExistingIssueMessage } from '../discord/lookup.js';
 import { withRetry } from '../utils/retry.js';
@@ -105,7 +105,7 @@ async function handleIssueOpened(
   const message = await withRetry(() => channel.send({ embeds: [embed] }));
 
   const thread = await withRetry(() => message.startThread({
-    name: `Issue #${issue.number}: ${issue.title.substring(0, 90)}`,
+    name: buildThreadName('Issue', issue.number, issue.title),
     autoArchiveDuration: 1440,
   }));
 
@@ -151,7 +151,7 @@ async function handleIssueStateChange(
   const message = await withRetry(() => channel.send({ embeds: [embed] }));
 
   const thread = await withRetry(() => message.startThread({
-    name: `Issue #${issue.number}: ${issue.title.substring(0, 90)}`,
+    name: buildThreadName('Issue', issue.number, issue.title),
     autoArchiveDuration: 1440,
   }));
 
@@ -202,7 +202,7 @@ export async function getOrCreateIssueThread(
   const message = await withRetry(() => channel.messages.fetch(existing.messageId));
   const thread = await withRetry(() =>
     message.startThread({
-      name: `Issue #${issue.number}: ${issue.title.substring(0, 90)}`,
+      name: buildThreadName('Issue', issue.number, issue.title),
       autoArchiveDuration: 1440,
     })
   );
