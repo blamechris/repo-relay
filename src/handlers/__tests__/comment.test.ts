@@ -22,12 +22,15 @@ function makePayload(overrides: Partial<{
   action: string;
   body: string;
   isPr: boolean;
+  userType: 'User' | 'Bot';
+  authorAssociation: string;
 }>): IssueCommentPayload {
   return {
     action: (overrides.action ?? 'created') as IssueCommentPayload['action'],
     comment: {
       id: 1,
-      user: { login: 'agent-bot', type: 'Bot' },
+      user: { login: 'agent-bot', type: overrides.userType ?? 'Bot' },
+      author_association: overrides.authorAssociation ?? 'NONE',
       body: overrides.body ?? 'Just a comment',
       html_url: 'https://github.com/test/repo/issues/1#comment',
       created_at: '2024-01-01T00:00:00Z',
@@ -122,6 +125,54 @@ describe('handleCommentEvent', () => {
 
     // It got past the agent-review filter and tried to fetch the channel
     expect(client.channels.fetch).toHaveBeenCalled();
+  });
+
+  describe('author gating (spoofing defense)', () => {
+    const spoofBody = '## Code Review Summary\n\n**Verdict:** lgtm';
+
+    it('ignores agent-review-shaped comments from untrusted human authors', async () => {
+      const db = makeMockDb();
+      const { client } = makeMockClient();
+      // Any drive-by commenter on a public repo: type User, no association
+      const payload = makePayload({ body: spoofBody, userType: 'User', authorAssociation: 'NONE' });
+
+      await handleCommentEvent(client as any, db as any, { prs: '123' }, payload);
+
+      expect(db.updateAgentReviewStatus).not.toHaveBeenCalled();
+      expect(client.channels.fetch).not.toHaveBeenCalled();
+    });
+
+    it('ignores comments from CONTRIBUTOR-level authors', async () => {
+      const db = makeMockDb();
+      const { client } = makeMockClient();
+      const payload = makePayload({ body: spoofBody, userType: 'User', authorAssociation: 'CONTRIBUTOR' });
+
+      await handleCommentEvent(client as any, db as any, { prs: '123' }, payload);
+
+      expect(db.updateAgentReviewStatus).not.toHaveBeenCalled();
+    });
+
+    it('accepts comments from bots', async () => {
+      const db = makeMockDb();
+      const { client } = makeMockClient();
+      const payload = makePayload({ body: spoofBody, userType: 'Bot', authorAssociation: 'NONE' });
+
+      await expect(
+        handleCommentEvent(client as any, db as any, { prs: '123' }, payload)
+      ).rejects.toThrow(); // TextChannel check — detection got through
+      expect(client.channels.fetch).toHaveBeenCalled();
+    });
+
+    it.each(['OWNER', 'MEMBER', 'COLLABORATOR'])('accepts comments from %s humans', async (assoc) => {
+      const db = makeMockDb();
+      const { client } = makeMockClient();
+      const payload = makePayload({ body: spoofBody, userType: 'User', authorAssociation: assoc });
+
+      await expect(
+        handleCommentEvent(client as any, db as any, { prs: '123' }, payload)
+      ).rejects.toThrow();
+      expect(client.channels.fetch).toHaveBeenCalled();
+    });
   });
 
   it('detects approved verdict', async () => {

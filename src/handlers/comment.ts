@@ -13,6 +13,7 @@ import {
   AGENT_REVIEW_PATTERNS,
   APPROVED_PATTERNS,
   CHANGES_REQUESTED_PATTERNS,
+  isTrustedReviewAuthor,
 } from '../patterns/agent-review.js';
 
 export interface IssueCommentPayload {
@@ -23,6 +24,7 @@ export interface IssueCommentPayload {
       login: string;
       type: 'User' | 'Bot';
     };
+    author_association?: string;
     body: string;
     html_url: string;
     created_at: string;
@@ -62,6 +64,14 @@ export async function handleCommentEvent(
   );
 
   if (!isAgentReview) {
+    return;
+  }
+
+  // Spoofing defense: only bots and repo insiders may set review state
+  if (!isTrustedReviewAuthor(comment.user, comment.author_association)) {
+    console.log(
+      `[repo-relay] Ignoring agent-review-shaped comment from untrusted author @${comment.user.login} (${comment.author_association ?? 'no association'})`
+    );
     return;
   }
 
