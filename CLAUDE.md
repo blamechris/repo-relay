@@ -349,7 +349,7 @@ Without scheduled polling, reviews on quiet PRs may not be reflected until the n
 
 GitHub-hosted runners don't persist state between workflow runs. The SQLite database at `~/.repo-relay/{repo}/state.db` is lost after each run.
 
-**Recommendation:** Add `actions/cache@v4` before the repo-relay step to cache `~/.repo-relay`. The DB includes a WAL checkpoint on close and integrity check on startup, making it safe for cache-based persistence. See the README for the full snippet.
+**Recommendation:** Add `actions/cache@v4` before the repo-relay step to cache `~/.repo-relay`. The cache `key` must be unique per run (e.g. suffixed with `${{ github.run_id }}`) with a `restore-keys` prefix — GitHub cache entries are immutable, so a constant key saves once and freezes state forever. Pair it with a `concurrency` group to serialize runs. The DB includes a WAL checkpoint on close and integrity check on startup, making it safe for cache-based persistence. See the README for the full snippet.
 
 ## Onboarding Learnings
 
@@ -359,7 +359,7 @@ Lessons learned from integrating repo-relay into exodus-loop and archery-apprent
 
 1. **"Missing Access" error** - Bot connects but can't post. Usually missing Discord permissions at channel level. See [#12](https://github.com/blamechris/repo-relay/issues/12).
 
-2. **Review reply cascade** - Owner replies to Copilot comments trigger more notifications. Requires workflow `if` filter. See [#13](https://github.com/blamechris/repo-relay/issues/13).
+2. **Review reply cascade** - Owner replies to Copilot comments trigger more notifications. Filtered automatically on personal repos (reviewer == repo owner + state `commented`); org-owned repos still need a workflow `if` filter because the owner is the org, never a human. See [#13](https://github.com/blamechris/repo-relay/issues/13) and [#146](https://github.com/blamechris/repo-relay/issues/146).
 
 3. **First-run failure** - Expected if secrets aren't configured. Users should configure secrets, then re-run.
 

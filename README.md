@@ -65,7 +65,7 @@ This interactive wizard will guide you through setup and create the workflow fil
 
 1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
 2. Create new application → Bot → Reset Token → Copy token
-3. Enable intents: **Message Content Intent**, **Server Members Intent**
+3. No privileged intents are required — leave **Message Content** and **Server Members** intents disabled
 4. Generate invite URL (OAuth2 → URL Generator):
    - Scopes: `bot`
    - Permissions: See [Required Discord Permissions](#required-discord-permissions) below
@@ -221,6 +221,7 @@ When generating the bot invite URL, ensure these permissions are enabled:
 | **Send Messages** | Post PR/issue/release embeds |
 | **Create Public Threads** | Create threads for PR updates |
 | **Send Messages in Threads** | Post updates to PR threads |
+| **Manage Threads** | Unarchive auto-archived PR threads when new updates arrive |
 | **Embed Links** | Render rich embeds with PR info |
 | **Read Message History** | Find existing PR messages to update |
 
@@ -245,19 +246,27 @@ If the bot connects but can't post, check the channel-level permissions. The bot
 
 ### State Persistence with GitHub-Hosted Runners
 
-Add an `actions/cache` step before repo-relay to persist state between runs:
+Add an `actions/cache` step before repo-relay to persist state between runs. The `key` **must be unique per run** — GitHub cache entries are immutable, so a constant key saves once on the first run and never updates again, silently freezing your state. Use a per-run key with a `restore-keys` prefix so each run restores the most recent snapshot and saves a new one:
 
 ```yaml
+concurrency:
+  group: repo-relay-${{ github.repository }}
+
+# ...
+
     - uses: actions/cache@v4
       with:
         path: ~/.repo-relay
-        key: repo-relay-state-${{ github.repository }}
+        key: repo-relay-state-${{ github.repository }}-${{ github.run_id }}
+        restore-keys: |
+          repo-relay-state-${{ github.repository }}-
 
     - uses: blamechris/repo-relay@v1
       ...
 ```
 
 **Notes:**
+- The `concurrency` group serializes repo-relay runs — without it, simultaneous events (e.g. a push and its CI completing) can race and create duplicate embeds or lose status updates
 - Cache evicts after 7 days of inactivity (fine for active repos)
 - No security concern — the state DB contains only Discord message IDs and PR metadata
 - If cache misses, repo-relay falls back to searching the last 100 channel messages
@@ -284,7 +293,7 @@ Add an `actions/cache` step before repo-relay to persist state between runs:
 
 **Symptom:** Replying to Copilot review comments triggers more notifications.
 
-**Fix:** This is handled automatically since v1. The review handler filters out `pull_request_review` events where the reviewer is the repo owner and the review state is `commented`. No workflow-level filter needed.
+**Fix:** On **personal repos**, this is handled automatically — the review handler filters out `pull_request_review` events where the reviewer is the repo owner and the review state is `commented`. On **org-owned repos** the automatic filter does not apply (the repo owner is the org, never a human reviewer), so add a workflow-level `if` filter for now — see [#13](https://github.com/blamechris/repo-relay/issues/13) and [#146](https://github.com/blamechris/repo-relay/issues/146).
 
 ### First PR Shows Red X
 
