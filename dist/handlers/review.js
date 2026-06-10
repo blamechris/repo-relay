@@ -7,18 +7,31 @@ import { getChannelForEvent } from '../config/channels.js';
 import { updatePrEmbedAndNotify } from './pr.js';
 import { getExistingPrMessage } from '../discord/lookup.js';
 import { withRetry } from '../utils/retry.js';
+/**
+ * Associations whose `commented` reviews are cascade noise (#13, #146):
+ * replying to inline review comments fires another pull_request_review event
+ * with state 'commented'. Keyed on author_association so the filter works on
+ * both personal repos (OWNER) and org-owned repos (MEMBER/COLLABORATOR),
+ * where the old repo-owner login comparison never matched a human reviewer.
+ */
+export const CASCADE_REVIEW_ASSOCIATIONS = new Set([
+    'OWNER',
+    'MEMBER',
+    'COLLABORATOR',
+]);
 export async function handleReviewEvent(client, db, channelConfig, payload) {
     const { action, review, pull_request: pr, repository } = payload;
     const repo = repository.full_name;
     if (action !== 'submitted') {
         return;
     }
-    // Skip owner comment replies to prevent notification cascades (#13)
-    // When an owner replies to Copilot review comments, GitHub fires another
-    // pull_request_review event with state 'commented'. These are noise.
-    const isOwnerComment = review.user.login === repository.owner.login &&
-        review.state === 'commented';
-    if (isOwnerComment) {
+    // Skip collaborator comment replies to prevent notification cascades (#13)
+    // The Bot-type guard keeps Copilot reviews (state 'commented') flowing
+    // regardless of the bot's association.
+    const isCascadeComment = review.state === 'commented' &&
+        review.user.type === 'User' &&
+        CASCADE_REVIEW_ASSOCIATIONS.has(review.author_association);
+    if (isCascadeComment) {
         return;
     }
     const channelId = getChannelForEvent(channelConfig, 'review');

@@ -265,68 +265,88 @@ describe('shouldSkipEvent', () => {
 
   // ── pull_request_review ───────────────────────────────────────
 
+  function reviewEvent(overrides: {
+    action?: string;
+    state?: string;
+    association?: string;
+    userType?: 'User' | 'Bot';
+    login?: string;
+    repo?: string;
+    ownerLogin?: string;
+  } = {}): GitHubEventPayload {
+    return {
+      event: 'pull_request_review',
+      payload: {
+        action: overrides.action ?? 'submitted',
+        review: {
+          id: 1,
+          user: { login: overrides.login ?? 'reviewer', type: overrides.userType ?? 'User' },
+          body: 'body',
+          state: overrides.state ?? 'approved',
+          html_url: '',
+          author_association: overrides.association ?? 'NONE',
+        },
+        pull_request: { number: 1 },
+        repository: {
+          full_name: overrides.repo ?? 'some-org/repo',
+          owner: { login: overrides.ownerLogin ?? 'some-org' },
+        },
+      },
+    } as GitHubEventPayload;
+  }
+
   it('skips pull_request_review with action !== submitted', () => {
-    const event: GitHubEventPayload = {
-      event: 'pull_request_review',
-      payload: {
-        action: 'dismissed',
-        review: {
-          id: 1, user: { login: 'u', type: 'User' },
-          body: null, state: 'dismissed', html_url: '',
-        },
-        pull_request: { number: 1 },
-        repository: { full_name: 'owner/repo', owner: { login: 'o' } },
-      },
-    };
-    expect(shouldSkipEvent(event)).toBe("pull_request_review: action 'dismissed' not handled");
+    expect(shouldSkipEvent(reviewEvent({ action: 'dismissed', state: 'dismissed' })))
+      .toBe("pull_request_review: action 'dismissed' not handled");
   });
 
-  it('skips pull_request_review owner comment reply', () => {
-    const event: GitHubEventPayload = {
-      event: 'pull_request_review',
-      payload: {
-        action: 'submitted',
-        review: {
-          id: 1, user: { login: 'owner-user', type: 'User' },
-          body: 'thanks', state: 'commented', html_url: '',
-        },
-        pull_request: { number: 1 },
-        repository: { full_name: 'owner-user/repo', owner: { login: 'owner-user' } },
-      },
-    };
-    expect(shouldSkipEvent(event)).toBe('pull_request_review: owner comment reply');
+  // Cascade filter (#13, #146): comment replies from anyone with write-ish
+  // association are noise — on org repos the old repo-owner login comparison
+  // never matched, so the filter must key on author_association instead.
+  it.each(['OWNER', 'MEMBER', 'COLLABORATOR'] as const)(
+    'skips commented review from %s on an org-owned repo',
+    (association) => {
+      expect(shouldSkipEvent(reviewEvent({ state: 'commented', association })))
+        .toBe('pull_request_review: collaborator comment reply');
+    }
+  );
+
+  it('skips commented review from OWNER on a personal repo', () => {
+    const event = reviewEvent({
+      state: 'commented', association: 'OWNER',
+      login: 'owner-user', repo: 'owner-user/repo', ownerLogin: 'owner-user',
+    });
+    expect(shouldSkipEvent(event)).toBe('pull_request_review: collaborator comment reply');
   });
 
-  it('passes pull_request_review owner approval (not a comment)', () => {
-    const event: GitHubEventPayload = {
-      event: 'pull_request_review',
-      payload: {
-        action: 'submitted',
-        review: {
-          id: 1, user: { login: 'owner-user', type: 'User' },
-          body: 'lgtm', state: 'approved', html_url: '',
-        },
-        pull_request: { number: 1 },
-        repository: { full_name: 'owner-user/repo', owner: { login: 'owner-user' } },
-      },
-    };
+  it.each(['NONE', 'CONTRIBUTOR'] as const)(
+    'passes commented review from %s (external reviewer, not a cascade)',
+    (association) => {
+      expect(shouldSkipEvent(reviewEvent({ state: 'commented', association }))).toBeNull();
+    }
+  );
+
+  it.each(['OWNER', 'MEMBER', 'COLLABORATOR'] as const)(
+    'passes approved review from %s (verdicts are never cascade noise)',
+    (association) => {
+      expect(shouldSkipEvent(reviewEvent({ state: 'approved', association }))).toBeNull();
+    }
+  );
+
+  it('passes changes_requested review from MEMBER', () => {
+    expect(shouldSkipEvent(reviewEvent({ state: 'changes_requested', association: 'MEMBER' }))).toBeNull();
+  });
+
+  it('passes commented Bot review (Copilot) regardless of association', () => {
+    const event = reviewEvent({
+      state: 'commented', association: 'MEMBER',
+      userType: 'Bot', login: 'copilot-pull-request-reviewer[bot]',
+    });
     expect(shouldSkipEvent(event)).toBeNull();
   });
 
   it('passes pull_request_review with action submitted', () => {
-    const event: GitHubEventPayload = {
-      event: 'pull_request_review',
-      payload: {
-        action: 'submitted',
-        review: {
-          id: 1, user: { login: 'u', type: 'User' },
-          body: 'lgtm', state: 'approved', html_url: '',
-        },
-        pull_request: { number: 1 },
-        repository: { full_name: 'owner/repo', owner: { login: 'o' } },
-      },
-    };
-    expect(shouldSkipEvent(event)).toBeNull();
+    expect(shouldSkipEvent(reviewEvent())).toBeNull();
   });
 
   // ── issues ────────────────────────────────────────────────────

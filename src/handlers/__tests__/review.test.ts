@@ -24,6 +24,7 @@ function makePayload(overrides: Partial<{
   reviewerType: 'User' | 'Bot';
   state: string;
   ownerLogin: string;
+  authorAssociation: string;
 }>): PrReviewPayload {
   return {
     action: overrides.action ?? 'submitted',
@@ -36,6 +37,7 @@ function makePayload(overrides: Partial<{
       body: 'Review body',
       state: (overrides.state ?? 'approved') as PrReviewPayload['review']['state'],
       html_url: 'https://github.com/test/repo/pull/1#review',
+      author_association: (overrides.authorAssociation ?? 'NONE') as PrReviewPayload['review']['author_association'],
     },
     pull_request: { number: 1 },
     repository: {
@@ -98,20 +100,22 @@ describe('handleReviewEvent', () => {
     expect(db.logEvent).not.toHaveBeenCalled();
   });
 
-  it('returns early for owner comment replies (cascade filter #13)', async () => {
-    const db = makeMockDb();
-    const { client } = makeMockClient();
-    const payload = makePayload({
-      reviewerLogin: 'owner',
-      ownerLogin: 'owner',
-      state: 'commented',
-    });
+  it.each(['OWNER', 'MEMBER', 'COLLABORATOR'])(
+    'returns early for %s comment replies (cascade filter #13/#146)',
+    async (authorAssociation) => {
+      const db = makeMockDb();
+      const { client } = makeMockClient();
+      const payload = makePayload({
+        state: 'commented',
+        authorAssociation,
+      });
 
-    await handleReviewEvent(client as any, db as any, { prs: '123' }, payload);
+      await handleReviewEvent(client as any, db as any, { prs: '123' }, payload);
 
-    expect(db.logEvent).not.toHaveBeenCalled();
-    expect(client.channels.fetch).not.toHaveBeenCalled();
-  });
+      expect(db.logEvent).not.toHaveBeenCalled();
+      expect(client.channels.fetch).not.toHaveBeenCalled();
+    }
+  );
 
   it('does NOT filter owner approvals (approvals are meaningful)', async () => {
     const db = makeMockDb();
@@ -124,10 +128,11 @@ describe('handleReviewEvent', () => {
       reviewerLogin: 'owner',
       ownerLogin: 'owner',
       state: 'approved',
+      authorAssociation: 'OWNER',
     });
 
     // Will throw because our mock channel isn't a real TextChannel,
-    // but the point is it got past the owner filter
+    // but the point is it got past the cascade filter
     await expect(
       handleReviewEvent(client as any, db as any, { prs: '123' }, payload)
     ).rejects.toThrow();
@@ -136,16 +141,33 @@ describe('handleReviewEvent', () => {
     expect(client.channels.fetch).toHaveBeenCalled();
   });
 
-  it('does NOT filter non-owner comment reviews', async () => {
+  it('does NOT filter comment reviews from external reviewers (NONE association)', async () => {
     const db = makeMockDb();
     const { client } = makeMockClient();
     const payload = makePayload({
       reviewerLogin: 'external-reviewer',
-      ownerLogin: 'owner',
       state: 'commented',
+      authorAssociation: 'NONE',
     });
 
     // Will throw on TextChannel check, but confirms it got past filters
+    await expect(
+      handleReviewEvent(client as any, db as any, { prs: '123' }, payload)
+    ).rejects.toThrow();
+
+    expect(client.channels.fetch).toHaveBeenCalled();
+  });
+
+  it('does NOT filter Bot comment reviews (Copilot) even with collaborator association', async () => {
+    const db = makeMockDb();
+    const { client } = makeMockClient();
+    const payload = makePayload({
+      reviewerLogin: 'copilot-pull-request-reviewer[bot]',
+      reviewerType: 'Bot',
+      state: 'commented',
+      authorAssociation: 'MEMBER',
+    });
+
     await expect(
       handleReviewEvent(client as any, db as any, { prs: '123' }, payload)
     ).rejects.toThrow();
