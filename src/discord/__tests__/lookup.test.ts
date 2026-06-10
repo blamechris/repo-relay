@@ -30,6 +30,7 @@ function makeMockDb() {
     updateCiStatus: vi.fn(),
     updateCopilotStatus: vi.fn(),
     updateAgentReviewStatus: vi.fn(),
+    updateHumanReviewStatus: vi.fn(),
     getIssueMessage: vi.fn(() => null),
     saveIssueMessage: vi.fn(),
   };
@@ -131,6 +132,25 @@ describe('getExistingPrMessage', () => {
     expect(db.updateCiStatus).toHaveBeenCalledWith(REPO, 42, 'success');
     expect(db.updateCopilotStatus).toHaveBeenCalledWith(REPO, 42, 'reviewed', 3);
     expect(db.updateAgentReviewStatus).toHaveBeenCalledWith(REPO, 42, 'approved');
+    // Footer predates #146 — no human review fields, nothing to recover
+    expect(db.updateHumanReviewStatus).not.toHaveBeenCalled();
+  });
+
+  it('recovers human review status from embed footer metadata (#146)', async () => {
+    const db = makeMockDb();
+    const savedRow = { repo: REPO, prNumber: 42, messageId: 'msg-1', threadId: 'thread-1' };
+    db.getPrMessage
+      .mockReturnValueOnce(null)
+      .mockReturnValueOnce(savedRow);
+
+    const footer = 'repo-relay:v1:{"type":"pr","pr":42,"repo":"owner/repo","ci":"success","copilot":"reviewed","agent":"pending","human":"approved","humanBy":"alice"}';
+    const channel = makeMockChannel([
+      makeMockMessage('msg-1', '🔀 PR #42: My PR', PR_URL, 'thread-1', footer),
+    ]);
+
+    await getExistingPrMessage(db as any, channel, REPO, 42);
+
+    expect(db.updateHumanReviewStatus).toHaveBeenCalledWith(REPO, 42, 'approved', 'alice');
   });
 
   it('skips status recovery when no footer present', async () => {

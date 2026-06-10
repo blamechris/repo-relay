@@ -33,13 +33,17 @@ export interface ReviewStatus {
     copilot: 'pending' | 'reviewed';
     copilotComments?: number;
     agentReview: 'pending' | 'approved' | 'changes_requested' | 'none';
+    /** Latest human verdict (#146). Unlike bot reviews there is no 'pending'
+     * state — most PRs never receive one, so 'none'/undefined hides the line. */
+    humanReview?: 'approved' | 'changes_requested' | 'none';
+    humanReviewer?: string;
 }
 export declare function buildPrEmbed(pr: PrData, ci?: CiStatus, reviews?: ReviewStatus): EmbedBuilder;
 export declare function buildPrComponents(prUrl: string, ciUrl?: string): ActionRowBuilder<ButtonBuilder>;
 export declare function buildPushReply(author: string, sha: string, compareUrl?: string): string;
 export declare function buildCiReply(ci: CiStatus): string;
 export declare function buildCiFailureReply(ci: CiStatus, failedSteps: FailedStep[]): string;
-export declare function buildReviewReply(type: 'copilot' | 'agent', status: string, comments?: number, url?: string): string;
+export declare function buildReviewReply(type: 'copilot' | 'agent' | 'human', status: string, comments?: number, url?: string, reviewer?: string): string;
 export declare function buildMergedReply(mergedBy?: string, baseBranch?: string): string;
 export declare function buildClosedReply(closedBy?: string): string;
 export interface IssueData {
@@ -82,6 +86,9 @@ export interface PrFooterMetadata {
     copilot: ReviewStatus['copilot'];
     copilotComments?: number;
     agent: ReviewStatus['agentReview'];
+    /** Present only when a human verdict exists — pre-#146 footers lack it. */
+    human?: 'approved' | 'changes_requested';
+    humanBy?: string;
 }
 export interface IssueFooterMetadata {
     type: 'issue';
