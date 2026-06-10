@@ -20,5 +20,5 @@ export function isUnknownMessageError(error: unknown): boolean {
 /** startThread was called on a message that already has a (possibly archived) thread. */
 export function isThreadAlreadyCreatedError(error: unknown): boolean {
   if (error instanceof DiscordAPIError && error.code === THREAD_ALREADY_CREATED) return true;
-  return error instanceof Error && error.message.includes('already has a thread');
+  return error instanceof Error && error.message.includes('already been created for this message');
 }

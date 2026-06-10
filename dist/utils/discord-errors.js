@@ -18,6 +18,6 @@ export function isUnknownMessageError(error) {
 export function isThreadAlreadyCreatedError(error) {
     if (error instanceof DiscordAPIError && error.code === THREAD_ALREADY_CREATED)
         return true;
-    return error instanceof Error && error.message.includes('already has a thread');
+    return error instanceof Error && error.message.includes('already been created for this message');
 }
 //# sourceMappingURL=discord-errors.js.map
