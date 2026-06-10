@@ -108,5 +108,27 @@ export async function handleReviewEvent(
     if (!result.stale) {
       db.updatePrMessageTimestamp(repo, pr.number);
     }
+    return;
+  }
+
+  // Human reviews (#146): a person's approved/changes_requested verdict gets
+  // the same treatment as bot reviews — thread reply + embed status update.
+  // 'commented' reviews carry no verdict and stay ignored; other bots too.
+  if (review.user.type !== 'User') {
+    return;
+  }
+  if (review.state !== 'approved' && review.state !== 'changes_requested') {
+    return;
+  }
+  const verdict = review.state;
+
+  const result = await updatePrEmbedAndNotify(
+    channel, db, repo, pr.number, existing,
+    buildReviewReply('human', verdict, undefined, review.html_url, review.user.login),
+    // Update status in DB so the rebuilt embed reflects the verdict
+    () => db.updateHumanReviewStatus(repo, pr.number, verdict, review.user.login)
+  );
+  if (!result.stale) {
+    db.updatePrMessageTimestamp(repo, pr.number);
   }
 }

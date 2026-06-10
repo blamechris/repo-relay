@@ -352,6 +352,8 @@ export function buildEmbedWithStatus(db: StateDb, repo: string, prNumber: number
     copilot: status?.copilotStatus ?? 'pending',
     copilotComments: status?.copilotComments ?? 0,
     agentReview: status?.agentReviewStatus ?? 'pending',
+    humanReview: status?.humanReviewStatus ?? 'none',
+    humanReviewer: status?.humanReviewLogin ?? undefined,
   };
 
   const ci: CiStatus = {
