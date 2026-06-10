@@ -7,6 +7,7 @@ import { getChannelForEvent } from '../config/channels.js';
 import { buildEmbedWithStatus, getOrCreateThread } from './pr.js';
 import { getExistingPrMessage } from '../discord/lookup.js';
 import { withRetry } from '../utils/retry.js';
+import { isUnknownMessageError } from '../utils/discord-errors.js';
 import { AGENT_REVIEW_PATTERNS, APPROVED_PATTERNS, CHANGES_REQUESTED_PATTERNS, isTrustedReviewAuthor, } from '../patterns/agent-review.js';
 export async function handleCommentEvent(client, db, channelConfig, payload) {
     const { action, comment, issue, repository } = payload;
@@ -63,8 +64,7 @@ export async function handleCommentEvent(client, db, channelConfig, payload) {
         db.updatePrMessageTimestamp(repo, prNumber);
     }
     catch (error) {
-        const errMsg = error instanceof Error ? error.message : String(error);
-        if (errMsg.includes('Unknown Message')) {
+        if (isUnknownMessageError(error)) {
             console.log(`[repo-relay] Stale message for PR #${prNumber}, clearing DB entry`);
             db.deletePrMessage(repo, prNumber);
         }

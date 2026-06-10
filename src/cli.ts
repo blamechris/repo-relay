@@ -96,7 +96,10 @@ async function main(): Promise<void> {
     console.log('[repo-relay] Event processed successfully');
   } catch (error) {
     console.error(`[repo-relay] ERROR: ${safeErrorMessage(error)}`);
-    process.exit(1);
+    // exitCode (not exit()) so the finally block runs: disconnect() closes
+    // the DB with a WAL checkpoint — skipping it leaves a dirty WAL for the
+    // actions/cache post step to snapshot
+    process.exitCode = 1;
   } finally {
     await relay.disconnect();
   }

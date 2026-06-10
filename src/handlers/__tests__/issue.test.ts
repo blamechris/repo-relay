@@ -4,6 +4,7 @@ import { TextChannel } from 'discord.js';
 
 vi.mock('../../embeds/builders.js', () => ({
   buildIssueEmbed: vi.fn(() => ({ mock: 'embed' })),
+  buildThreadName: vi.fn((kind: string, number: number, title: string) => `${kind} #${number}: ${title}`.slice(0, 100)),
   buildIssueClosedReply: vi.fn((closedBy?: string, stateReason?: string | null) => {
     if (stateReason === 'not_planned') return `🟣 Closed as not planned by @${closedBy}`;
     return `🟣 Closed by @${closedBy}`;
