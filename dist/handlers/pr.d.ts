@@ -52,5 +52,19 @@ export declare function buildEmbedWithStatus(db: StateDb, repo: string, prNumber
     reviews: ReviewStatus;
     ci: CiStatus;
 } | null;
+export interface PrEmbedUpdateResult {
+    /** The Discord message was deleted; the stale DB entry has been cleared. */
+    stale: boolean;
+    /** A thread message was posted. */
+    posted: boolean;
+}
+/**
+ * Fetch a PR's Discord message, rebuild its embed from current DB status,
+ * and optionally post `threadMessage` to the PR's thread. `beforeRebuild`
+ * runs between the message fetch and the embed rebuild, so status writes
+ * land in the rebuilt embed. A stale message (deleted on Discord) clears
+ * the DB entry; any other error propagates.
+ */
+export declare function updatePrEmbedAndNotify(channel: TextChannel, db: StateDb, repo: string, prNumber: number, existing: PrMessage, threadMessage?: string, beforeRebuild?: () => void): Promise<PrEmbedUpdateResult>;
 export declare function getOrCreateThread(channel: TextChannel, db: StateDb, repo: string, pr: PrData, existing: PrMessage): Promise<ThreadChannel>;
 //# sourceMappingURL=pr.d.ts.map

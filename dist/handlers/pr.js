@@ -278,6 +278,42 @@ export function buildEmbedWithStatus(db, repo, prNumber) {
     };
     return { prData, reviews, ci };
 }
+/**
+ * Fetch a PR's Discord message, rebuild its embed from current DB status,
+ * and optionally post `threadMessage` to the PR's thread. `beforeRebuild`
+ * runs between the message fetch and the embed rebuild, so status writes
+ * land in the rebuilt embed. A stale message (deleted on Discord) clears
+ * the DB entry; any other error propagates.
+ */
+export async function updatePrEmbedAndNotify(channel, db, repo, prNumber, existing, threadMessage, beforeRebuild) {
+    try {
+        const message = await withRetry(() => channel.messages.fetch(existing.messageId));
+        beforeRebuild?.();
+        // Rebuild and edit the embed with updated status
+        const statusData = buildEmbedWithStatus(db, repo, prNumber);
+        let posted = false;
+        if (statusData) {
+            const embed = buildPrEmbed(statusData.prData, statusData.ci, statusData.reviews);
+            const components = [buildPrComponents(statusData.prData.url, statusData.ci.url)];
+            await withRetry(() => message.edit({ embeds: [embed], components }));
+            if (threadMessage) {
+                // Post to thread
+                const thread = await getOrCreateThread(channel, db, repo, statusData.prData, existing);
+                await withRetry(() => thread.send(threadMessage));
+                posted = true;
+            }
+        }
+        return { stale: false, posted };
+    }
+    catch (error) {
+        if (isUnknownMessageError(error)) {
+            console.log(`[repo-relay] Stale message for PR #${prNumber}, clearing DB entry`);
+            db.deletePrMessage(repo, prNumber);
+            return { stale: true, posted: false };
+        }
+        throw error;
+    }
+}
 // Helper to get existing thread or create one if it doesn't exist
 export async function getOrCreateThread(channel, db, repo, pr, existing) {
     return getOrCreateMessageThread(channel, existing, buildThreadName('PR', pr.number, pr.title), `📋 Updates for PR #${pr.number} will appear here.`, (threadId) => db.updatePrThread(repo, pr.number, threadId));
