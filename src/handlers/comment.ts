@@ -9,10 +9,12 @@ import { getChannelForEvent, ChannelConfig } from '../config/channels.js';
 import { buildEmbedWithStatus, getOrCreateThread } from './pr.js';
 import { getExistingPrMessage } from '../discord/lookup.js';
 import { withRetry } from '../utils/retry.js';
+import { isUnknownMessageError } from '../utils/discord-errors.js';
 import {
   AGENT_REVIEW_PATTERNS,
   APPROVED_PATTERNS,
   CHANGES_REQUESTED_PATTERNS,
+  isTrustedReviewAuthor,
 } from '../patterns/agent-review.js';
 
 export interface IssueCommentPayload {
@@ -23,6 +25,7 @@ export interface IssueCommentPayload {
       login: string;
       type: 'User' | 'Bot';
     };
+    author_association?: string;
     body: string;
     html_url: string;
     created_at: string;
@@ -62,6 +65,14 @@ export async function handleCommentEvent(
   );
 
   if (!isAgentReview) {
+    return;
+  }
+
+  // Spoofing defense: only bots and repo insiders may set review state
+  if (!isTrustedReviewAuthor(comment.user, comment.author_association)) {
+    console.log(
+      `[repo-relay] Ignoring agent-review-shaped comment from untrusted author @${comment.user.login} (${comment.author_association ?? 'no association'})`
+    );
     return;
   }
 
@@ -107,8 +118,7 @@ export async function handleCommentEvent(
 
     db.updatePrMessageTimestamp(repo, prNumber);
   } catch (error: unknown) {
-    const errMsg = error instanceof Error ? error.message : String(error);
-    if (errMsg.includes('Unknown Message')) {
+    if (isUnknownMessageError(error)) {
       console.log(`[repo-relay] Stale message for PR #${prNumber}, clearing DB entry`);
       db.deletePrMessage(repo, prNumber);
     } else {

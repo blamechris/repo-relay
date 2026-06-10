@@ -13,7 +13,7 @@
     "dev": "tsx src/cli.ts",
     "setup": "tsx src/setup.ts",
     "start": "node dist/cli.js",
-    "lint": "eslint src --ext .ts",
+    "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
@@ -33,7 +33,7 @@
     "url": "git+https://github.com/blamechris/repo-relay.git"
   },
   "dependencies": {
-    "better-sqlite3": "^11.7.0",
+    "better-sqlite3": "^12.10.0",
     "discord.js": "^14.16.3",
     "prompts": "^2.4.2"
   },
@@ -44,6 +44,7 @@
     "eslint": "^9.19.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
+    "typescript-eslint": "^8.61.0",
     "vitest": "^3.0.4"
   },
   "engines": {

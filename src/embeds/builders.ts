@@ -75,7 +75,7 @@ export function buildPrEmbed(
   if (reviews) {
     const copilotStatus =
       reviews.copilot === 'reviewed'
-        ? `✅ Reviewed (${reviews.copilotComments ?? 0} comments)`
+        ? '✅ Reviewed'
         : '⏳ Pending';
     reviewLines.push(`• Copilot: ${copilotStatus}`);
 
@@ -156,18 +156,23 @@ export function buildCiReply(ci: CiStatus): string {
   return `🔄 CI: ${status}`;
 }
 
+const MESSAGE_LIMIT = 2000; // Discord message content hard cap
+
 export function buildCiFailureReply(ci: CiStatus, failedSteps: FailedStep[]): string {
   const base = buildCiReply(ci);
   if (failedSteps.length === 0) return base;
 
   const maxDisplay = 5;
+  const maxNameLength = 80; // matrix job names can be arbitrarily long
   const lines = failedSteps.slice(0, maxDisplay).map(
-    s => `• \`${s.jobName}\` > \`${s.stepName}\``
+    s => `• \`${truncateDescription(s.jobName, maxNameLength)}\` > \`${truncateDescription(s.stepName, maxNameLength)}\``
   );
   if (failedSteps.length > maxDisplay) {
     lines.push(`...and ${failedSteps.length - maxDisplay} more`);
   }
-  return `${base}\n**Failed steps:**\n${lines.join('\n')}`;
+  const reply = `${base}\n**Failed steps:**\n${lines.join('\n')}`;
+  // Belt-and-suspenders: never exceed the message limit regardless of inputs
+  return reply.length > MESSAGE_LIMIT ? reply.substring(0, MESSAGE_LIMIT - 1) + '…' : reply;
 }
 
 export function buildReviewReply(
@@ -226,13 +231,13 @@ export function buildIssueEmbed(issue: IssueData): EmbedBuilder {
   if (issue.labels.length > 0) {
     embed.addFields({
       name: 'Labels',
-      value: issue.labels.map((l) => `\`${l}\``).join(' '),
+      value: formatLabelsField(issue.labels),
       inline: false,
     });
   }
 
   if (issue.body && issue.body.length > 0) {
-    embed.setDescription(truncateDescription(issue.body, 200));
+    embed.setDescription(safeDescription(issue.body, 200));
   }
 
   // Encode state metadata in footer for recovery
@@ -289,7 +294,7 @@ export function buildReleaseEmbed(
     });
 
   if (body && body.length > 0) {
-    embed.setDescription(truncateDescription(body, 500));
+    embed.setDescription(safeDescription(body, 500));
   }
 
   return embed;
@@ -331,7 +336,7 @@ export function buildDeploymentEmbed(
     );
 
   if (description) {
-    embed.setDescription(truncateDescription(description, 500));
+    embed.setDescription(safeDescription(description, 500));
   }
 
   if (targetUrl) {
@@ -351,7 +356,7 @@ export function buildPushEmbed(
   const maxDisplay = 5;
   const commitLines = commits.slice(0, maxDisplay).map(c => {
     const sha = c.id.substring(0, 7);
-    const firstLine = c.message.split('\n')[0];
+    const firstLine = escapeMaskedLinks(c.message.split('\n')[0]);
     const truncated = firstLine.length > 100 ? firstLine.substring(0, 97) + '...' : firstLine;
     return `\`${sha}\` ${truncated}`;
   });
@@ -410,7 +415,7 @@ export function buildDependabotAlertEmbed(payload: DependabotAlertPayload): Embe
     .setColor(SEVERITY_COLORS[severity] ?? Colors.Grey)
     .setTitle(truncateTitle(`🔓 Dependabot: ${capitalize(severity)} vulnerability in ${pkg}`))
     .setURL(alert.html_url)
-    .setDescription(alert.security_advisory.summary)
+    .setDescription(safeDescription(alert.security_advisory.summary, 4096))
     .addFields(
       { name: 'Severity', value: capitalize(severity), inline: true },
       { name: 'Package', value: `\`${pkg}\` (${alert.dependency.package.ecosystem})`, inline: true },
@@ -457,7 +462,7 @@ export function buildCodeScanningAlertEmbed(payload: CodeScanningAlertPayload): 
     .setColor(SEVERITY_COLORS[severity] ?? Colors.Grey)
     .setTitle(truncateTitle(`🔍 Code Scanning: ${alert.rule.name}`))
     .setURL(alert.html_url)
-    .setDescription(truncateDescription(alert.rule.description, 200))
+    .setDescription(safeDescription(alert.rule.description, 200))
     .addFields(
       { name: 'Rule', value: `\`${alert.rule.id}\``, inline: true },
       { name: 'Severity', value: capitalize(severity), inline: true },
@@ -547,8 +552,61 @@ function truncateTitle(title: string): string {
   return title.length > 256 ? title.substring(0, 255) + '…' : title;
 }
 
+const THREAD_NAME_LIMIT = 100; // Discord hard cap — exceeding it is an API 400
+
+/**
+ * Build a thread name that fits Discord's 100-char limit. The prefix length
+ * varies with the entity number, so the title budget must be computed from
+ * the full name — truncating the title alone overflows for large numbers.
+ */
+export function buildThreadName(kind: 'PR' | 'Issue', number: number, title: string): string {
+  const prefix = `${kind} #${number}: `;
+  const room = THREAD_NAME_LIMIT - prefix.length;
+  const fitted = title.length > room ? title.substring(0, Math.max(room - 1, 0)) + '…' : title;
+  // Unconditional clamp: an absurdly large entity number could leave no room
+  return (prefix + fitted).substring(0, THREAD_NAME_LIMIT);
+}
+
+const FIELD_VALUE_LIMIT = 1024; // Discord embed field value hard cap
+
+/** Join backtick-wrapped labels, capping at the field limit with a "+N more" tail. */
+function formatLabelsField(labels: string[]): string {
+  const parts: string[] = [];
+  let length = 0;
+  for (let i = 0; i < labels.length; i++) {
+    const piece = `\`${labels[i]}\``;
+    // Reserve room for the separator and the actual "+N more" tail
+    const tail = `+${labels.length - i} more`;
+    const reserve = i < labels.length - 1 ? tail.length + 1 : 0;
+    if (length + piece.length + 1 + reserve > FIELD_VALUE_LIMIT) {
+      parts.push(tail);
+      break;
+    }
+    parts.push(piece);
+    length += piece.length + 1;
+  }
+  // Unconditional clamp — the cap must hold for any inputs
+  const joined = parts.join(' ');
+  return joined.length > FIELD_VALUE_LIMIT ? joined.substring(0, FIELD_VALUE_LIMIT) : joined;
+}
+
 function truncateDescription(text: string, maxLength: number): string {
   return text.length > maxLength ? text.substring(0, maxLength - 3) + '...' : text;
+}
+
+/**
+ * Neutralize markdown masked links. Discord renders [text](url) inside embed
+ * descriptions, letting untrusted GitHub content (issue bodies, release notes,
+ * commit messages) display disguised phishing links with the bot's credibility.
+ * Escaping the opening bracket breaks link rendering; Discord shows it as "[".
+ */
+function escapeMaskedLinks(text: string): string {
+  return text.replace(/\[/g, '\\[');
+}
+
+/** Sanitize + length-cap untrusted text bound for an embed description. */
+function safeDescription(text: string, maxLength: number): string {
+  return truncateDescription(escapeMaskedLinks(text), maxLength);
 }
 
 function capitalize(str: string): string {

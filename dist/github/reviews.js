@@ -4,7 +4,7 @@
  * Used to detect Copilot and agent-review status by piggybacking on other events,
  * since GitHub Apps using GITHUB_TOKEN don't trigger workflows.
  */
-import { AGENT_REVIEW_PATTERNS, APPROVED_PATTERNS, CHANGES_REQUESTED_PATTERNS, } from '../patterns/agent-review.js';
+import { AGENT_REVIEW_PATTERNS, APPROVED_PATTERNS, CHANGES_REQUESTED_PATTERNS, isTrustedReviewAuthor, } from '../patterns/agent-review.js';
 import { safeErrorMessage } from '../utils/errors.js';
 /** Bound pagination — 10 pages × 100 items covers any realistic PR. */
 const MAX_PAGES = 10;
@@ -84,8 +84,11 @@ export async function checkForReviews(db, repo, prNumber, githubToken) {
     try {
         const commentsUrl = `https://api.github.com/repos/${owner}/${repoName}/issues/${prNumber}/comments?per_page=100`;
         const comments = await fetchAllPages(commentsUrl, headers, 'comments');
-        // Find the most recent agent-review comment
-        const matchingComments = comments.filter(c => AGENT_REVIEW_PATTERNS.some(p => p.test(c.body)));
+        // Find the most recent agent-review comment from a trusted author —
+        // without the author gate, any commenter's pattern-matching comment
+        // (even one that arrived after a real review) would set the status
+        const matchingComments = comments.filter(c => isTrustedReviewAuthor(c.user, c.author_association) &&
+            AGENT_REVIEW_PATTERNS.some(p => p.test(c.body)));
         const agentReviewComment = matchingComments
             .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
         if (agentReviewComment) {

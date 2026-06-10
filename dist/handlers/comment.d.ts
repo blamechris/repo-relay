@@ -12,6 +12,7 @@ export interface IssueCommentPayload {
             login: string;
             type: 'User' | 'Bot';
         };
+        author_association?: string;
         body: string;
         html_url: string;
         created_at: string;

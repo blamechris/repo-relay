@@ -52,4 +52,6 @@ export declare function buildEmbedWithStatus(db: StateDb, repo: string, prNumber
     ci: CiStatus;
 } | null;
 export declare function getOrCreateThread(channel: TextChannel, db: StateDb, repo: string, pr: PrData, existing: PrMessage): Promise<ThreadChannel>;
+/** Fetch a thread by ID and unarchive it; null if it doesn't exist. */
+export declare function fetchAndUnarchiveThread(channel: TextChannel, threadId: string): Promise<ThreadChannel | null>;
 //# sourceMappingURL=pr.d.ts.map
