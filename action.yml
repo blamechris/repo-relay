@@ -44,21 +44,27 @@ runs:
     - name: Install dependencies
       shell: bash
       working-directory: ${{ github.action_path }}
-      run: npm ci --omit=dev 2>/dev/null || npm ci --production
+      run: npm ci --omit=dev
 
     - name: Validate inputs
       shell: bash
+      # Inputs are passed via env and referenced as shell variables — never
+      # interpolated with ${{ }} into the script text, which would let a value
+      # containing shell metacharacters execute (classic Actions injection).
+      env:
+        DISCORD_BOT_TOKEN: ${{ inputs.discord_bot_token }}
+        CHANNEL_PRS: ${{ inputs.channel_prs }}
       run: |
-        if [ -z "${{ inputs.discord_bot_token }}" ]; then
+        if [ -z "$DISCORD_BOT_TOKEN" ]; then
           echo "::error::discord_bot_token is required but was not provided"
           exit 1
         fi
-        if [ -z "${{ inputs.channel_prs }}" ]; then
+        if [ -z "$CHANNEL_PRS" ]; then
           echo "::error::channel_prs is required but was not provided"
           exit 1
         fi
-        if ! [[ "${{ inputs.channel_prs }}" =~ ^[0-9]+$ ]]; then
-          echo "::error::channel_prs must be a numeric Discord channel ID, got: ${{ inputs.channel_prs }}"
+        if ! [[ "$CHANNEL_PRS" =~ ^[0-9]+$ ]]; then
+          echo "::error::channel_prs must be a numeric Discord channel ID, got: $CHANNEL_PRS"
           exit 1
         fi
         echo "Inputs validated successfully"
