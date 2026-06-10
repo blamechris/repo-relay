@@ -15,7 +15,11 @@ export function buildWorkflowTemplate(ciWorkflowName, features, defaultBranch = 
     if (features.pushEvents) {
         // NOTE: $default-branch is only substituted inside org workflow *templates*;
         // in a generated user workflow it would be a literal, dead branch filter.
-        eventLines.push('  push:', `    branches: [${defaultBranch}]`);
+        // Quote + escape the branch name — git refnames allow YAML-significant
+        // characters (quotes, braces, leading specials) that would break the
+        // flow sequence if emitted bare.
+        const escapedBranch = defaultBranch.replace(/(["\\])/g, '\\$1');
+        eventLines.push('  push:', `    branches: ["${escapedBranch}"]`);
     }
     if (features.issues) {
         eventLines.push('  issues:', '    types: [opened, closed, reopened]');

@@ -181,7 +181,7 @@ describe('buildWorkflowTemplate', () => {
     // $default-branch is a workflow-template-only macro — it must never appear
     // in a generated user workflow (it would be treated as a literal branch name)
     expect(result).not.toContain('$default-branch');
-    expect(result).toContain('branches: [main]');
+    expect(result).toContain('branches: ["main"]');
 
     // Core events still present
     expect(result).toContain('pull_request:');
@@ -191,7 +191,7 @@ describe('buildWorkflowTemplate', () => {
   it('pushEvents enabled with custom default branch: uses the provided branch', () => {
     const result = buildWorkflowTemplate('CI', { issues: false, releases: false, deployments: false, reviewPolling: false, pushEvents: true, securityAlerts: false }, 'develop');
 
-    expect(result).toContain('branches: [develop]');
+    expect(result).toContain('branches: ["develop"]');
     expect(result).not.toContain('$default-branch');
   });
 
