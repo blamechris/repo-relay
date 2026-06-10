@@ -19,6 +19,23 @@ const PROJECT_TYPES: Record<'library' | 'webapp' | 'app' | 'minimal', ProjectFea
   minimal: { issues: false, releases: false, deployments: false, reviewPolling: false, pushEvents: false, securityAlerts: false },
 };
 
+function getDefaultBranch(): string {
+  try {
+    const ref = execSync('git symbolic-ref refs/remotes/origin/HEAD', { encoding: 'utf-8' }).trim();
+    const match = ref.match(/refs\/remotes\/origin\/(.+)$/);
+    if (match) return match[1];
+  } catch {
+    // origin/HEAD not set locally — fall through to current branch
+  }
+  try {
+    const branch = execSync('git branch --show-current', { encoding: 'utf-8' }).trim();
+    if (branch) return branch;
+  } catch {
+    // not a git repo — use the conventional default
+  }
+  return 'main';
+}
+
 function getRepoUrl(): string | null {
   try {
     const remote = execSync('git remote get-url origin', { encoding: 'utf-8' }).trim();
@@ -238,7 +255,7 @@ async function main(): Promise<void> {
     }
   }
 
-  writeFileSync(workflowPath, buildWorkflowTemplate(ciWorkflow || 'CI', features));
+  writeFileSync(workflowPath, buildWorkflowTemplate(ciWorkflow || 'CI', features, getDefaultBranch()));
   console.log('\n✅ Created .github/workflows/discord-notify.yml\n');
 
   // Final instructions
