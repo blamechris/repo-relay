@@ -190,6 +190,10 @@ After merging, update the issue with:
 
 **NEVER commit directly to main.** Always use feature branches and PRs.
 
+### Unattended Merge Authority
+
+During autonomous sessions (`/autonomous-dev-flow`, `/tackle-issues`), a session-created PR may be self-merged ONLY after `/full-review` passes with a clean verdict, ALL CI checks are green on the final commit, and ALL review threads are resolved. NEVER use `gh pr merge --auto` or GitHub auto-merge — verify the gates, then merge synchronously and update the `v1` tag. Every self-merged PR MUST appear as an entry in the end-of-session report. If any gate fails, flag the PR and leave it for the user. Outside autonomous sessions, the default remains: present a summary and wait for explicit user confirmation before merging. Full gate definition: `.claude/commands/unattended-merge.md`.
+
 ### Merge Gate — MANDATORY short-circuit when merge is blocked
 
 When `gh pr merge` fails with "base branch policy prohibits the merge":
