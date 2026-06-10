@@ -91,16 +91,20 @@ export function buildCiReply(ci) {
     const status = getCiStatusText(ci);
     return `🔄 CI: ${status}`;
 }
+const MESSAGE_LIMIT = 2000; // Discord message content hard cap
 export function buildCiFailureReply(ci, failedSteps) {
     const base = buildCiReply(ci);
     if (failedSteps.length === 0)
         return base;
     const maxDisplay = 5;
-    const lines = failedSteps.slice(0, maxDisplay).map(s => `• \`${s.jobName}\` > \`${s.stepName}\``);
+    const maxNameLength = 80; // matrix job names can be arbitrarily long
+    const lines = failedSteps.slice(0, maxDisplay).map(s => `• \`${truncateDescription(s.jobName, maxNameLength)}\` > \`${truncateDescription(s.stepName, maxNameLength)}\``);
     if (failedSteps.length > maxDisplay) {
         lines.push(`...and ${failedSteps.length - maxDisplay} more`);
     }
-    return `${base}\n**Failed steps:**\n${lines.join('\n')}`;
+    const reply = `${base}\n**Failed steps:**\n${lines.join('\n')}`;
+    // Belt-and-suspenders: never exceed the message limit regardless of inputs
+    return reply.length > MESSAGE_LIMIT ? reply.substring(0, MESSAGE_LIMIT - 1) + '…' : reply;
 }
 export function buildReviewReply(type, status, comments, url) {
     if (type === 'copilot') {
@@ -136,7 +140,7 @@ export function buildIssueEmbed(issue) {
     if (issue.labels.length > 0) {
         embed.addFields({
             name: 'Labels',
-            value: issue.labels.map((l) => `\`${l}\``).join(' '),
+            value: formatLabelsField(issue.labels),
             inline: false,
         });
     }
@@ -364,6 +368,36 @@ function getIssueStateLabel(state, stateReason) {
 }
 function truncateTitle(title) {
     return title.length > 256 ? title.substring(0, 255) + '…' : title;
+}
+const THREAD_NAME_LIMIT = 100; // Discord hard cap — exceeding it is an API 400
+/**
+ * Build a thread name that fits Discord's 100-char limit. The prefix length
+ * varies with the entity number, so the title budget must be computed from
+ * the full name — truncating the title alone overflows for large numbers.
+ */
+export function buildThreadName(kind, number, title) {
+    const prefix = `${kind} #${number}: `;
+    const room = THREAD_NAME_LIMIT - prefix.length;
+    const fitted = title.length > room ? title.substring(0, room - 1) + '…' : title;
+    return prefix + fitted;
+}
+const FIELD_VALUE_LIMIT = 1024; // Discord embed field value hard cap
+/** Join backtick-wrapped labels, capping at the field limit with a "+N more" tail. */
+function formatLabelsField(labels) {
+    const parts = [];
+    let length = 0;
+    for (let i = 0; i < labels.length; i++) {
+        const piece = `\`${labels[i]}\``;
+        // Reserve room for the separator and a worst-case "+NN more" tail
+        const reserve = i < labels.length - 1 ? 12 : 0;
+        if (length + piece.length + 1 + reserve > FIELD_VALUE_LIMIT) {
+            parts.push(`+${labels.length - i} more`);
+            break;
+        }
+        parts.push(piece);
+        length += piece.length + 1;
+    }
+    return parts.join(' ');
 }
 function truncateDescription(text, maxLength) {
     return text.length > maxLength ? text.substring(0, maxLength - 3) + '...' : text;

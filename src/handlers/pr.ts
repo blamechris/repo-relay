@@ -4,7 +4,7 @@
 
 import { Client, TextChannel, ThreadChannel, ChannelType } from 'discord.js';
 import { StateDb, StoredPrData, PrMessage } from '../db/state.js';
-import { buildPrEmbed, buildPrComponents, buildMergedReply, buildClosedReply, buildPushReply, PrData, ReviewStatus, CiStatus } from '../embeds/builders.js';
+import { buildPrEmbed, buildPrComponents, buildMergedReply, buildClosedReply, buildPushReply, buildThreadName, PrData, ReviewStatus, CiStatus } from '../embeds/builders.js';
 import { getChannelForEvent, ChannelConfig } from '../config/channels.js';
 import { getExistingPrMessage } from '../discord/lookup.js';
 import { withRetry } from '../utils/retry.js';
@@ -124,7 +124,7 @@ async function handlePrOpened(
 
   // Create a thread for updates
   const thread = await withRetry(() => message.startThread({
-    name: `PR #${pr.number}: ${pr.title.substring(0, 90)}`,
+    name: buildThreadName('PR', pr.number, pr.title),
     autoArchiveDuration: 1440, // 24 hours
   }));
 
@@ -189,7 +189,7 @@ async function handlePrClosed(
 
     // Create a thread
     const thread = await withRetry(() => message.startThread({
-      name: `PR #${pr.number}: ${pr.title.substring(0, 90)}`,
+      name: buildThreadName('PR', pr.number, pr.title),
       autoArchiveDuration: 1440,
     }));
 
@@ -233,7 +233,7 @@ async function handlePrPush(
 
     // Create a thread for updates
     const thread = await withRetry(() => message.startThread({
-      name: `PR #${pr.number}: ${pr.title.substring(0, 90)}`,
+      name: buildThreadName('PR', pr.number, pr.title),
       autoArchiveDuration: 1440,
     }));
 
@@ -304,7 +304,7 @@ async function handlePrUpdated(
 
     // Create a thread for updates
     const thread = await withRetry(() => message.startThread({
-      name: `PR #${pr.number}: ${pr.title.substring(0, 90)}`,
+      name: buildThreadName('PR', pr.number, pr.title),
       autoArchiveDuration: 1440,
     }));
 
@@ -405,7 +405,7 @@ export async function getOrCreateThread(
   const message = await withRetry(() => channel.messages.fetch(existing.messageId));
   const thread = await withRetry(() =>
     message.startThread({
-      name: `PR #${pr.number}: ${pr.title.substring(0, 90)}`,
+      name: buildThreadName('PR', pr.number, pr.title),
       autoArchiveDuration: 1440,
     })
   );

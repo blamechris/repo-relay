@@ -67,6 +67,12 @@ export declare function buildForcePushEmbed(branch: string, beforeSha: string, a
 export declare function buildDependabotAlertEmbed(payload: DependabotAlertPayload): EmbedBuilder;
 export declare function buildSecretScanningAlertEmbed(payload: SecretScanningAlertPayload): EmbedBuilder;
 export declare function buildCodeScanningAlertEmbed(payload: CodeScanningAlertPayload): EmbedBuilder;
+/**
+ * Build a thread name that fits Discord's 100-char limit. The prefix length
+ * varies with the entity number, so the title budget must be computed from
+ * the full name — truncating the title alone overflows for large numbers.
+ */
+export declare function buildThreadName(kind: 'PR' | 'Issue', number: number, title: string): string;
 export declare function extractRepoFromUrl(url: string): string | null;
 export interface PrFooterMetadata {
     type: 'pr';
