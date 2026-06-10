@@ -6,7 +6,7 @@
 
 import { Client, Events, GatewayIntentBits, GuildChannel, PermissionsBitField, REST, Routes } from 'discord.js';
 import { StateDb } from './db/state.js';
-import { getChannelConfig, type ChannelConfig } from './config/channels.js';
+import { type ChannelConfig } from './config/channels.js';
 import {
   handlePrEvent,
   handleCiEvent,
@@ -28,13 +28,12 @@ import {
   type DependabotAlertPayload,
   type SecretScanningAlertPayload,
   type CodeScanningAlertPayload,
-  type SecurityAlertPayload,
 } from './handlers/index.js';
 import { checkForReviews } from './github/reviews.js';
 import { safeErrorMessage } from './utils/errors.js';
 import { REPO_NAME_PATTERN } from './utils/validation.js';
 import { withRetry } from './utils/retry.js';
-import { buildEmbedWithStatus } from './handlers/pr.js';
+import { buildEmbedWithStatus, getOrCreateThread } from './handlers/pr.js';
 import { buildPrEmbed, buildPrComponents, buildReviewReply } from './embeds/builders.js';
 import { TextChannel } from 'discord.js';
 import { getChannelForEvent } from './config/channels.js';
@@ -445,24 +444,23 @@ export class RepoRelay {
           await withRetry(() => message.edit({ embeds: [embed], components }));
           console.log(`[repo-relay] Updated embed for PR #${prNumber} with detected reviews`);
 
-          // Post to thread about detected reviews
-          if (existing.threadId) {
-            try {
-              const threadId = existing.threadId;
-              const thread = await withRetry(() => channel.threads.fetch(threadId));
-              if (thread) {
-                if (result.copilotReviewed && result.copilotUrl) {
-                  const reply = buildReviewReply('copilot', 'reviewed', undefined, result.copilotUrl);
-                  await withRetry(() => thread.send(reply));
-                }
-                if (result.agentReviewStatus !== 'pending' && result.agentReviewUrl) {
-                  const reply = buildReviewReply('agent', result.agentReviewStatus, undefined, result.agentReviewUrl);
-                  await withRetry(() => thread.send(reply));
-                }
-              }
-            } catch {
-              // Thread might be archived or deleted
+          // Post to thread about detected reviews. getOrCreateThread handles
+          // unarchiving — these are exactly the quiet PRs whose threads have
+          // auto-archived, and a raw thread.send would fail (50083) silently.
+          try {
+            const thread = await getOrCreateThread(channel, this.db, repo, statusData.prData, existing);
+            if (result.copilotReviewed && result.copilotUrl) {
+              const reply = buildReviewReply('copilot', 'reviewed', undefined, result.copilotUrl);
+              await withRetry(() => thread.send(reply));
             }
+            if (result.agentReviewStatus !== 'pending' && result.agentReviewUrl) {
+              const reply = buildReviewReply('agent', result.agentReviewStatus, undefined, result.agentReviewUrl);
+              await withRetry(() => thread.send(reply));
+            }
+          } catch (threadError) {
+            // The status is already persisted, so a dropped send won't retry —
+            // make the loss visible instead of swallowing it
+            console.log(`[repo-relay] Warning: Failed to post review update to thread for PR #${prNumber}: ${safeErrorMessage(threadError)}`);
           }
         }
       } catch (error) {

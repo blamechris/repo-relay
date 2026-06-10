@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { handleSecurityAlertEvent, type SecurityAlertPayload, type DependabotAlertPayload, type SecretScanningAlertPayload, type CodeScanningAlertPayload } from '../security.js';
+import { handleSecurityAlertEvent, type DependabotAlertPayload, type SecretScanningAlertPayload, type CodeScanningAlertPayload } from '../security.js';
 import { TextChannel } from 'discord.js';
 
 vi.mock('../../embeds/builders.js', () => ({
