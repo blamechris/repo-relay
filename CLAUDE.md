@@ -359,7 +359,7 @@ Lessons learned from integrating repo-relay into exodus-loop and archery-apprent
 
 1. **"Missing Access" error** - Bot connects but can't post. Usually missing Discord permissions at channel level. See [#12](https://github.com/blamechris/repo-relay/issues/12).
 
-2. **Review reply cascade** - Owner replies to Copilot comments trigger more notifications. Filtered automatically on personal repos (reviewer == repo owner + state `commented`); org-owned repos still need a workflow `if` filter because the owner is the org, never a human. See [#13](https://github.com/blamechris/repo-relay/issues/13) and [#146](https://github.com/blamechris/repo-relay/issues/146).
+2. **Review reply cascade** - Replies to Copilot review comments fire extra `pull_request_review` events with state `commented`. Filtered automatically on both personal and org-owned repos: `commented` reviews from human reviewers with `author_association` OWNER/MEMBER/COLLABORATOR are dropped (handler + pre-filter). No workflow `if` filter needed. See [#13](https://github.com/blamechris/repo-relay/issues/13) and [#146](https://github.com/blamechris/repo-relay/issues/146).
 
 3. **First-run failure** - Expected if secrets aren't configured. Users should configure secrets, then re-run.
 
