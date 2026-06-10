@@ -83,17 +83,29 @@ export async function handleCiEvent(client, db, channelConfig, payload, githubTo
         }
     }
 }
-function mapCiStatus(status, conclusion) {
+export function mapCiStatus(status, conclusion) {
     if (status === 'completed') {
         switch (conclusion) {
             case 'success':
+            case 'neutral':
+            case 'skipped':
+                // Informational outcomes deliberately render as success
                 return 'success';
             case 'failure':
+            case 'timed_out':
+            case 'startup_failure':
                 return 'failure';
             case 'cancelled':
+            case 'stale':
                 return 'cancelled';
+            case 'action_required':
+                // Blocked waiting on approval — not a pass, not a fail
+                return 'pending';
             default:
-                return 'success'; // neutral, skipped treated as success
+                // Fail safe: a completed run with an unrecognized (or null) conclusion
+                // must never render as "✅ Passed"
+                console.warn(`[repo-relay] Unknown workflow_run conclusion "${conclusion}" — treating as failure`);
+                return 'failure';
         }
     }
     if (status === 'in_progress') {

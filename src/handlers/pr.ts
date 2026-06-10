@@ -2,8 +2,8 @@
  * Pull Request event handler
  */
 
-import { Client, TextChannel, ThreadChannel, ChannelType } from 'discord.js';
-import { StateDb, StoredPrData, PrMessage } from '../db/state.js';
+import { Client, TextChannel, ThreadChannel } from 'discord.js';
+import { StateDb, PrMessage } from '../db/state.js';
 import { buildPrEmbed, buildPrComponents, buildMergedReply, buildClosedReply, buildPushReply, buildThreadName, PrData, ReviewStatus, CiStatus } from '../embeds/builders.js';
 import { getChannelForEvent, ChannelConfig } from '../config/channels.js';
 import { getExistingPrMessage } from '../discord/lookup.js';
@@ -118,6 +118,35 @@ async function handlePrOpened(
   repo: string,
   pr: PrData
 ): Promise<void> {
+  // Idempotency: workflow re-runs, webhook redeliveries, and close→reopen
+  // cycles all route here — reuse the existing embed instead of creating a
+  // duplicate (which would orphan the original message and thread forever)
+  const existing = await getExistingPrMessage(db, channel, repo, pr.number);
+  if (existing) {
+    try {
+      const message = await withRetry(() => channel.messages.fetch(existing.messageId));
+      savePrDataFromPrData(db, repo, pr);
+      db.savePrStatus(repo, pr.number);
+      const statusData = buildEmbedWithStatus(db, repo, pr.number);
+      const embed = statusData
+        ? buildPrEmbed(statusData.prData, statusData.ci, statusData.reviews)
+        : buildPrEmbed(pr);
+      const components = [buildPrComponents(pr.url, statusData?.ci.url)];
+      await withRetry(() => message.edit({ embeds: [embed], components }));
+      db.updatePrMessageTimestamp(repo, pr.number);
+      return;
+    } catch (error: unknown) {
+      // Message was deleted from Discord - clear stale DB entry
+      const errMsg = error instanceof Error ? error.message : String(error);
+      if (errMsg.includes('Unknown Message')) {
+        console.log(`[repo-relay] Stale message for PR #${pr.number}, creating new one`);
+        db.deletePrMessage(repo, pr.number);
+      } else {
+        throw error;
+      }
+    }
+  }
+
   const embed = buildPrEmbed(pr);
   const components = [buildPrComponents(pr.url)];
   const message = await withRetry(() => channel.send({ embeds: [embed], components }));
