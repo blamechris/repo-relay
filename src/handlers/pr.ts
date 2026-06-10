@@ -8,6 +8,7 @@ import { buildPrEmbed, buildPrComponents, buildMergedReply, buildClosedReply, bu
 import { getChannelForEvent, ChannelConfig } from '../config/channels.js';
 import { getExistingPrMessage } from '../discord/lookup.js';
 import { withRetry } from '../utils/retry.js';
+import { isThreadAlreadyCreatedError, isUnknownMessageError } from '../utils/discord-errors.js';
 
 export interface PrEventPayload {
   action: 'opened' | 'closed' | 'reopened' | 'synchronize' | 'edited' | 'ready_for_review' | 'converted_to_draft';
@@ -170,8 +171,7 @@ async function handlePrClosed(
       return;
     } catch (error: unknown) {
       // Message was deleted from Discord - clear stale DB entry
-      const errMsg = error instanceof Error ? error.message : String(error);
-      if (errMsg.includes('Unknown Message')) {
+      if (isUnknownMessageError(error)) {
         console.log(`[repo-relay] Stale message for PR #${pr.number}, creating new one`);
         db.deletePrMessage(repo, pr.number);
         existing = null;
@@ -214,8 +214,7 @@ async function handlePrPush(
       const messageId = existing.messageId;
       await withRetry(() => channel.messages.fetch(messageId));
     } catch (error: unknown) {
-      const errMsg = error instanceof Error ? error.message : String(error);
-      if (errMsg.includes('Unknown Message')) {
+      if (isUnknownMessageError(error)) {
         console.log(`[repo-relay] Stale message for PR #${pr.number}, creating new one`);
         db.deletePrMessage(repo, pr.number);
         existing = null;
@@ -285,8 +284,7 @@ async function handlePrUpdated(
       db.updatePrMessageTimestamp(repo, pr.number);
       return;
     } catch (error: unknown) {
-      const errMsg = error instanceof Error ? error.message : String(error);
-      if (errMsg.includes('Unknown Message')) {
+      if (isUnknownMessageError(error)) {
         console.log(`[repo-relay] Stale message for PR #${pr.number}, creating new one`);
         db.deletePrMessage(repo, pr.number);
         existing = null;
@@ -384,31 +382,39 @@ export async function getOrCreateThread(
   pr: PrData,
   existing: PrMessage
 ): Promise<ThreadChannel> {
-  // If we have a thread ID, try to fetch it
-  if (existing.threadId) {
-    try {
-      const threadId = existing.threadId;
-      const thread = await withRetry(() => channel.threads.fetch(threadId));
-      if (thread) {
-        // Unarchive if archived
-        if (thread.archived) {
-          await withRetry(async () => { await thread.setArchived(false); });
-        }
-        return thread;
-      }
-    } catch {
-      // Thread doesn't exist or was deleted, create a new one
+  // A message thread's ID equals its parent message's ID, so even when the
+  // DB has no threadId (channel-search recovery can't see archived threads —
+  // Message#thread is cache-only), the thread is still fetchable directly.
+  const threadId = existing.threadId ?? existing.messageId;
+  const recovered = await fetchAndUnarchiveThread(channel, threadId);
+  if (recovered) {
+    if (!existing.threadId) {
+      db.updatePrThread(repo, pr.number, recovered.id);
     }
+    return recovered;
   }
 
   // Create a new thread on the message
   const message = await withRetry(() => channel.messages.fetch(existing.messageId));
-  const thread = await withRetry(() =>
-    message.startThread({
-      name: `PR #${pr.number}: ${pr.title.substring(0, 90)}`,
-      autoArchiveDuration: 1440,
-    })
-  );
+  let thread: ThreadChannel;
+  try {
+    thread = await withRetry(() =>
+      message.startThread({
+        name: `PR #${pr.number}: ${pr.title.substring(0, 90)}`,
+        autoArchiveDuration: 1440,
+      })
+    );
+  } catch (error: unknown) {
+    // 160004: the message already has a thread we couldn't see — fetch it
+    if (isThreadAlreadyCreatedError(error)) {
+      const fallback = await fetchAndUnarchiveThread(channel, existing.messageId);
+      if (fallback) {
+        db.updatePrThread(repo, pr.number, fallback.id);
+        return fallback;
+      }
+    }
+    throw error;
+  }
 
   // Update the database with the new thread ID
   db.updatePrThread(repo, pr.number, thread.id);
@@ -416,4 +422,21 @@ export async function getOrCreateThread(
   await withRetry(() => thread.send(`📋 Updates for PR #${pr.number} will appear here.`));
 
   return thread;
+}
+
+/** Fetch a thread by ID and unarchive it; null if it doesn't exist. */
+export async function fetchAndUnarchiveThread(
+  channel: TextChannel,
+  threadId: string
+): Promise<ThreadChannel | null> {
+  try {
+    const thread = await withRetry(() => channel.threads.fetch(threadId));
+    if (!thread) return null;
+    if (thread.archived) {
+      await withRetry(async () => { await thread.setArchived(false); });
+    }
+    return thread;
+  } catch {
+    return null;
+  }
 }

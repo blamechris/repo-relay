@@ -9,6 +9,7 @@ import { getChannelForEvent, ChannelConfig } from '../config/channels.js';
 import { buildEmbedWithStatus, getOrCreateThread } from './pr.js';
 import { getExistingPrMessage } from '../discord/lookup.js';
 import { withRetry } from '../utils/retry.js';
+import { isUnknownMessageError } from '../utils/discord-errors.js';
 import { fetchFailedSteps } from '../github/ci.js';
 
 export interface WorkflowRunPayload {
@@ -109,8 +110,7 @@ export async function handleCiEvent(
         console.log(`[repo-relay] No PR data found, cannot rebuild embed`);
       }
     } catch (error: unknown) {
-      const errMsg = error instanceof Error ? error.message : String(error);
-      if (errMsg.includes('Unknown Message')) {
+      if (isUnknownMessageError(error)) {
         console.log(`[repo-relay] Stale message for PR #${pr.number}, clearing DB entry`);
         db.deletePrMessage(repo, pr.number);
       } else {

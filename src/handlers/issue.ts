@@ -8,6 +8,8 @@ import { buildIssueEmbed, buildIssueClosedReply, buildIssueReopenedReply, IssueD
 import { getChannelForEvent, ChannelConfig } from '../config/channels.js';
 import { getExistingIssueMessage } from '../discord/lookup.js';
 import { withRetry } from '../utils/retry.js';
+import { isThreadAlreadyCreatedError, isUnknownMessageError } from '../utils/discord-errors.js';
+import { fetchAndUnarchiveThread } from './pr.js';
 
 export interface IssueEventPayload {
   action: 'opened' | 'closed' | 'reopened' | 'labeled' | 'unlabeled' | 'edited';
@@ -136,8 +138,7 @@ async function handleIssueStateChange(
       db.updateIssueMessageTimestamp(repo, issue.number);
       return;
     } catch (error: unknown) {
-      const errMsg = error instanceof Error ? error.message : String(error);
-      if (errMsg.includes('Unknown Message')) {
+      if (isUnknownMessageError(error)) {
         console.log(`[repo-relay] Stale message for Issue #${issue.number}, creating new one`);
         db.deleteIssueMessage(repo, issue.number);
       } else {
@@ -184,28 +185,36 @@ export async function getOrCreateIssueThread(
   issue: IssueData,
   existing: IssueMessage
 ): Promise<ThreadChannel> {
-  if (existing.threadId) {
-    try {
-      const threadId = existing.threadId;
-      const thread = await withRetry(() => channel.threads.fetch(threadId));
-      if (thread) {
-        if (thread.archived) {
-          await withRetry(async () => { await thread.setArchived(false); });
-        }
-        return thread;
-      }
-    } catch {
-      // Thread doesn't exist or was deleted, create a new one
+  // Thread ID == parent message ID; archived threads are invisible to the
+  // cache-only Message#thread, so try a direct fetch even without a threadId.
+  const threadId = existing.threadId ?? existing.messageId;
+  const recovered = await fetchAndUnarchiveThread(channel, threadId);
+  if (recovered) {
+    if (!existing.threadId) {
+      db.updateIssueThread(repo, issue.number, recovered.id);
     }
+    return recovered;
   }
 
   const message = await withRetry(() => channel.messages.fetch(existing.messageId));
-  const thread = await withRetry(() =>
-    message.startThread({
-      name: `Issue #${issue.number}: ${issue.title.substring(0, 90)}`,
-      autoArchiveDuration: 1440,
-    })
-  );
+  let thread: ThreadChannel;
+  try {
+    thread = await withRetry(() =>
+      message.startThread({
+        name: `Issue #${issue.number}: ${issue.title.substring(0, 90)}`,
+        autoArchiveDuration: 1440,
+      })
+    );
+  } catch (error: unknown) {
+    if (isThreadAlreadyCreatedError(error)) {
+      const fallback = await fetchAndUnarchiveThread(channel, existing.messageId);
+      if (fallback) {
+        db.updateIssueThread(repo, issue.number, fallback.id);
+        return fallback;
+      }
+    }
+    throw error;
+  }
 
   db.updateIssueThread(repo, issue.number, thread.id);
 
