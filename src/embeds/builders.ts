@@ -237,7 +237,7 @@ export function buildIssueEmbed(issue: IssueData): EmbedBuilder {
   }
 
   if (issue.body && issue.body.length > 0) {
-    embed.setDescription(truncateDescription(issue.body, 200));
+    embed.setDescription(safeDescription(issue.body, 200));
   }
 
   // Encode state metadata in footer for recovery
@@ -294,7 +294,7 @@ export function buildReleaseEmbed(
     });
 
   if (body && body.length > 0) {
-    embed.setDescription(truncateDescription(body, 500));
+    embed.setDescription(safeDescription(body, 500));
   }
 
   return embed;
@@ -336,7 +336,7 @@ export function buildDeploymentEmbed(
     );
 
   if (description) {
-    embed.setDescription(truncateDescription(description, 500));
+    embed.setDescription(safeDescription(description, 500));
   }
 
   if (targetUrl) {
@@ -356,7 +356,7 @@ export function buildPushEmbed(
   const maxDisplay = 5;
   const commitLines = commits.slice(0, maxDisplay).map(c => {
     const sha = c.id.substring(0, 7);
-    const firstLine = c.message.split('\n')[0];
+    const firstLine = escapeMaskedLinks(c.message.split('\n')[0]);
     const truncated = firstLine.length > 100 ? firstLine.substring(0, 97) + '...' : firstLine;
     return `\`${sha}\` ${truncated}`;
   });
@@ -415,7 +415,7 @@ export function buildDependabotAlertEmbed(payload: DependabotAlertPayload): Embe
     .setColor(SEVERITY_COLORS[severity] ?? Colors.Grey)
     .setTitle(truncateTitle(`🔓 Dependabot: ${capitalize(severity)} vulnerability in ${pkg}`))
     .setURL(alert.html_url)
-    .setDescription(alert.security_advisory.summary)
+    .setDescription(safeDescription(alert.security_advisory.summary, 4096))
     .addFields(
       { name: 'Severity', value: capitalize(severity), inline: true },
       { name: 'Package', value: `\`${pkg}\` (${alert.dependency.package.ecosystem})`, inline: true },
@@ -462,7 +462,7 @@ export function buildCodeScanningAlertEmbed(payload: CodeScanningAlertPayload): 
     .setColor(SEVERITY_COLORS[severity] ?? Colors.Grey)
     .setTitle(truncateTitle(`🔍 Code Scanning: ${alert.rule.name}`))
     .setURL(alert.html_url)
-    .setDescription(truncateDescription(alert.rule.description, 200))
+    .setDescription(safeDescription(alert.rule.description, 200))
     .addFields(
       { name: 'Rule', value: `\`${alert.rule.id}\``, inline: true },
       { name: 'Severity', value: capitalize(severity), inline: true },
@@ -592,6 +592,21 @@ function formatLabelsField(labels: string[]): string {
 
 function truncateDescription(text: string, maxLength: number): string {
   return text.length > maxLength ? text.substring(0, maxLength - 3) + '...' : text;
+}
+
+/**
+ * Neutralize markdown masked links. Discord renders [text](url) inside embed
+ * descriptions, letting untrusted GitHub content (issue bodies, release notes,
+ * commit messages) display disguised phishing links with the bot's credibility.
+ * Escaping the opening bracket breaks link rendering; Discord shows it as "[".
+ */
+function escapeMaskedLinks(text: string): string {
+  return text.replace(/\[/g, '\\[');
+}
+
+/** Sanitize + length-cap untrusted text bound for an embed description. */
+function safeDescription(text: string, maxLength: number): string {
+  return truncateDescription(escapeMaskedLinks(text), maxLength);
 }
 
 function capitalize(str: string): string {

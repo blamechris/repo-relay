@@ -145,7 +145,7 @@ export function buildIssueEmbed(issue) {
         });
     }
     if (issue.body && issue.body.length > 0) {
-        embed.setDescription(truncateDescription(issue.body, 200));
+        embed.setDescription(safeDescription(issue.body, 200));
     }
     // Encode state metadata in footer for recovery
     const repo = extractRepoFromUrl(issue.url);
@@ -187,7 +187,7 @@ export function buildReleaseEmbed(name, tagName, url, author, authorAvatar, body
         inline: true,
     });
     if (body && body.length > 0) {
-        embed.setDescription(truncateDescription(body, 500));
+        embed.setDescription(safeDescription(body, 500));
     }
     return embed;
 }
@@ -210,7 +210,7 @@ export function buildDeploymentEmbed(state, environment, ref, sha, author, autho
     })
         .addFields({ name: 'Environment', value: environment, inline: true }, { name: 'Ref', value: `\`${ref}\``, inline: true }, { name: 'Commit', value: `\`${sha.substring(0, 7)}\``, inline: true }, { name: 'Status', value: capitalize(state), inline: true });
     if (description) {
-        embed.setDescription(truncateDescription(description, 500));
+        embed.setDescription(safeDescription(description, 500));
     }
     if (targetUrl) {
         embed.setURL(targetUrl);
@@ -221,7 +221,7 @@ export function buildPushEmbed(branch, commits, sender, senderAvatar, compareUrl
     const maxDisplay = 5;
     const commitLines = commits.slice(0, maxDisplay).map(c => {
         const sha = c.id.substring(0, 7);
-        const firstLine = c.message.split('\n')[0];
+        const firstLine = escapeMaskedLinks(c.message.split('\n')[0]);
         const truncated = firstLine.length > 100 ? firstLine.substring(0, 97) + '...' : firstLine;
         return `\`${sha}\` ${truncated}`;
     });
@@ -262,7 +262,7 @@ export function buildDependabotAlertEmbed(payload) {
         .setColor(SEVERITY_COLORS[severity] ?? Colors.Grey)
         .setTitle(truncateTitle(`🔓 Dependabot: ${capitalize(severity)} vulnerability in ${pkg}`))
         .setURL(alert.html_url)
-        .setDescription(alert.security_advisory.summary)
+        .setDescription(safeDescription(alert.security_advisory.summary, 4096))
         .addFields({ name: 'Severity', value: capitalize(severity), inline: true }, { name: 'Package', value: `\`${pkg}\` (${alert.dependency.package.ecosystem})`, inline: true });
     if (alert.security_advisory.cve_id) {
         embed.addFields({ name: 'CVE', value: alert.security_advisory.cve_id, inline: true });
@@ -295,7 +295,7 @@ export function buildCodeScanningAlertEmbed(payload) {
         .setColor(SEVERITY_COLORS[severity] ?? Colors.Grey)
         .setTitle(truncateTitle(`🔍 Code Scanning: ${alert.rule.name}`))
         .setURL(alert.html_url)
-        .setDescription(truncateDescription(alert.rule.description, 200))
+        .setDescription(safeDescription(alert.rule.description, 200))
         .addFields({ name: 'Rule', value: `\`${alert.rule.id}\``, inline: true }, { name: 'Severity', value: capitalize(severity), inline: true }, { name: 'Tool', value: alert.tool.name, inline: true }, { name: 'Location', value: `\`${location.path}:${location.start_line}\``, inline: true });
 }
 // Helper functions
@@ -405,6 +405,19 @@ function formatLabelsField(labels) {
 }
 function truncateDescription(text, maxLength) {
     return text.length > maxLength ? text.substring(0, maxLength - 3) + '...' : text;
+}
+/**
+ * Neutralize markdown masked links. Discord renders [text](url) inside embed
+ * descriptions, letting untrusted GitHub content (issue bodies, release notes,
+ * commit messages) display disguised phishing links with the bot's credibility.
+ * Escaping the opening bracket breaks link rendering; Discord shows it as "[".
+ */
+function escapeMaskedLinks(text) {
+    return text.replace(/\[/g, '\\[');
+}
+/** Sanitize + length-cap untrusted text bound for an embed description. */
+function safeDescription(text, maxLength) {
+    return truncateDescription(escapeMaskedLinks(text), maxLength);
 }
 function capitalize(str) {
     return str.charAt(0).toUpperCase() + str.slice(1);

@@ -8,7 +8,7 @@ import { buildEmbedWithStatus, getOrCreateThread } from './pr.js';
 import { getExistingPrMessage } from '../discord/lookup.js';
 import { withRetry } from '../utils/retry.js';
 import { isUnknownMessageError } from '../utils/discord-errors.js';
-import { AGENT_REVIEW_PATTERNS, APPROVED_PATTERNS, CHANGES_REQUESTED_PATTERNS, } from '../patterns/agent-review.js';
+import { AGENT_REVIEW_PATTERNS, APPROVED_PATTERNS, CHANGES_REQUESTED_PATTERNS, isTrustedReviewAuthor, } from '../patterns/agent-review.js';
 export async function handleCommentEvent(client, db, channelConfig, payload) {
     const { action, comment, issue, repository } = payload;
     const repo = repository.full_name;
@@ -21,6 +21,11 @@ export async function handleCommentEvent(client, db, channelConfig, payload) {
     // Check if this is an agent-review comment
     const isAgentReview = AGENT_REVIEW_PATTERNS.some((pattern) => pattern.test(body));
     if (!isAgentReview) {
+        return;
+    }
+    // Spoofing defense: only bots and repo insiders may set review state
+    if (!isTrustedReviewAuthor(comment.user, comment.author_association)) {
+        console.log(`[repo-relay] Ignoring agent-review-shaped comment from untrusted author @${comment.user.login} (${comment.author_association ?? 'no association'})`);
         return;
     }
     const channelId = getChannelForEvent(channelConfig, 'review');
