@@ -15,6 +15,10 @@ on:
   release:
     types: [published]
 
+# Serialize runs — concurrent jobs would race on the state cache
+concurrency:
+  group: repo-relay-${{ github.repository }}
+
 jobs:
   notify:
     runs-on: ubuntu-latest
@@ -26,7 +30,16 @@ jobs:
       (github.event_name != 'workflow_run' ||
        github.event.workflow_run.pull_requests[0] != null)
     steps:
-      - uses: blamechris/repo-relay@3a08a89260c725dffc11026f1d31edf874b0e0d9 # v1.0.2
+      # Persist SQLite state between runs. Per-run key: cache entries are
+      # immutable, so a constant key would freeze state at the first run.
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.repo-relay
+          key: repo-relay-state-${{ github.repository }}-${{ github.run_id }}
+          restore-keys: |
+            repo-relay-state-${{ github.repository }}-
+
+      - uses: blamechris/repo-relay@f08840b9c336b50f6aef8d6e157d8f7e705fa875 # v1.1.0
         with:
           discord_bot_token: ${{ secrets.DISCORD_BOT_TOKEN }}
           channel_prs: ${{ secrets.DISCORD_CHANNEL_PRS }}
