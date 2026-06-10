@@ -7,6 +7,7 @@ import { getChannelForEvent } from '../config/channels.js';
 import { buildEmbedWithStatus, getOrCreateThread } from './pr.js';
 import { getExistingPrMessage } from '../discord/lookup.js';
 import { withRetry } from '../utils/retry.js';
+import { isUnknownMessageError } from '../utils/discord-errors.js';
 import { fetchFailedSteps } from '../github/ci.js';
 export async function handleCiEvent(client, db, channelConfig, payload, githubToken) {
     const { workflow_run: run, repository } = payload;
@@ -72,8 +73,7 @@ export async function handleCiEvent(client, db, channelConfig, payload, githubTo
             }
         }
         catch (error) {
-            const errMsg = error instanceof Error ? error.message : String(error);
-            if (errMsg.includes('Unknown Message')) {
+            if (isUnknownMessageError(error)) {
                 console.log(`[repo-relay] Stale message for PR #${pr.number}, clearing DB entry`);
                 db.deletePrMessage(repo, pr.number);
             }
