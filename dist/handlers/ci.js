@@ -104,7 +104,7 @@ export function mapCiStatus(status, conclusion) {
             default:
                 // Fail safe: a completed run with an unrecognized (or null) conclusion
                 // must never render as "✅ Passed"
-                console.warn(`Unknown workflow_run conclusion "${conclusion}" — treating as failure`);
+                console.warn(`[repo-relay] Unknown workflow_run conclusion "${conclusion}" — treating as failure`);
                 return 'failure';
         }
     }
