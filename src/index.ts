@@ -4,7 +4,7 @@
  * Entry point for the bot library.
  */
 
-import { Client, GatewayIntentBits, GuildChannel, PermissionsBitField, REST, Routes } from 'discord.js';
+import { Client, Events, GatewayIntentBits, GuildChannel, PermissionsBitField, REST, Routes } from 'discord.js';
 import { StateDb } from './db/state.js';
 import { getChannelConfig, type ChannelConfig } from './config/channels.js';
 import {
@@ -67,6 +67,9 @@ export { REPO_NAME_PATTERN };
 /** Warn if scheduled polling exceeds 80% of the 5-min cron interval. */
 const POLL_WARN_THRESHOLD_MS = 4 * 60_000;
 
+/** Hard deadline for the gateway ready event after login. */
+const READY_TIMEOUT_MS = 60_000;
+
 const REQUIRED_PERMISSIONS = [
   { flag: PermissionsBitField.Flags.SendMessages, name: 'Send Messages' },
   { flag: PermissionsBitField.Flags.CreatePublicThreads, name: 'Create Public Threads' },
@@ -92,12 +95,24 @@ export class RepoRelay {
 
   constructor(config: RepoRelayConfig) {
     this.config = config;
-    this.client = new Client({
-      intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-      ],
+    this.client = this.createClient();
+  }
+
+  private createClient(): Client {
+    // Guilds alone suffices: the bot consumes no message gateway events and
+    // all reads/writes go through REST
+    const client = new Client({
+      intents: [GatewayIntentBits.Guilds],
     });
+    // A listener-less 'error' emit crashes the process with a raw stack,
+    // bypassing safeErrorMessage — always keep sanitized listeners attached
+    client.on(Events.Error, (err) => {
+      console.error(`[repo-relay] Discord client error: ${safeErrorMessage(err)}`);
+    });
+    client.on(Events.Warn, (msg) => {
+      console.log(`[repo-relay] Discord client warning: ${msg}`);
+    });
+    return client;
   }
 
   async connect(): Promise<void> {
@@ -110,8 +125,20 @@ export class RepoRelay {
     for (let attempt = 0; ; attempt++) {
       try {
         await new Promise<void>((resolve, reject) => {
-          this.client.once('ready', () => resolve());
-          this.client.login(this.config.discordToken).catch(reject);
+          // Hard deadline: if login resolves but ready never fires (gateway
+          // flap), a fire-once CLI must fail fast, not hang to the job timeout
+          const timeout = setTimeout(
+            () => reject(new Error(`Discord ready event not received within ${READY_TIMEOUT_MS / 1000}s`)),
+            READY_TIMEOUT_MS
+          );
+          this.client.once(Events.ClientReady, () => {
+            clearTimeout(timeout);
+            resolve();
+          });
+          this.client.login(this.config.discordToken).catch((err) => {
+            clearTimeout(timeout);
+            reject(err);
+          });
         });
         break;
       } catch (error) {
@@ -128,8 +155,8 @@ export class RepoRelay {
         const waitMs = resetAt.getTime() - Date.now();
         if (waitMs <= 0) {
           console.log(`[repo-relay] Session limit reset time has passed, retrying immediately (attempt ${attempt + 1}/${maxRetries})...`);
-          this.client.destroy();
-          this.client = new Client({ intents: this.client.options.intents });
+          await this.client.destroy();
+          this.client = this.createClient();
           continue;
         }
 
@@ -143,8 +170,8 @@ export class RepoRelay {
         const waitMin = (waitMs / 60_000).toFixed(1);
         console.log(`[repo-relay] Session limit exhausted. Waiting ${waitMin}min until reset at ${resetAt.toISOString()}...`);
         await new Promise(r => setTimeout(r, waitMs + 1000)); // +1s buffer
-        this.client.destroy();
-        this.client = new Client({ intents: this.client.options.intents });
+        await this.client.destroy();
+        this.client = this.createClient();
       }
     }
 
@@ -250,7 +277,9 @@ export class RepoRelay {
 
   async disconnect(): Promise<void> {
     this.db?.close();
-    this.client.destroy();
+    // destroy() is async — exiting before the gateway close handshake wastes
+    // a resumable session, which matters against the 1000/day identify budget
+    await this.client.destroy();
     console.log('[repo-relay] Disconnected from Discord');
   }
 

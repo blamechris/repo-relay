@@ -28,6 +28,7 @@ let loginImpl: () => Promise<string>;
 function makeMockClient() {
   const mockClient = {
     once: vi.fn(),
+    on: vi.fn(),
     login: vi.fn(),
     destroy: vi.fn(),
     user: { tag: 'test-bot#1234' },
@@ -37,7 +38,7 @@ function makeMockClient() {
   mockClient.login.mockImplementation(async () => {
     const result = await loginImpl();
     const readyCall = mockClient.once.mock.calls.find(
-      (c: unknown[]) => c[0] === 'ready'
+      (c: unknown[]) => c[0] === 'clientReady'
     );
     if (readyCall) readyCall[1]();
     return result;
