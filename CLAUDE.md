@@ -382,6 +382,10 @@ git push origin v1
 
 Consumers reference `uses: blamechris/repo-relay@v1` which resolves to this tag.
 
+## Repo Memory MCP
+
+The `repo-memory` MCP is available. Prefer `get_file_summary` over `Read` when exploring code you won't edit — it returns cached summaries and saves tokens. Also available: `get_project_map`, `get_related_files`, `search_by_purpose`. Use `Read` when you need exact lines or plan to edit. When launching subagents, tell them repo-memory tools are available.
+
 ### Key Files for Debugging
 
 | File | Purpose |
