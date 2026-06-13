@@ -17,8 +17,6 @@ Orchestrate long-running autonomous dev sessions — work through GitHub issues 
 ### Phase 0: Queue Setup
 
 ```bash
-REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
-
 BRANCH_PREFIX="auto/"
 ```
 
@@ -404,4 +402,4 @@ This makes the skill **idempotent** — safe to re-run without duplicating work.
 13. **Comment on skips** — Every skipped issue gets a GitHub comment explaining why. The user sees the reason.
 14. **Pre-Skill Checkpoint** — Re-read CLAUDE.md and skill files before running /full-review to prevent context drift.
 15. **Sync before branching** — Always `git checkout main && git pull` before starting each issue. Check for merged PRs first.
-<!-- skill-templates: autonomous-dev-flow 5ed9260 2026-06-10 -->
+<!-- skill-templates: autonomous-dev-flow 5df829a 2026-06-12 -->
