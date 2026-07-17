@@ -80,6 +80,11 @@ describe('isConfigError', () => {
     expect(isConfigError(new Error('Unknown Channel'))).toBe(true);
   });
 
+  it('classifies non-TokenInvalid DiscordjsError intent failures via the message fallback', () => {
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- pinning the fall-through for the deprecated code path
+    expect(isConfigError(new DiscordjsError(DiscordjsErrorCodes.DisallowedIntents))).toBe(true);
+  });
+
   it('does NOT classify Discord 5xx as config', () => {
     expect(isConfigError(makeApiError(500))).toBe(false);
     expect(isConfigError(makeApiError(503))).toBe(false);

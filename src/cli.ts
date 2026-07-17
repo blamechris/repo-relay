@@ -104,8 +104,13 @@ async function main(): Promise<void> {
       // annotate loudly but exit 0 so a notification hiccup doesn't fail the
       // consumer's check. Config errors (bad token, missing channel/perms)
       // still fail — they need the repo owner, not a retry.
-      // Single line: a raw newline ends a ::warning:: annotation mid-message
-      const message = safeErrorMessage(error).replace(/\r?\n/g, ' ');
+      // Workflow-command data escaping (same as @actions/core escapeData):
+      // raw %/CR/LF would truncate the annotation, and a LF would start a
+      // fresh line that could smuggle a new ::command::
+      const message = safeErrorMessage(error)
+        .replace(/%/g, '%25')
+        .replace(/\r/g, '%0D')
+        .replace(/\n/g, '%0A');
       console.log(`::warning::[repo-relay] Notification not delivered (best-effort): ${message}`);
     } else {
       console.error(`[repo-relay] ERROR: ${safeErrorMessage(error)}`);

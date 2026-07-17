@@ -28,9 +28,11 @@ const UNKNOWN_CHANNEL = 10003; // RESTJSONErrorCodes.UnknownChannel
 export function isConfigError(error) {
     if (error instanceof ConfigError)
         return true;
-    // Invalid bot token, rejected by client.login before any request is made
-    if (error instanceof DiscordjsError) {
-        return error.code === DiscordjsErrorCodes.TokenInvalid;
+    // Invalid bot token, rejected by client.login before any request is made.
+    // No early return for other DiscordjsError codes — they fall through to
+    // the message check below (e.g. DisallowedIntents)
+    if (error instanceof DiscordjsError && error.code === DiscordjsErrorCodes.TokenInvalid) {
+        return true;
     }
     // REST-level: malformed request (e.g. non-numeric channel ID), bad auth,
     // no access to the channel, or channel deleted
@@ -41,9 +43,11 @@ export function isConfigError(error) {
     }
     // Message fallbacks, same pattern as discord-errors.ts: gateway-level auth
     // failures (disallowed intents, close code 4014) surface as plain Errors
-    // from @discordjs/ws, and wrapped channel-lookup errors lose their class
+    // from @discordjs/ws ('Used disallowed intents'), discord.js's own intent
+    // error says 'Privileged intent...', and wrapped channel-lookup errors
+    // lose their class
     if (error instanceof Error) {
-        return /invalid token|disallowed intents|unknown channel/i.test(error.message);
+        return /invalid token|disallowed intents|privileged intent|unknown channel/i.test(error.message);
     }
     return false;
 }
