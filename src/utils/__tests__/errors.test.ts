@@ -81,7 +81,7 @@ describe('isConfigError', () => {
   });
 
   it('classifies non-TokenInvalid DiscordjsError intent failures via the message fallback', () => {
-    // eslint-disable-next-line @typescript-eslint/no-deprecated -- pinning the fall-through for the deprecated code path
+    // Deprecated enum member used on purpose: pins the fall-through for the code path
     expect(isConfigError(new DiscordjsError(DiscordjsErrorCodes.DisallowedIntents))).toBe(true);
   });
 
