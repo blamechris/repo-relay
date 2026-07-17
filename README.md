@@ -142,6 +142,7 @@ That's it! The action handles Node.js setup, dependency installation, and execut
 | `channel_releases` | No | `channel_prs` | Channel ID for release notifications |
 | `state_dir` | No | `~/.repo-relay` | Directory for SQLite state |
 | `github_token` | No | `github.token` | GitHub token for API access |
+| `best_effort` | No | `false` | Exit 0 with a warning on transient infra failures (Discord 5xx, timeouts); config errors (bad token, missing channel/permissions) still fail |
 
 <details>
 <summary><strong>Advanced: Manual Workflow Setup</strong></summary>

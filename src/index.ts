@@ -30,7 +30,7 @@ import {
   type CodeScanningAlertPayload,
 } from './handlers/index.js';
 import { checkForReviews } from './github/reviews.js';
-import { safeErrorMessage } from './utils/errors.js';
+import { ConfigError, isConfigError, safeErrorMessage } from './utils/errors.js';
 import { REPO_NAME_PATTERN } from './utils/validation.js';
 import { withRetry } from './utils/retry.js';
 import { buildEmbedWithStatus, getOrCreateThread } from './handlers/pr.js';
@@ -218,7 +218,12 @@ export class RepoRelay {
       let channel;
       try {
         channel = await withRetry(() => this.client.channels.fetch(channelId));
-      } catch {
+      } catch (error) {
+        // Only fold definitive config errors (bad auth, unknown channel) into
+        // the aggregate ConfigError below; transient trouble (exhausted 5xx
+        // retries, network) must propagate raw so best-effort delivery can
+        // classify it as infrastructure, not configuration
+        if (!isConfigError(error)) throw error;
         errors.push(
           `[repo-relay] ERROR: Could not access channel ${channelId}\n` +
           `  The channel may not exist or the bot may not have access to it.`
@@ -266,7 +271,7 @@ export class RepoRelay {
     if (errors.length > 0) {
       const message = errors.join('\n');
       console.error(message);
-      throw new Error(
+      throw new ConfigError(
         `Missing Discord permissions in ${errors.length} channel(s). See logs above for details.`
       );
     }
@@ -275,7 +280,13 @@ export class RepoRelay {
   }
 
   async disconnect(): Promise<void> {
-    this.db?.close();
+    try {
+      this.db?.close();
+    } catch (error) {
+      // A DB close failure must not skip the gateway teardown below — a live
+      // gateway socket would hold the event loop open until the job timeout
+      console.log(`[repo-relay] State DB close failed (non-fatal): ${safeErrorMessage(error)}`);
+    }
     // destroy() is async — exiting before the gateway close handshake wastes
     // a resumable session, which matters against the 1000/day identify budget
     await this.client.destroy();

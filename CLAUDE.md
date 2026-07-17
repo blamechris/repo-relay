@@ -296,6 +296,7 @@ npm run lint      # Run ESLint
 | `GITHUB_TOKEN` | Yes | For GitHub API access (review detection) |
 | `STATE_DIR` | No | Custom state directory (default: `~/.repo-relay`) |
 | `REPO_RELAY_SESSION_MAX_WAIT` | No | Max ms to wait for Discord session limit reset (default: `300000` = 5 min). Set to `0` to fail immediately. |
+| `REPO_RELAY_BEST_EFFORT` | No | `true`/`1`: exit 0 with a `::warning::` on transient infra failures (Discord 5xx, timeouts, network); definitive config errors (invalid token, disallowed intents, unknown/forbidden channel, missing permissions — see `isConfigError`) still exit 1. Set from the `best_effort` action input. |
 
 ## Code Patterns
 

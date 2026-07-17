@@ -8,7 +8,7 @@
 import { readFileSync, realpathSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { RepoRelay, type GitHubEventPayload } from './index.js';
-import { safeErrorMessage } from './utils/errors.js';
+import { isConfigError, safeErrorMessage } from './utils/errors.js';
 import { getChannelConfig } from './config/channels.js';
 import { shouldSkipEvent } from './pre-filter.js';
 import type { PrEventPayload } from './handlers/pr.js';
@@ -90,19 +90,45 @@ async function main(): Promise<void> {
     stateDir: process.env.STATE_DIR,
   });
 
+  const bestEffortEnv = (process.env.REPO_RELAY_BEST_EFFORT ?? '').trim().toLowerCase();
+  const bestEffort = bestEffortEnv === 'true' || bestEffortEnv === '1';
+
   try {
     await relay.connect();
     await relay.validatePermissions();
     await relay.handleEvent(eventData);
     console.log('[repo-relay] Event processed successfully');
   } catch (error) {
-    console.error(`[repo-relay] ERROR: ${safeErrorMessage(error)}`);
-    // exitCode (not exit()) so the finally block runs: disconnect() closes
-    // the DB with a WAL checkpoint — skipping it leaves a dirty WAL for the
-    // actions/cache post step to snapshot
-    process.exitCode = 1;
+    if (bestEffort && !isConfigError(error)) {
+      // Transient infrastructure trouble (Discord 5xx, timeouts, network):
+      // annotate loudly but exit 0 so a notification hiccup doesn't fail the
+      // consumer's check. Config errors (bad token, missing channel/perms)
+      // still fail — they need the repo owner, not a retry.
+      // Workflow-command data escaping (same as @actions/core escapeData):
+      // raw %/CR/LF would truncate the annotation, and a LF would start a
+      // fresh line that could smuggle a new ::command::
+      const message = safeErrorMessage(error)
+        .replace(/%/g, '%25')
+        .replace(/\r/g, '%0D')
+        .replace(/\n/g, '%0A');
+      console.log(`::warning::[repo-relay] Notification not delivered (best-effort): ${message}`);
+    } else {
+      console.error(`[repo-relay] ERROR: ${safeErrorMessage(error)}`);
+      // exitCode (not exit()) so the finally block runs: disconnect() closes
+      // the DB with a WAL checkpoint — skipping it leaves a dirty WAL for the
+      // actions/cache post step to snapshot
+      process.exitCode = 1;
+    }
   } finally {
-    await relay.disconnect();
+    try {
+      await relay.disconnect();
+    } catch (error) {
+      // Teardown trouble must not override the delivery outcome (a gateway
+      // mid-outage can fail the close handshake) — but a half-destroyed
+      // client can hold the event loop open, so force the exit
+      console.log(`[repo-relay] Disconnect failed (non-fatal): ${safeErrorMessage(error)}`);
+      process.exit(process.exitCode ?? 0);
+    }
   }
 }
 
