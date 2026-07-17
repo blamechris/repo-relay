@@ -32,17 +32,18 @@ export function isConfigError(error) {
     if (error instanceof DiscordjsError) {
         return error.code === DiscordjsErrorCodes.TokenInvalid;
     }
-    // REST-level: bad auth, no access to the channel, or channel deleted
+    // REST-level: malformed request (e.g. non-numeric channel ID), bad auth,
+    // no access to the channel, or channel deleted
     if (error instanceof DiscordAPIError) {
-        if (error.status === 401 || error.status === 403)
+        if (error.status === 400 || error.status === 401 || error.status === 403)
             return true;
         return error.code === UNKNOWN_CHANNEL;
     }
-    // Gateway-level auth failures (e.g. disallowed intents, close code 4014)
-    // surface as plain Errors from @discordjs/ws — match by message, same
-    // fallback pattern as discord-errors.ts
+    // Message fallbacks, same pattern as discord-errors.ts: gateway-level auth
+    // failures (disallowed intents, close code 4014) surface as plain Errors
+    // from @discordjs/ws, and wrapped channel-lookup errors lose their class
     if (error instanceof Error) {
-        return /invalid token|disallowed intents/i.test(error.message);
+        return /invalid token|disallowed intents|unknown channel/i.test(error.message);
     }
     return false;
 }

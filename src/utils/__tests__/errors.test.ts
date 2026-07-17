@@ -61,7 +61,8 @@ describe('isConfigError', () => {
     expect(isConfigError(new DiscordjsError(DiscordjsErrorCodes.TokenInvalid))).toBe(true);
   });
 
-  it('classifies REST 401/403 as config', () => {
+  it('classifies REST 400/401/403 as config', () => {
+    expect(isConfigError(makeApiError(400))).toBe(true); // e.g. malformed channel ID
     expect(isConfigError(makeApiError(401))).toBe(true);
     expect(isConfigError(makeApiError(403, 50001))).toBe(true); // Missing Access
   });
@@ -73,6 +74,10 @@ describe('isConfigError', () => {
   it('classifies gateway auth failures by message (plain Errors from @discordjs/ws)', () => {
     expect(isConfigError(new Error('Used disallowed intents'))).toBe(true);
     expect(isConfigError(new Error('An invalid token was provided.'))).toBe(true);
+  });
+
+  it('classifies wrapped Unknown Channel errors by message', () => {
+    expect(isConfigError(new Error('Unknown Channel'))).toBe(true);
   });
 
   it('does NOT classify Discord 5xx as config', () => {

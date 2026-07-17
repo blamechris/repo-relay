@@ -90,8 +90,8 @@ async function main(): Promise<void> {
     stateDir: process.env.STATE_DIR,
   });
 
-  const bestEffort =
-    process.env.REPO_RELAY_BEST_EFFORT === 'true' || process.env.REPO_RELAY_BEST_EFFORT === '1';
+  const bestEffortEnv = (process.env.REPO_RELAY_BEST_EFFORT ?? '').trim().toLowerCase();
+  const bestEffort = bestEffortEnv === 'true' || bestEffortEnv === '1';
 
   try {
     await relay.connect();
@@ -104,7 +104,9 @@ async function main(): Promise<void> {
       // annotate loudly but exit 0 so a notification hiccup doesn't fail the
       // consumer's check. Config errors (bad token, missing channel/perms)
       // still fail — they need the repo owner, not a retry.
-      console.log(`::warning::[repo-relay] Notification not delivered (best-effort): ${safeErrorMessage(error)}`);
+      // Single line: a raw newline ends a ::warning:: annotation mid-message
+      const message = safeErrorMessage(error).replace(/\r?\n/g, ' ');
+      console.log(`::warning::[repo-relay] Notification not delivered (best-effort): ${message}`);
     } else {
       console.error(`[repo-relay] ERROR: ${safeErrorMessage(error)}`);
       // exitCode (not exit()) so the finally block runs: disconnect() closes
@@ -117,8 +119,10 @@ async function main(): Promise<void> {
       await relay.disconnect();
     } catch (error) {
       // Teardown trouble must not override the delivery outcome (a gateway
-      // mid-outage can fail the close handshake)
+      // mid-outage can fail the close handshake) — but a half-destroyed
+      // client can hold the event loop open, so force the exit
       console.log(`[repo-relay] Disconnect failed (non-fatal): ${safeErrorMessage(error)}`);
+      process.exit(process.exitCode ?? 0);
     }
   }
 }
