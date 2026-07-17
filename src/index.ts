@@ -30,7 +30,7 @@ import {
   type CodeScanningAlertPayload,
 } from './handlers/index.js';
 import { checkForReviews } from './github/reviews.js';
-import { safeErrorMessage } from './utils/errors.js';
+import { ConfigError, safeErrorMessage } from './utils/errors.js';
 import { REPO_NAME_PATTERN } from './utils/validation.js';
 import { withRetry } from './utils/retry.js';
 import { buildEmbedWithStatus, getOrCreateThread } from './handlers/pr.js';
@@ -266,7 +266,7 @@ export class RepoRelay {
     if (errors.length > 0) {
       const message = errors.join('\n');
       console.error(message);
-      throw new Error(
+      throw new ConfigError(
         `Missing Discord permissions in ${errors.length} channel(s). See logs above for details.`
       );
     }

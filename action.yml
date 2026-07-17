@@ -32,6 +32,15 @@ inputs:
   github_token:
     description: 'GitHub token for API access (review detection). Defaults to github.token'
     required: false
+  best_effort:
+    description: >-
+      Tolerate transient infrastructure failures (Discord 5xx, timeouts,
+      network errors) by exiting 0 with a warning annotation, so a
+      notification hiccup never fails the consuming workflow. Definitive
+      configuration errors (invalid token, disallowed intents,
+      unknown/forbidden channel, missing channel permissions) still fail.
+    required: false
+    default: 'false'
 
 runs:
   using: 'composite'
@@ -81,4 +90,5 @@ runs:
         DISCORD_CHANNEL_SECURITY: ${{ inputs.channel_security }}
         GITHUB_TOKEN: ${{ inputs.github_token || github.token }}
         STATE_DIR: ${{ inputs.state_dir }}
+        REPO_RELAY_BEST_EFFORT: ${{ inputs.best_effort }}
       run: node dist/cli.js

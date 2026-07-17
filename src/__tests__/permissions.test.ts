@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PermissionsBitField } from 'discord.js';
 import { RepoRelay } from '../index.js';
+import { ConfigError } from '../utils/errors.js';
 
 const ALL_REQUIRED = [
   PermissionsBitField.Flags.SendMessages,
@@ -82,6 +83,18 @@ describe('validatePermissions', () => {
     const relay = createRelay(client, { prs: '111' });
 
     await expect(relay.validatePermissions()).rejects.toThrow('Missing Discord permissions');
+  });
+
+  it('throws a ConfigError so best-effort delivery still fails on it', async () => {
+    const withoutSendMessages = ALL_REQUIRED.filter(
+      (f) => f !== PermissionsBitField.Flags.SendMessages,
+    );
+    const perms = makePermissions(withoutSendMessages);
+    const channel = makeMockChannel('111', perms);
+    const client = makeMockClient({ '111': channel });
+    const relay = createRelay(client, { prs: '111' });
+
+    await expect(relay.validatePermissions()).rejects.toBeInstanceOf(ConfigError);
   });
 
   it('error message lists the specific missing permission', async () => {

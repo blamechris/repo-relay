@@ -8,7 +8,7 @@
 import { readFileSync, realpathSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { RepoRelay, type GitHubEventPayload } from './index.js';
-import { safeErrorMessage } from './utils/errors.js';
+import { isConfigError, safeErrorMessage } from './utils/errors.js';
 import { getChannelConfig } from './config/channels.js';
 import { shouldSkipEvent } from './pre-filter.js';
 import type { PrEventPayload } from './handlers/pr.js';
@@ -90,19 +90,36 @@ async function main(): Promise<void> {
     stateDir: process.env.STATE_DIR,
   });
 
+  const bestEffort =
+    process.env.REPO_RELAY_BEST_EFFORT === 'true' || process.env.REPO_RELAY_BEST_EFFORT === '1';
+
   try {
     await relay.connect();
     await relay.validatePermissions();
     await relay.handleEvent(eventData);
     console.log('[repo-relay] Event processed successfully');
   } catch (error) {
-    console.error(`[repo-relay] ERROR: ${safeErrorMessage(error)}`);
-    // exitCode (not exit()) so the finally block runs: disconnect() closes
-    // the DB with a WAL checkpoint — skipping it leaves a dirty WAL for the
-    // actions/cache post step to snapshot
-    process.exitCode = 1;
+    if (bestEffort && !isConfigError(error)) {
+      // Transient infrastructure trouble (Discord 5xx, timeouts, network):
+      // annotate loudly but exit 0 so a notification hiccup doesn't fail the
+      // consumer's check. Config errors (bad token, missing channel/perms)
+      // still fail — they need the repo owner, not a retry.
+      console.log(`::warning::[repo-relay] Notification not delivered (best-effort): ${safeErrorMessage(error)}`);
+    } else {
+      console.error(`[repo-relay] ERROR: ${safeErrorMessage(error)}`);
+      // exitCode (not exit()) so the finally block runs: disconnect() closes
+      // the DB with a WAL checkpoint — skipping it leaves a dirty WAL for the
+      // actions/cache post step to snapshot
+      process.exitCode = 1;
+    }
   } finally {
-    await relay.disconnect();
+    try {
+      await relay.disconnect();
+    } catch (error) {
+      // Teardown trouble must not override the delivery outcome (a gateway
+      // mid-outage can fail the close handshake)
+      console.log(`[repo-relay] Disconnect failed (non-fatal): ${safeErrorMessage(error)}`);
+    }
   }
 }
 
