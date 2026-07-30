@@ -1,3 +1,7 @@
+---
+description: "A reload-resilient north star for an unattended, multi-wave backlog-clearing marathon — a compact, self-contained constitution you re-invoke after every..."
+---
+
 # /prime-directive
 
 A reload-resilient north star for an unattended, multi-wave backlog-clearing marathon — a compact, self-contained constitution you re-invoke after every context compaction to re-establish the mission, the authority you were granted, the per-issue loop, and the never-strip guardrails before resuming. Where `/tackle-issues` and `/autonomous-dev-flow` are the machinery, this is the constitution that keeps a long autonomous run from drifting as its context is summarized and rebuilt.
@@ -101,5 +105,3 @@ Run a **SOLID + DRY** whole-project audit (`/swarm-audit`) and file / act on its
 - **Queue:** `scratchpad/autonomous-queue.json`. The durable wave queue the next session is seeded from.
 - **This directive:** invoke `/prime-directive` (compiled live artifact: `.claude/skills/prime-directive/SKILL.md`). Do not depend on the `.claude/commands/` path resolving (Reliability rule 1).
 - **Issue list:** `gh issue list --state open`.
-
-<!-- skill-templates: prime-directive 8196307 2026-07-30 -->

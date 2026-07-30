@@ -2,8 +2,9 @@
   "registry": "blamechris/skill-templates",
   "skills": {
     "autonomous-dev-flow": {
-      "hash": "d4fba03",
-      "installed": "2026-07-30"
+      "hash": "8196307",
+      "installed": "2026-07-30",
+      "targets": ["claude"]
     },
     "catchup": {
       "hash": "3f7f775",
@@ -14,12 +15,14 @@
       "installed": "2026-07-30"
     },
     "prime-directive": {
-      "hash": "d4fba03",
-      "installed": "2026-07-30"
+      "hash": "8196307",
+      "installed": "2026-07-30",
+      "targets": ["claude"]
     },
     "session-lifecycle": {
-      "hash": "f7bc0db",
-      "installed": "2026-07-30"
+      "hash": "8196307",
+      "installed": "2026-07-30",
+      "targets": ["claude"]
     },
     "skill": {
       "hash": "7b4d37f",
@@ -30,12 +33,14 @@
       "installed": "2026-06-12"
     },
     "tackle-issues": {
-      "hash": "d4fba03",
-      "installed": "2026-07-30"
+      "hash": "8196307",
+      "installed": "2026-07-30",
+      "targets": ["claude"]
     },
     "tiered-delegation": {
-      "hash": "a9ed830",
-      "installed": "2026-07-30"
+      "hash": "8196307",
+      "installed": "2026-07-30",
+      "targets": ["claude"]
     },
     "unattended-merge": {
       "hash": "d3cd6f5",

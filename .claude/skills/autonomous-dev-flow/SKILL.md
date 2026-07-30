@@ -1,3 +1,7 @@
+---
+description: "Orchestrate long-running autonomous dev sessions — work through GitHub issues sequentially with TDD, create PRs, run /full-review, then merge or flag..."
+---
+
 # /autonomous-dev-flow
 
 Orchestrate long-running autonomous dev sessions — work through GitHub issues sequentially with TDD, create PRs, run /full-review, then merge or flag according to this repo's self-merge posture, and continue to the next issue. PRs that don't merge accumulate for asynchronous user review while work continues.
@@ -455,5 +459,3 @@ This makes the skill **idempotent** — safe to re-run without duplicating work.
 13. **Comment on skips** — Every skipped issue gets a GitHub comment explaining why. The user sees the reason.
 14. **Pre-Skill Checkpoint** — Re-read CLAUDE.md and skill files before running /full-review to prevent context drift.
 15. **Sync before branching** — Always `git checkout main && git pull` before starting each issue. Check for merged PRs first.
-
-<!-- skill-templates: autonomous-dev-flow 8196307 2026-07-30 -->

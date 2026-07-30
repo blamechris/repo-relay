@@ -1,3 +1,7 @@
+---
+description: "The cost-discipline constitution for multi-agent work: the **session's top model orchestrates; cheaper tiers execute**."
+---
+
 # /tiered-delegation
 
 The cost-discipline constitution for multi-agent work: the **session's top model orchestrates; cheaper tiers execute**. Invoke it when a session is about to fan out subagents or workflows (audits, marathons, parallel implementation, large research) to load the delegation rules — who does what tier of work, how far down to push each task, and when a claim must be re-verified before it drives an action. It composes with the marathon machinery (`/prime-directive`, `/tackle-issues`, `/parallel-dev`) and with ad-hoc Workflow/Agent fan-outs alike.
@@ -64,5 +68,3 @@ When only one tier exists, everything runs at the ceiling and this skill's value
 - Running a whole marathon with the top-most tier as the session model "for quality" — paying ~2x cache-read on every orchestration turn for work a mid-tier ceiling handles; the top tier earns its rate only at convergence/adjudication/decomposition moments.
 - A skill hard-coding a top-tier model, breaking sessions that run below it.
 - The orchestrator re-grepping what a delegated explorer is already searching, paying twice.
-
-<!-- skill-templates: tiered-delegation 8196307 2026-07-30 -->

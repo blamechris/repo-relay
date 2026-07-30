@@ -1,3 +1,7 @@
+---
+description: "Run an unattended marathon session that works through GitHub issues across multiple waves until convergence — all issues are resolved, or all remaining..."
+---
+
 # /tackle-issues
 
 Run an unattended marathon session that works through GitHub issues across multiple waves until convergence — all issues are resolved, or all remaining issues are genuinely blocked. Designed to maximize overnight/extended usage windows.
@@ -415,5 +419,3 @@ This makes the skill **idempotent** — safe to re-run without duplicating work.
 17. **Morning summary is mandatory** — Even if interrupted, output the best summary possible with data collected so far.
 18. **Wave boundaries are session boundaries** — Shed context at each wave boundary, mode-aware: end + restart fresh from handoff note + queue + the ledger's STATE header where the user or a configured re-launcher will relaunch; force a boundary compaction and continue where nothing would. Respect the ~150K main-thread context ceiling and the per-wave cost circuit breaker (see Session Boundaries and the Session Ledger).
 19. **STATE header over full re-reads** — After compaction, read only the ledger's STATE header; the full ledger history is on-demand reference, never a mandatory re-read.
-
-<!-- skill-templates: tackle-issues 8196307 2026-07-30 -->
