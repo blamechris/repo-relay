@@ -10,7 +10,7 @@ The core invariant: **the model you are running as is the ceiling, not the defau
 
 ## The tier ladder
 
-not documented per-repo — this is a property of the user's Claude Code harness, not this repo. Check the harness's own tier listing at session start rather than assuming a fixed roster; never assume a tier is present that the harness doesn't currently list
+For this user's harness: **fable > opus > sonnet > haiku**. Fable (top-tier) is present only when the session itself runs on it — never hard-code it in a worker brief. Billing asymmetry worth exploiting: Claude-subscription TUI sessions draw the fat interactive quota while headless/SDK/API work is metered separately, so high-volume mechanical fan-outs belong on the cheapest adequate tier, not the ceiling.
 
 Resolve the ladder **relative to the session model** at invocation time:
 
