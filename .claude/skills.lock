@@ -1,0 +1,49 @@
+{
+  "registry": "blamechris/skill-templates",
+  "skills": {
+    "autonomous-dev-flow": {
+      "hash": "d4fba03",
+      "installed": "2026-07-30"
+    },
+    "catchup": {
+      "hash": "3f7f775",
+      "installed": "2026-07-30"
+    },
+    "learn": {
+      "hash": "df2de5e",
+      "installed": "2026-07-30"
+    },
+    "prime-directive": {
+      "hash": "d4fba03",
+      "installed": "2026-07-30"
+    },
+    "session-lifecycle": {
+      "hash": "f7bc0db",
+      "installed": "2026-07-30"
+    },
+    "skill": {
+      "hash": "7b4d37f",
+      "installed": "2026-07-30"
+    },
+    "start-working": {
+      "hash": "5df829a",
+      "installed": "2026-06-12"
+    },
+    "tackle-issues": {
+      "hash": "d4fba03",
+      "installed": "2026-07-30"
+    },
+    "tiered-delegation": {
+      "hash": "a9ed830",
+      "installed": "2026-07-30"
+    },
+    "unattended-merge": {
+      "hash": "d3cd6f5",
+      "installed": "2026-06-10"
+    },
+    "visual-brief": {
+      "hash": "a85c799",
+      "installed": "2026-07-30"
+    }
+  }
+}

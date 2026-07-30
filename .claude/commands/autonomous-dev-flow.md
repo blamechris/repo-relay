@@ -1,6 +1,6 @@
 # /autonomous-dev-flow
 
-Orchestrate long-running autonomous dev sessions — work through GitHub issues sequentially with TDD, create PRs, run /full-review, and continue to the next issue. The user reviews and merges PRs asynchronously while work continues.
+Orchestrate long-running autonomous dev sessions — work through GitHub issues sequentially with TDD, create PRs, run /full-review, then merge or flag according to this repo's self-merge posture, and continue to the next issue. PRs that don't merge accumulate for asynchronous user review while work continues.
 
 ## Arguments
 
@@ -17,6 +17,7 @@ Orchestrate long-running autonomous dev sessions — work through GitHub issues 
 ### Phase 0: Queue Setup
 
 ```bash
+# "auto/"
 BRANCH_PREFIX="auto/"
 ```
 
@@ -180,6 +181,7 @@ ISSUE_TITLE=$(gh issue view "${ISSUE_NUM}" --json title -q '.title')
 SLUG=$(printf '%s' "${ISSUE_TITLE}" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+|-+$//g' | cut -c1-40)
 
 # Create branch from issue number + slug
+# `auto/<number>-<slug>`
 BRANCH="${BRANCH_PREFIX}${ISSUE_NUM}-${SLUG}"
 git checkout -b "${BRANCH}"
 ```
@@ -191,9 +193,11 @@ git checkout -b "${BRANCH}"
 Based on the issue's acceptance criteria, write tests that describe the desired behavior. Tests MUST fail before any implementation.
 
 ```bash
-npm test
+# npm test
+# Test files follow `__tests__/*.test.ts` convention
 
-# Test files follow __tests__/*.test.ts convention
+# Run tests to confirm they fail
+${TEST_COMMAND}
 ```
 
 If tests pass immediately, the behavior already exists — investigate before proceeding. Either the issue is already resolved or the tests don't capture the right behavior.
@@ -204,7 +208,7 @@ Write the minimum implementation to make all new tests pass. Don't over-engineer
 
 ```bash
 # Run tests to confirm they pass
-npm test
+${TEST_COMMAND}
 ```
 
 If tests still fail, iterate on the implementation until they pass. Do NOT move to REFACTOR until all tests are green.
@@ -219,9 +223,10 @@ With green tests as a safety net:
 
 ```bash
 # Run tests again to confirm refactoring didn't break anything
-npm test
+${TEST_COMMAND}
 
-npm run typecheck
+# npm run typecheck
+${LINT_COMMAND}
 ```
 
 ### Phase 4: Commit and PR Creation
@@ -242,7 +247,7 @@ Refs #${ISSUE_NUM}
 EOF
 )"
 
-# Commit scopes: discord, github, db, cli, core
+# discord, github, db, cli, core
 
 git push -u origin ${BRANCH}
 ```
@@ -275,13 +280,40 @@ Refs #${ISSUE_NUM}
 
 - [ ] All new tests pass
 - [ ] Existing tests unbroken
-- [ ] TypeScript type-checks clean
-- [ ] npm run build succeeds
+- [ ] TypeScript type-checks clean (`npm run typecheck`)
+- [ ] `npm run build` succeeds
 EOF
 )")
 
 PR_NUM=$(echo "$PR_URL" | grep -oE '[0-9]+$')
 ```
+
+### Phase 4.5: Smoke Test (if applicable)
+
+If the PR modified **UI or frontend files**, run the project's smoke test to catch visual regressions before review. This prevents wasting review cycles on PRs that break the UI.
+
+```bash
+# repo-relay has no UI/frontend surface — this phase never triggers (kept for template parity)
+CHANGED_FILES=$(git diff --name-only main...HEAD)
+if echo "$CHANGED_FILES" | grep -qE '^__NO_UI_SURFACE__$'; then
+  NEEDS_SMOKE_TEST=true
+fi
+```
+
+If `NEEDS_SMOKE_TEST` is true:
+
+1. **Rebuild UI** if needed (e.g., `npm run build`)
+2. **Run `/smoke-test`** — this launches the app, opens a headless browser, and verifies key UI elements
+3. **Check results:**
+   - **All pass:** Continue to Phase 5 (review)
+   - **Failures:** Read the screenshots, diagnose whether it's an app bug or a test selector issue
+     - **App bug:** Fix the code, re-run tests, amend commit, re-run smoke test
+     - **Test issue:** Note it in the PR description, continue (don't block on flaky test selectors)
+4. **Max 2 smoke test fix attempts** — if still failing after 2 fixes, flag the PR as "Needs attention (smoke test failure)" and move on
+
+If `NEEDS_SMOKE_TEST` is false, skip directly to Phase 5.
+
+**CRITICAL:** The smoke test must NOT send real messages or create persistent state. It only verifies UI rendering and navigation.
 
 ### Phase 5: Full Review
 
@@ -297,7 +329,7 @@ Capture results: verdict, findings counts, fixes committed, issues created/close
 
 **If critical findings exist:** Fix them (standard /full-review behavior handles this). Two fix attempts max — after that, flag the PR as "Needs attention" and move on.
 
-**Merge through the Unattended Merge Gate** (see `/unattended-merge`). If the verdict is clean, ALL CI checks (`check (20)`, `check (22)`, `dist-freshness`) pass on the final commit, and ALL review threads are resolved, squash-merge, verify the PR reports `MERGED`, update the `v1` tag, and record the merge as an entry in the final session report. NEVER use `gh pr merge --auto` or GitHub auto-merge — verify the gates first, then merge synchronously. If any gate fails, do NOT merge: flag the PR for the user with the failed gate named and keep working.
+**Merge — or don't — exactly as Critical Rule 5 directs.** Rule 5 records whether this repo grants unattended merge authority at all; it is the only place that decides, and nothing here overrides it. If rule 5 grants gated self-merge: when the verdict is clean, ALL CI checks pass on the final commit, and ALL review threads are resolved, merge per repo convention (see `unattended-merge`), verify the PR reports `MERGED`, and record the merge as an entry in the final session report. NEVER use `gh pr merge --auto` or GitHub auto-merge — verify the gates first, then merge synchronously. If any gate fails, do NOT merge: flag the PR for the user with the failed gate named and keep working. If rule 5 withholds merge authority, leave the PR open and flag it — a clean review is not a reason to revisit that.
 
 ### Phase 6: Assess, Report, and Continue
 
@@ -305,7 +337,7 @@ Based on /full-review results, classify the PR:
 
 | Verdict | Meaning | Action |
 |---------|---------|--------|
-| Clean | No critical findings, all comments addressed | Edit PR body: `Refs` → `Closes`. Merge via the Unattended Merge Gate, record the entry, mark issue done, continue |
+| Clean | No critical findings, all comments addressed | Edit PR body: `Refs` → `Closes`. Then follow Critical Rule 5: if this repo grants gated self-merge, merge and record the entry; if it withholds merge authority, flag the PR and leave it open. Mark the issue done, continue |
 | Needs attention | Critical findings or unresolved comments | Keep `Refs` (don't auto-close). Flag for user, continue |
 | Broken | Tests failing after review fixes | Keep `Refs` (don't auto-close). Flag for user, continue |
 
@@ -320,13 +352,13 @@ Output cumulative progress table:
 ```markdown
 ## Session Progress ({completed}/{total})
 
-| # | Issue | Branch | PR | Review | Status |
-|---|-------|--------|----|--------|--------|
-| 1 | #12 — Add retry logic | 12-add-retry | #45 | Approve (0 critical) | Done |
-| 2 | #15 — Add leaderboard | — | — | — | Decomposed → #20, #21 |
-| 3 | #20 — Leaderboard data model | 20-lb-model | #46 | Approve (1 suggestion) | Done |
-| 4 | #18 — Add auth tests | — | — | — | In progress |
-| 5 | #22 — Update error handling | — | — | — | Queued |
+| # | Issue | Branch | PR | Smoke | Review | Status |
+|---|-------|--------|----|-------|--------|--------|
+| 1 | #12 — Add retry logic | 12-add-retry | #45 | — | Approve (0 critical) | Done |
+| 2 | #15 — Add leaderboard | — | — | — | — | Decomposed → #20, #21 |
+| 3 | #20 — Leaderboard data model | 20-lb-model | #46 | 12/13 | Approve (1 suggestion) | Done |
+| 4 | #18 — Add auth tests | — | — | — | — | In progress |
+| 5 | #22 — Update error handling | — | — | — | — | Queued |
 ```
 
 **CRITICAL: Never block the session on a flagged PR.** Flag and move on. The user handles flagged PRs during check-ins.
@@ -345,16 +377,25 @@ After all issues are processed (or the queue is exhausted), output final summary
 
 ### Results
 
-| # | Issue | PR | Review Verdict | Status |
-|---|-------|----|---------------|--------|
-| 1 | #12 — Add retry logic | [#45](url) | Approve | Merged (`abc1234`) |
-| 2 | #15 — Add leaderboard | — | — | Decomposed → #20, #21, #22 |
-| 3 | #20 — Leaderboard data model | [#46](url) | Approve | Merged (`def5678`) |
-| 4 | #18 — Add auth tests | [#47](url) | Request Changes | Needs attention |
+| # | Issue | PR | Smoke | Review Verdict | Status |
+|---|-------|----|-------|---------------|--------|
+| 1 | #12 — Add retry logic | [#45](url) | — | Approve | Merged (`abc1234`) |
+| 2 | #15 — Add leaderboard | — | — | — | Decomposed → #20, #21, #22 |
+| 3 | #20 — Leaderboard data model | [#46](url) | 12/13 | Approve | Merged (`def5678`) |
+| 4 | #18 — Add auth tests | [#47](url) | — | Request Changes | Needs attention |
+
+### Merged by this session
+
+One entry per self-merged PR — MANDATORY (Unattended Merge Gate rule 6). Omit this whole section when Critical Rule 5 withholds merge authority for this repo: there is nothing to report, and an empty "Merged by this session" table invites the reader to assume a merge happened:
+
+| PR | Issue | Review | Checks | Merge SHA |
+|----|-------|--------|--------|-----------|
+| [#45](url) | #12 — Add retry logic | Approve, 0 unresolved | all green | `abc1234` |
+| [#46](url) | #20 — Leaderboard data model | Approve, 0 unresolved | all green | `def5678` |
 
 ### Summary
-- **Merged this session:** N PRs — one entry each under "Merged by this session" (PR, issue, verdict, checks, merge SHA); MANDATORY per the Unattended Merge Gate
-- **Needs attention:** M PRs (details below)
+- **Merged this session:** N PRs (entries above)
+- **Open / needs attention:** M PRs (details below)
 - **Decomposed:** K issues → L sub-issues created
 - **Skipped:** J issues (reasons below)
 - **Issues created during reviews:** #A, #B, #C
@@ -368,10 +409,18 @@ After all issues are processed (or the queue is exhausted), output final summary
 - **#30**: Needs user decision on provider choice
 
 ### Next Steps
-- Merge ready PRs
-- Address flagged PRs
+- Review the merged-PR entries (post-merge audit)
+- Address flagged PRs (each names its failed gate)
 - Review created issues for follow-up work
 ```
+
+## Session Boundaries
+
+Long autonomous runs are a sequence of bounded sessions, not one endless context — context re-reads dominate their cost, and a restart that halves context pays for itself within ~6–10 requests. When this skill runs inside a marathon (`/tackle-issues`), the wave boundary is the session boundary; run standalone, apply the same discipline at queue checkpoints:
+
+- **~150K main-thread context ceiling.** Past ~150K tokens of main-thread context, finish the current issue only, write a short handoff note (queue position, open blockers, awaiting-user items, last verified merge), and end the session. Resume Strategy below makes the fresh session lossless — it re-derives progress from GitHub state, so the handoff plus the queue is all the seed a restart needs.
+- **Cost circuit breaker at queue checkpoints.** Every few issues (and always before starting a large one), check session cost (the harness statusline shows running session cost; repo-relay has not documented an explicit per-session budget yet — treat a session running unusually long/expensive relative to the work item as the signal to stop and check with the user). Over budget → write the handoff and **stop and notify** instead of continuing.
+- **Verify state directly.** A background monitor ending is not a verdict — assert PR/CI state with a direct query before recording it, and re-check `mergeStateStatus` at the current head after any push.
 
 ## Resume Strategy
 
@@ -383,7 +432,7 @@ If a session is interrupted (crash, timeout, user stops it), re-running with the
 2. Skip issues that already have merged or open PRs
 3. Resume from the first issue without a PR
 
-This makes the skill **idempotent** — safe to re-run without duplicating work.
+This makes the skill **idempotent** — safe to re-run without duplicating work. The same idempotence is what makes deliberate session-boundary restarts (above) lossless.
 
 ## Critical Rules
 
@@ -391,7 +440,7 @@ This makes the skill **idempotent** — safe to re-run without duplicating work.
 2. **TDD is mandatory** — RED → GREEN → REFACTOR for every issue. No skipping tests. If pure docs/config, note why tests are N/A.
 3. **Branch from main every time** — Never stack branches. Each PR is independently mergeable in any order.
 4. **One confirmation point** — The initial queue approval. Everything after is fully autonomous.
-5. **Merge only through the Unattended Merge Gate** — /full-review clean + ALL checks green on the final commit + ALL review threads resolved. No `gh pr merge --auto`, no protection overrides. A failed gate means flag, don't merge. Every self-merged PR MUST appear as an entry in the final session report, and every merge is followed by the `v1` retag.
+5. **Self-merge authority for this repo** — Merge only through the Unattended Merge Gate (`/unattended-merge`) — `/full-review` clean + ALL CI checks (`check (20)`, `check (22)`, `dist-freshness`) green on the final commit + ALL review threads resolved. No `gh pr merge --auto`, no GitHub auto-merge, no protection overrides. A failed gate means flag, don't merge. Every self-merged PR MUST appear as an entry in the final session report, and every merge is followed by retagging `v1` to main.
 6. **Never block on review findings** — Flag and move on. The user handles flagged PRs during check-ins.
 7. **Two fix attempts max** — If /full-review finds critical issues, fix them. If a second attempt still fails, flag and move on.
 8. **Progress table after every issue** — The user may check in at any time. The table must be current.
@@ -402,4 +451,5 @@ This makes the skill **idempotent** — safe to re-run without duplicating work.
 13. **Comment on skips** — Every skipped issue gets a GitHub comment explaining why. The user sees the reason.
 14. **Pre-Skill Checkpoint** — Re-read CLAUDE.md and skill files before running /full-review to prevent context drift.
 15. **Sync before branching** — Always `git checkout main && git pull` before starting each issue. Check for merged PRs first.
-<!-- skill-templates: autonomous-dev-flow 5df829a 2026-06-12 -->
+
+<!-- skill-templates: autonomous-dev-flow d4fba03 2026-07-30 -->

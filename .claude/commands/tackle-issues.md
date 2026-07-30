@@ -14,7 +14,7 @@ Composes `/autonomous-dev-flow` logic internally but adds multi-wave retry with 
   - If empty, auto-detect: scan open issues sorted by complexity (low first, then medium, skip high)
   - Options: `max:N` (default 20, hard cap 30), `sort:created-asc` (default) or `sort:created-desc`
   - `waves:N` (default 3, max 4) — maximum retry waves
-  - `merge:off` — disable the Unattended Merge Gate; PRs accumulate for user review (default: gated self-merge is ON)
+  - `merge:off` — disable the Unattended Merge Gate for this run; PRs accumulate for `/batch-merge`. Default is whatever Critical Rule 5 records for this repo; where rule 5 withholds merge authority this flag is redundant and `merge:on` is not honoured
 
 ## Instructions
 
@@ -34,21 +34,36 @@ Morning Summary        → Structured report of everything that happened
 
 Each wave runs the full Phase 1-6 cycle from `/autonomous-dev-flow` for each issue. The difference is what happens between waves and how retries are handled.
 
+### Session Boundaries and the Session Ledger
+
+A marathon spans multiple *sessions*, not one endless context. Context re-reads dominate marathon cost, so wave boundaries double as session boundaries:
+
+- **Session ledger + STATE header.** Keep an append-only session ledger (`autonomous-session-<date>.md` at repo root — gitignored, never commit). Its top carries a rolling **STATE header** — a compact block (~2K tokens, hard-capped, rewritten in place) holding: current wave + position, queue pointer, open blockers, awaiting-user list, and the last **verified** merge (PR + SHA). After a compaction or on a fresh session, the STATE header is the **only mandatory read**; the full history below it is consulted on-demand only (a prior decision, a retry's failure reason) — never re-read top-to-bottom as a ritual.
+- **End the session at each wave boundary.** When a wave completes (after Phase 2 replenishment and the Phase 4 convergence check), write/refresh the handoff note and STATE header, then end the session; the next wave starts fresh, seeded from handoff note + queue + STATE header — never the full history. A restart that halves context pays for itself within ~6–10 requests.
+- **~150K main-thread context ceiling.** Past ~150K tokens of main-thread context, finish the current issue only, write the handoff, end the session mid-wave if necessary.
+- **Per-wave cost circuit breaker.** At each wave boundary, check session cost (the harness statusline shows running session cost; repo-relay has not documented an explicit per-session budget yet — treat a session running unusually long/expensive relative to the work item as the signal to stop and check with the user). Over budget → write the handoff and **stop and notify**; do not start the next wave.
+- **Verify state directly, never from a stale reading.** A monitor/watcher ending is **not** a verdict — assert PR/CI state with a direct query before recording it. And `mergeStateStatus` is only meaningful at the **current** head — re-check it after any push before acting on a BLOCKED/CLEAN reading.
+
+`MASTER_LOG` (below) lives in the ledger; the STATE header summarizes it, and Resume Strategy re-derives ground truth from GitHub regardless.
+
 ### Phase 0: Marathon Setup
 
 ```bash
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 REPO_NAME=$(basename "$REPO")
 SESSION_START=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-BRANCH_PREFIX="auto/"  # Exception to standard feat/fix/ convention — see note below
-```
 
-> **Note:** The `auto/` branch prefix is an intentional exception to the repo's `feat/`/`fix/` naming convention (CLAUDE.md). Marathon session branches use `auto/` so automation and cleanup tooling can identify them as bot-managed.
+# "auto/"
+BRANCH_PREFIX="auto/"
+
+# `^(auto|feat|fix|docs|chore)/` — covers this skill's own `auto/` branches plus every human-authored prefix in CLAUDE.md
+BRANCH_PREFIX_RE="^(auto|feat|fix|docs|chore)/"
+```
 
 Parse `$ARGUMENTS` — same as `/autonomous-dev-flow` but with higher defaults:
 - `max` defaults to 20, hard cap 30
 - `waves` defaults to 3, max 4
-- gated self-merge defaults to ON (`merge:off` disables it)
+- self-merge follows Critical Rule 5 for this repo (`merge:off` can disable it for a run, but no flag can enable it where rule 5 withholds it)
 
 Build the initial queue using the same logic as `/autonomous-dev-flow` Phase 0:
 - Fetch issues by label, milestone, explicit list, or auto-detect
@@ -72,7 +87,7 @@ Display the marathon queue:
 | — | #16 — Refactor auth module | enhancement | Assigned to @user (skipped) |
 
 **Mode:** Unattended marathon (up to {W} waves)
-**Self-merge:** Unattended Merge Gate {ON / off (`merge:off`)}
+**Self-merge:** {per Critical Rule 5 — Unattended Merge Gate ON / off (`merge:off`) / withheld by this repo}
 **Estimated scope:** {N} issues × {W} max waves
 
 Start marathon session?
@@ -111,10 +126,10 @@ After each issue, output the wave progress table:
 
 | # | Issue | Branch | PR | Review | Status | Attempt |
 |---|-------|--------|----|--------|--------|---------|
-| 1 | #12 — Add retry logic | auto/12-add-retry | #45 | Approve | Done | W1 |
+| 1 | #12 — Add retry logic | 12-add-retry | #45 | Approve | Done | W1 |
 | 2 | #15 — Leaderboard | — | — | — | Decomposed → #20,#21 | W1 |
-| 3 | #20 — LB data model | auto/20-lb-model | #46 | Request Changes | Retry (W2) | W1 |
-| 4 | #18 — Auth tests | auto/18-auth-tests | #47 | Approve | Done | W1 |
+| 3 | #20 — LB data model | 20-lb-model | #46 | Request Changes | Retry (W2) | W1 |
+| 4 | #18 — Auth tests | 18-auth-tests | #47 | Approve | Done | W1 |
 | 5 | #21 — LB display | — | — | — | In progress | W1 |
 ```
 
@@ -128,7 +143,7 @@ From `MASTER_LOG`, gather issues where the latest attempt was not `Done`:
 
 | Status | Meaning | Retry? |
 |--------|---------|--------|
-| Done | PR merged through the Unattended Merge Gate (or review-clean under `merge:off`) | No — skip in future waves |
+| Done | PR merged through the Unattended Merge Gate, or review-clean and left open where rule 5 withholds merge authority (or under `merge:off`) | No — skip in future waves |
 | Retry | Tests failing or review found critical issues | Yes — re-attempt |
 | Flagged | 2 fix attempts failed in a wave | Yes — with different strategy |
 | Skipped | Non-automatable (blocked, no criteria, etc.) | No — genuinely blocked |
@@ -153,8 +168,8 @@ Add new unassigned issues to the queue if they match the original filter criteri
 
 ```bash
 gh pr list --state merged --json number,headRefName,mergedAt --limit 30 \
-  | jq --arg start "$SESSION_START" --arg prefix "$BRANCH_PREFIX" \
-    '[.[] | select(.mergedAt > $start) | select(.headRefName | startswith($prefix))]'
+  | jq --arg start "$SESSION_START" --arg prefix "$BRANCH_PREFIX_RE" \
+    '[.[] | select(.mergedAt > $start) | select(.headRefName | test($prefix))]'
 ```
 
 Note merged PRs. If a merged PR's issue is in the retry queue, remove it — the user handled it.
@@ -165,8 +180,6 @@ For issues entering Wave 2+, delete the stale branch and PR from the previous at
 
 ```bash
 # For each retry candidate:
-# Safety: only clean up branches with the session's BRANCH_PREFIX and PRs created after SESSION_START
-
 # Close the old PR (it had issues)
 gh pr close ${OLD_PR_NUM} --comment "Closing for retry in Wave ${NEXT_WAVE} — previous attempt had: ${FAILURE_REASON}"
 
@@ -267,13 +280,13 @@ After each wave, check for convergence BEFORE entering the next wave:
 
 ### Phase 5: Merge Accounting
 
-Merging happens **inline during waves** via the Unattended Merge Gate (see `/unattended-merge`): a PR self-merges the moment /full-review is clean, ALL CI checks (`check (20)`, `check (22)`, `dist-freshness`) pass on the final commit, and ALL review threads are resolved — no `gh pr merge --auto`, no human pause, merge verified `MERGED`, then the `v1` tag is updated per Tag Management. This unblocks dependent queue items mid-marathon. This phase is accounting only:
+Where Critical Rule 5 grants gated self-merge, merging happens **inline during waves** via the Unattended Merge Gate (see `unattended-merge`): a PR self-merges the moment /full-review is clean, ALL CI checks pass on the final commit, and ALL review threads are resolved — no `gh pr merge --auto`, no human pause, and the merge is verified `MERGED` before moving on. This unblocks dependent queue items mid-marathon. Where rule 5 withholds it, nothing merges inline and every finished PR is left open for review. This phase is accounting only:
 
 1. Collect every PR merged by the session — each MUST appear as an entry in the Morning Summary's "Merged by this session" table
 2. Any PR that passed review but failed a later gate (e.g. CI red at merge time) stays open — list it under Needs Attention with the failed gate named
-3. If `merge:off` was specified, no self-merges happened; note in the summary:
+3. If `merge:off` was specified, or Critical Rule 5 withholds merge authority for this repo, no self-merges happened; note in the summary:
 ```
-**Ready to merge:** {PR_NUMS} await manual merge (`/batch-merge` if installed).
+**Ready to merge:** Run `/batch-merge {PR_NUMS}` to merge completed PRs.
 ```
 
 ### Phase 6: Morning Summary
@@ -294,7 +307,7 @@ Output a comprehensive summary designed for the user to read when they return. T
 |--------|-------|
 | Issues attempted | {N} |
 | PRs merged by the session | {M} |
-| PRs flagged (needs attention) | {K} |
+| PRs open (needs attention) | {K} |
 | Issues decomposed | {D} → {S} sub-issues |
 | Issues blocked (auto) | {B} |
 | Issues skipped | {J} |
@@ -312,7 +325,7 @@ Output a comprehensive summary designed for the user to read when they return. T
 
 ### Merged by this session
 
-One entry per self-merged PR — MANDATORY (Unattended Merge Gate rule 6):
+One entry per self-merged PR — MANDATORY (Unattended Merge Gate rule 6). Omit the section entirely where Critical Rule 5 withholds merge authority: an empty table reads as though a merge happened:
 
 | PR | Issue | Review | Checks | Merge SHA |
 |----|-------|--------|--------|-----------|
@@ -351,7 +364,7 @@ These issues could not be implemented after {W} waves. Each has a detailed comme
 
 ### Next Steps
 
-1. **Audit merged PRs:** review the "Merged by this session" entries (anything left open under `merge:off` awaits manual merge)
+1. **Audit merged PRs:** review the "Merged by this session" entries (or `/batch-merge {PR_NUMS}` if `merge:off` left PRs open)
 2. **Review flagged PRs:** {list with specific issues to check}
 3. **Address blocked issues:** {list with recommendations}
 4. **New issues created:** {list of sub-issues or follow-up issues}
@@ -363,7 +376,7 @@ This skill uses **GitHub state** for resume — no local state files. Same as `/
 
 If a marathon session is interrupted (crash, timeout, user stops it), re-running with the same arguments will:
 
-1. Query GitHub for existing session branches (matching `BRANCH_PREFIX`) and PRs referencing each issue
+1. Query GitHub for existing session branches (matching `BRANCH_PREFIX_RE`) and PRs referencing each issue
 2. Detect which wave the session was in by counting attempts per issue
 3. Skip issues that already have merged or clean open PRs
 4. Resume from the first unfinished issue in the current wave
@@ -382,32 +395,20 @@ This makes the skill **idempotent** — safe to re-run without duplicating work.
 2. **TDD is mandatory** — RED → GREEN → REFACTOR for every issue, every wave. No skipping tests.
 3. **Branch from main every time** — Never stack branches. Fresh branch for every attempt, including retries.
 4. **One confirmation point** — The initial marathon queue approval. Everything after — including all waves and retries — is fully autonomous.
-5. **Merge only through the Unattended Merge Gate** — /full-review clean + ALL checks green on the final commit + ALL review threads resolved. No `gh pr merge --auto`, no protection overrides. `merge:off` disables self-merging. Every self-merged PR MUST appear as an entry in the Morning Summary, and every merge is followed by the `v1` retag.
+5. **Self-merge authority for this repo** — Merge only through the Unattended Merge Gate (`/unattended-merge`) — `/full-review` clean + ALL CI checks (`check (20)`, `check (22)`, `dist-freshness`) green on the final commit + ALL review threads resolved. No `gh pr merge --auto`, no protection overrides. If any gate fails, flag the PR and leave it for the user — repo-relay has no `/batch-merge` installed, so a flagged PR simply waits for user review. Every self-merged PR MUST appear as an entry in the Morning Summary, and every merge is followed by retagging `v1` to main.
 6. **Clean up failed attempts** — Close old PRs and delete old branches before retrying. Don't leave orphaned PRs.
 7. **Escalate strategy across waves** — Wave 1: standard approach. Wave 2: fresh context + address failures. Wave 3: alternative approach + scope reduction. Don't repeat the same failing approach.
 8. **Converge, don't loop forever** — If a wave produces zero new completions, stop. Further waves won't help.
 9. **Progress table after every issue** — The user may check in at any time. The table must show wave context.
 10. **Respect the hard cap** — Max 30 issues across all waves (including sub-issues from decomposition). Refuse larger queues.
 11. **Resume from GitHub state** — No local state files. Detect wave progress from closed/open PR counts per issue.
-12. **Compose existing skills** — `/full-review` is called as-is. The Unattended Merge Gate (`/unattended-merge`) governs self-merges. Don't reinvent their logic.
+12. **Compose existing skills** — `/full-review` is called as-is. Where Critical Rule 5 grants self-merge, the Unattended Merge Gate (`unattended-merge`) governs it; `/batch-merge` handles leftovers under `merge:off` or where rule 5 withholds merge authority. Don't reinvent their logic.
 13. **Decompose in Wave 1 only** — High-complexity decomposition happens once. Retries work on the sub-issues, not the parent.
 14. **Comment on blocked issues** — Every issue that fails all waves gets a detailed GitHub comment with what was tried and why it failed.
 15. **Pre-Skill Checkpoint** — Re-read CLAUDE.md and skill files before running `/full-review` in every wave.
 16. **Sync before every branch** — Always `git checkout main && git pull` before starting each issue in each wave.
 17. **Morning summary is mandatory** — Even if interrupted, output the best summary possible with data collected so far.
+18. **Wave boundaries are session boundaries** — End the session at each wave boundary and restart fresh from handoff note + queue + the ledger's STATE header. Respect the ~150K main-thread context ceiling and the per-wave cost circuit breaker (see Session Boundaries and the Session Ledger).
+19. **STATE header over full re-reads** — After compaction, read only the ledger's STATE header; the full ledger history is on-demand reference, never a mandatory re-read.
 
-## Customization Points
-
-Lines and sections marked with `{{CUSTOMIZE}}` need repo-specific adaptation. These mirror `/autonomous-dev-flow` customizations:
-
-- **Branch prefix** for session branches and resume detection
-- **Branch naming convention**
-- **Decomposition trigger label**
-- **Test runner command**
-- **Test file conventions**
-- **Lint/typecheck commands**
-- **PR test plan items**
-- **Commit scope conventions**
-- **Skip labels** beyond the defaults (`blocked`, `wontfix`)
-
-<!-- skill-templates: tackle-issues d3cd6f5 2026-06-10 -->
+<!-- skill-templates: tackle-issues d4fba03 2026-07-30 -->
