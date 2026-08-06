@@ -1,6 +1,119 @@
 # Repo Relay
 
-GitHub-Discord integration bot that tracks PRs, CI, issues, and releases with threaded updates.
+**Discord bot that gives every pull request one live discussion thread — CI, reviews, and releases in context, not notification spam.**
+
+[![CI](https://github.com/blamechris/repo-relay/actions/workflows/ci.yml/badge.svg)](https://github.com/blamechris/repo-relay/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/blamechris/repo-relay)](LICENSE)
+[![Latest tag](https://img.shields.io/github/v/tag/blamechris/repo-relay?sort=semver)](https://github.com/blamechris/repo-relay/tags)
+
+<img src="docs/assets/pr-thread.png" width="450" alt="Discord embed for a merged pull request with its attached update thread">
+
+*A real PR thread from Repo Relay's own server ([PR #165](https://github.com/blamechris/repo-relay/pull/165)): one embed, updated in place through CI and review to its merged state, with updates landing in the attached thread instead of the channel.*
+
+## Why Repo Relay
+
+GitHub's built-in Discord webhook posts a new channel message for every event, so one active PR scatters pushes, CI runs, and reviews across the feed. Repo Relay keeps each PR to exactly one channel message:
+
+- **One embed per PR, updated in place** — CI status, review status, and the merged/closed state edit the original embed instead of adding messages.
+- **One thread per PR** — pushes, CI results, reviews, and the merge post to the PR's attached thread, so updates stay next to their context.
+- **The channel stays scannable** — it reads as a list of PRs, not a log of events.
+- **No server to run** — ships as a GitHub Action; state lives in SQLite on the runner (or in `actions/cache` on hosted runners).
+
+## Quick Start
+
+The fastest way to get started:
+
+```bash
+npx -p github:blamechris/repo-relay repo-relay-init
+```
+
+The interactive wizard asks what you want to relay (issues, releases, deployments, security alerts, review polling), guides you through the Discord bot setup, and writes the workflow file for you.
+
+<details>
+<summary><strong>Manual Setup</strong></summary>
+
+### 1. Create Discord Bot
+
+1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
+2. Create new application → Bot → Reset Token → Copy token
+3. No privileged intents are required — leave **Message Content** and **Server Members** intents disabled
+4. Generate invite URL (OAuth2 → URL Generator):
+   - Scopes: `bot`
+   - Permissions: See [Required Discord Permissions](#required-discord-permissions) below
+5. Invite bot to your server
+
+### 2. Get Channel IDs
+
+1. Enable Developer Mode in Discord (Settings → Advanced → Developer Mode)
+2. Right-click channels → Copy ID
+
+### 3. Add Secrets to Repository
+
+Add these secrets to your GitHub repository (Settings → Secrets and variables → Actions):
+
+| Secret | Required | Description |
+|--------|----------|-------------|
+| `DISCORD_BOT_TOKEN` | Yes | Bot token from step 1 |
+| `DISCORD_CHANNEL_PRS` | Yes | Channel ID for PR notifications |
+| `DISCORD_CHANNEL_ISSUES` | No | Channel ID for issue notifications |
+| `DISCORD_CHANNEL_RELEASES` | No | Channel ID for release notifications |
+| `DISCORD_CHANNEL_DEPLOYMENTS` | No | Channel ID for deployment notifications |
+| `DISCORD_CHANNEL_SECURITY` | No | Channel ID for security alerts |
+
+### 4. Add Workflow
+
+Create `.github/workflows/discord-notify.yml`:
+
+```yaml
+name: Discord Notifications
+
+on:
+  pull_request:
+    types: [opened, synchronize, closed, reopened, edited, ready_for_review, converted_to_draft]
+  pull_request_review:
+    types: [submitted]
+  issue_comment:
+    types: [created]
+  issues:
+    types: [opened, closed, reopened]
+  release:
+    types: [published]
+  workflow_run:
+    workflows: ["CI"]  # Name of your CI workflow
+    types: [completed]
+  # Optional — add these if you relay deployments and security alerts:
+  # deployment_status:
+  # dependabot_alert:
+  #   types: [created]
+  # secret_scanning_alert:
+  #   types: [created]
+  # code_scanning_alert:
+  #   types: [created, appeared_in_branch]
+
+jobs:
+  notify:
+    runs-on: self-hosted  # or ubuntu-latest (see State Storage below)
+    permissions:
+      pull-requests: read
+      issues: read
+      contents: read
+    # Skip workflow_run events without PRs
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.pull_requests[0] != null
+
+    steps:
+      - uses: blamechris/repo-relay@v1
+        with:
+          discord_bot_token: ${{ secrets.DISCORD_BOT_TOKEN }}
+          channel_prs: ${{ secrets.DISCORD_CHANNEL_PRS }}
+          channel_issues: ${{ secrets.DISCORD_CHANNEL_ISSUES }}
+          channel_releases: ${{ secrets.DISCORD_CHANNEL_RELEASES }}
+          channel_deployments: ${{ secrets.DISCORD_CHANNEL_DEPLOYMENTS }}
+          channel_security: ${{ secrets.DISCORD_CHANNEL_SECURITY }}
+```
+
+That's it! The action handles Node.js setup, dependency installation, and execution automatically. A full copy-paste example lives at [`examples/workflow.yml`](examples/workflow.yml).
+
+</details>
 
 ## Features
 
@@ -9,8 +122,37 @@ GitHub-Discord integration bot that tracks PRs, CI, issues, and releases with th
 - **CI Status** - Shows workflow status (pending, running, passed, failed)
 - **Review Detection** - Detects Copilot and agent-review via piggyback on push/CI events; human `approved`/`changes_requested` reviews post to the thread and update the embed
 - **Issue & Release Notifications** - Separate channels for different event types
+- **Deployment Notifications** - `deployment_status` events post an embed (environment, ref, deployer) for terminal states: success, failure, error
+- **Security Alerts** - New Dependabot, secret scanning, and code scanning alerts post to a dedicated channel; code scanning also posts when an existing alert appears in a new branch
+- **Default-Branch Push Notifications** - Direct pushes to the default branch (PR merge commits are skipped); force pushes get a distinct embed
 - **Persistent State** - SQLite tracks PR ↔ message mappings
 - **Stale Message Handling** - Gracefully recovers if Discord messages are deleted
+
+## Channel Routing
+
+Every event type routes to a channel input; the optional ones fall back to `channel_prs` when unset, so a single channel works out of the box.
+
+| Input | Routes | Fallback |
+|-------|--------|----------|
+| `channel_prs` | PR embeds and threads, CI status, reviews, comments, default-branch pushes | Required |
+| `channel_issues` | Issue notifications (opened, closed, reopened) | `channel_prs` |
+| `channel_releases` | Release published notifications | `channel_prs` |
+| `channel_deployments` | Deployment success/failure/error embeds | `channel_prs` |
+| `channel_security` | Dependabot, secret scanning, and code scanning alert embeds | `channel_prs` |
+
+### Action Inputs
+
+| Input | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `discord_bot_token` | Yes | - | Discord bot token |
+| `channel_prs` | Yes | - | Channel ID for PR notifications |
+| `channel_issues` | No | `channel_prs` | Channel ID for issue notifications |
+| `channel_releases` | No | `channel_prs` | Channel ID for release notifications |
+| `channel_deployments` | No | `channel_prs` | Channel ID for deployment notifications |
+| `channel_security` | No | `channel_prs` | Channel ID for security alert notifications |
+| `state_dir` | No | `~/.repo-relay` | Directory for SQLite state |
+| `github_token` | No | `github.token` | GitHub token for API access |
+| `best_effort` | No | `false` | Exit 0 with a warning on transient infra failures (Discord 5xx, timeouts); config errors (bad token, missing channel/permissions) still fail |
 
 ## How It Works
 
@@ -48,102 +190,6 @@ GitHub Apps using `GITHUB_TOKEN` don't trigger workflows. To work around this:
 - If Copilot or agent-review is detected, the embed and thread are updated
 - Reviews are detected on the **next** event, not immediately
 
-## Quick Start
-
-The fastest way to get started:
-
-```bash
-npx blamechris/repo-relay init
-```
-
-This interactive wizard will guide you through setup and create the workflow file automatically.
-
-<details>
-<summary><strong>Manual Setup</strong></summary>
-
-### 1. Create Discord Bot
-
-1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
-2. Create new application → Bot → Reset Token → Copy token
-3. No privileged intents are required — leave **Message Content** and **Server Members** intents disabled
-4. Generate invite URL (OAuth2 → URL Generator):
-   - Scopes: `bot`
-   - Permissions: See [Required Discord Permissions](#required-discord-permissions) below
-5. Invite bot to your server
-
-### 2. Get Channel IDs
-
-1. Enable Developer Mode in Discord (Settings → Advanced → Developer Mode)
-2. Right-click channels → Copy ID
-
-### 3. Add Secrets to Repository
-
-Add these secrets to your GitHub repository (Settings → Secrets and variables → Actions):
-
-| Secret | Required | Description |
-|--------|----------|-------------|
-| `DISCORD_BOT_TOKEN` | Yes | Bot token from step 1 |
-| `DISCORD_CHANNEL_PRS` | Yes | Channel ID for PR notifications |
-| `DISCORD_CHANNEL_ISSUES` | No | Channel ID for issue notifications |
-| `DISCORD_CHANNEL_RELEASES` | No | Channel ID for release notifications |
-
-### 4. Add Workflow
-
-Create `.github/workflows/discord-notify.yml`:
-
-```yaml
-name: Discord Notifications
-
-on:
-  pull_request:
-    types: [opened, synchronize, closed, reopened, edited, ready_for_review, converted_to_draft]
-  pull_request_review:
-    types: [submitted]
-  issue_comment:
-    types: [created]
-  issues:
-    types: [opened, closed]
-  release:
-    types: [published]
-  workflow_run:
-    workflows: ["CI"]  # Name of your CI workflow
-    types: [completed]
-
-jobs:
-  notify:
-    runs-on: self-hosted  # or ubuntu-latest (see State Storage below)
-    permissions:
-      pull-requests: read
-      issues: read
-      contents: read
-    # Skip workflow_run events without PRs
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.pull_requests[0] != null
-
-    steps:
-      - uses: blamechris/repo-relay@v1
-        with:
-          discord_bot_token: ${{ secrets.DISCORD_BOT_TOKEN }}
-          channel_prs: ${{ secrets.DISCORD_CHANNEL_PRS }}
-          channel_issues: ${{ secrets.DISCORD_CHANNEL_ISSUES }}
-          channel_releases: ${{ secrets.DISCORD_CHANNEL_RELEASES }}
-```
-
-That's it! The action handles Node.js setup, dependency installation, and execution automatically.
-
-</details>
-
-### Action Inputs
-
-| Input | Required | Default | Description |
-|-------|----------|---------|-------------|
-| `discord_bot_token` | Yes | - | Discord bot token |
-| `channel_prs` | Yes | - | Channel ID for PR notifications |
-| `channel_issues` | No | `channel_prs` | Channel ID for issue notifications |
-| `channel_releases` | No | `channel_prs` | Channel ID for release notifications |
-| `state_dir` | No | `~/.repo-relay` | Directory for SQLite state |
-| `github_token` | No | `github.token` | GitHub token for API access |
-| `best_effort` | No | `false` | Exit 0 with a warning on transient infra failures (Discord 5xx, timeouts); config errors (bad token, missing channel/permissions) still fail |
-
 <details>
 <summary><strong>Advanced: Manual Workflow Setup</strong></summary>
 
@@ -160,7 +206,7 @@ on:
   issue_comment:
     types: [created]
   issues:
-    types: [opened, closed]
+    types: [opened, closed, reopened]
   release:
     types: [published]
   workflow_run:
@@ -202,6 +248,8 @@ jobs:
           DISCORD_CHANNEL_PRS: ${{ secrets.DISCORD_CHANNEL_PRS }}
           DISCORD_CHANNEL_ISSUES: ${{ secrets.DISCORD_CHANNEL_ISSUES }}
           DISCORD_CHANNEL_RELEASES: ${{ secrets.DISCORD_CHANNEL_RELEASES }}
+          DISCORD_CHANNEL_DEPLOYMENTS: ${{ secrets.DISCORD_CHANNEL_DEPLOYMENTS }}
+          DISCORD_CHANNEL_SECURITY: ${{ secrets.DISCORD_CHANNEL_SECURITY }}
           GITHUB_TOKEN: ${{ github.token }}
           STATE_DIR: ~/.repo-relay
         run: node dist/cli.js
@@ -339,6 +387,8 @@ npm run build
 npm run dev
 ```
 
-## License
+---
 
-MIT License - see [LICENSE](LICENSE)
+**Contributing:** Bug reports and pull requests are welcome via [GitHub Issues](https://github.com/blamechris/repo-relay/issues).
+**Security:** See [SECURITY.md](SECURITY.md) for how to report vulnerabilities.
+**License:** MIT — see [LICENSE](LICENSE).

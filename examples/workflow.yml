@@ -8,8 +8,10 @@
 #   DISCORD_CHANNEL_PRS  - Channel ID for PR notifications
 #
 # Optional secrets:
-#   DISCORD_CHANNEL_ISSUES   - Channel ID for issue notifications (defaults to PRS channel)
-#   DISCORD_CHANNEL_RELEASES - Channel ID for release notifications (defaults to PRS channel)
+#   DISCORD_CHANNEL_ISSUES      - Channel ID for issue notifications (defaults to PRS channel)
+#   DISCORD_CHANNEL_RELEASES    - Channel ID for release notifications (defaults to PRS channel)
+#   DISCORD_CHANNEL_DEPLOYMENTS - Channel ID for deployment notifications (defaults to PRS channel)
+#   DISCORD_CHANNEL_SECURITY    - Channel ID for security alerts (defaults to PRS channel)
 
 name: Discord Notifications
 
@@ -24,10 +26,21 @@ on:
     types: [created]
 
   issues:
-    types: [opened, closed]
+    types: [opened, closed, reopened]
 
   release:
     types: [published]
+
+  # Deployment notifications (terminal states: success, failure, error)
+  deployment_status:
+
+  # Security alerts (Dependabot, secret scanning, code scanning)
+  dependabot_alert:
+    types: [created]
+  secret_scanning_alert:
+    types: [created]
+  code_scanning_alert:
+    types: [created, appeared_in_branch]
 
   workflow_run:
     workflows: ["CI"]  # Change this to match your CI workflow name
@@ -49,4 +62,6 @@ jobs:
           channel_prs: ${{ secrets.DISCORD_CHANNEL_PRS }}
           channel_issues: ${{ secrets.DISCORD_CHANNEL_ISSUES }}
           channel_releases: ${{ secrets.DISCORD_CHANNEL_RELEASES }}
+          channel_deployments: ${{ secrets.DISCORD_CHANNEL_DEPLOYMENTS }}
+          channel_security: ${{ secrets.DISCORD_CHANNEL_SECURITY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
