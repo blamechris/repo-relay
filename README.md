@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/github/license/blamechris/repo-relay)](LICENSE)
 [![Latest tag](https://img.shields.io/github/v/tag/blamechris/repo-relay?sort=semver)](https://github.com/blamechris/repo-relay/tags)
 
-<img src="docs/assets/pr-thread.png" width="450" alt="Discord screenshot of a merged PR tracked by Repo Relay: a single embed titled 'PR #165: docs: document cache ref-scoping' showing branch, change stats, Copilot review status, and CI passed, with an attached thread containing update messages ending in 'Merged to main by @blamechris'">
+<img src="docs/assets/pr-thread.png" width="450" alt="Discord embed for a merged pull request with its attached update thread">
 
 *A real PR thread from Repo Relay's own server ([PR #165](https://github.com/blamechris/repo-relay/pull/165)): one embed, updated in place through CI and review to its merged state, with updates landing in the attached thread instead of the channel.*
 
@@ -123,7 +123,7 @@ That's it! The action handles Node.js setup, dependency installation, and execut
 - **Review Detection** - Detects Copilot and agent-review via piggyback on push/CI events; human `approved`/`changes_requested` reviews post to the thread and update the embed
 - **Issue & Release Notifications** - Separate channels for different event types
 - **Deployment Notifications** - `deployment_status` events post an embed (environment, ref, deployer) for terminal states: success, failure, error
-- **Security Alerts** - Newly created Dependabot, secret scanning, and code scanning alerts post to a dedicated channel
+- **Security Alerts** - New Dependabot, secret scanning, and code scanning alerts post to a dedicated channel; code scanning also posts when an existing alert appears in a new branch
 - **Default-Branch Push Notifications** - Direct pushes to the default branch (PR merge commits are skipped); force pushes get a distinct embed
 - **Persistent State** - SQLite tracks PR ↔ message mappings
 - **Stale Message Handling** - Gracefully recovers if Discord messages are deleted

@@ -22,4 +22,4 @@ Repo Relay runs inside GitHub Actions and handles a Discord bot token and a GitH
 
 ## Supported Versions
 
-Fixes land on `main`; the `v1` tag is updated to point at the latest fixed release. There are no backports to older tags — consumers should reference `blamechris/repo-relay@v1` (or pin a commit SHA and update it).
+Fixes land on `main` and are cut as new `v1.x.y` tags; the `v1` tag is a moving tag that is updated to point at the latest fixed tag. There are no backports to older tags — consumers should reference `blamechris/repo-relay@v1` (or pin a commit SHA and update it).
