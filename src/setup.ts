@@ -6,7 +6,7 @@
  */
 
 import prompts from 'prompts';
-import { existsSync, mkdirSync, writeFileSync, realpathSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, writeSync, realpathSync } from 'fs';
 import { execSync } from 'child_process';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
@@ -49,6 +49,26 @@ function getRepoUrl(): string | null {
 }
 
 export async function runSetup(): Promise<void> {
+  // stdin EOF mid-prompt (piped input, /dev/null, closed terminal) leaves the
+  // prompts promise unsettled: the event loop drains and node exits 0 having
+  // written nothing (#183). prompts' onCancel never fires for EOF — only for
+  // Esc/Ctrl+C aborts — so catch it at the last possible point: an exit-0
+  // before the wizard finished is a cancellation, not success. writeSync
+  // because async stdout writes can be lost inside an 'exit' handler.
+  let finished = false;
+  process.on('exit', (code) => {
+    if (!finished && code === 0) {
+      // exitCode first: the write can throw (EPIPE when the consumer closed
+      // the pipe — head, grep -q) and must not skip it
+      process.exitCode = 1;
+      try {
+        writeSync(1, '\n❌ Setup cancelled.\n\n');
+      } catch {
+        // stdout is gone — the exit code alone carries the outcome
+      }
+    }
+  });
+
   console.log('\n🚀 \x1b[1mrepo-relay Setup\x1b[0m\n');
 
   // Step 1: Discord Bot Token
@@ -234,6 +254,14 @@ export async function runSetup(): Promise<void> {
       : true,
   });
 
+  // Undefined means aborted (Esc/Ctrl+C), distinct from '' (cleared initial,
+  // defaulted to 'CI' below) — without this check a cancel at the last prompt
+  // would write the workflow file anyway and exit 0
+  if (ciWorkflow === undefined) {
+    console.log('\n❌ Setup cancelled.\n');
+    process.exit(1);
+  }
+
   // Create workflow file
   const workflowDir = join(process.cwd(), '.github', 'workflows');
   const workflowPath = join(workflowDir, 'discord-notify.yml');
@@ -285,6 +313,7 @@ export async function runSetup(): Promise<void> {
   console.log('└─────────────────────────────────────────────────────────────┘');
 
   console.log('\n🎉 Done! Commit and push to enable Discord notifications.\n');
+  finished = true;
 }
 
 /**
