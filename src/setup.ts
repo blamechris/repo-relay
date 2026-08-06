@@ -305,7 +305,7 @@ function isEntryPoint(): boolean {
 
 if (isEntryPoint()) {
   runSetup().catch((error) => {
-    console.error('Error:', safeErrorMessage(error));
+    console.error('[repo-relay] Error:', safeErrorMessage(error));
     process.exit(1);
   });
 }

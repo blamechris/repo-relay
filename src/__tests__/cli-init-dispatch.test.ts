@@ -18,6 +18,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const CLI_PATH = fileURLToPath(new URL('../../dist/cli.js', import.meta.url));
 const SETUP_PATH = fileURLToPath(new URL('../../dist/setup.js', import.meta.url));
 
+// Must exceed run()'s 30s execFile timeout — vitest's 5s default would kill
+// the test first, making the fail-loudly signal branch in run() unreachable
+const IT_TIMEOUT = 35_000;
+
 let fixtureDir: string;
 
 function run(
@@ -30,7 +34,9 @@ function run(
       args,
       {
         timeout: 30_000,
-        // Minimal env: the init path must work with no DISCORD_*/GITHUB_* set
+        // Minimal env: the init path must work with no DISCORD_*/GITHUB_* set.
+        // (PATH-only env breaks spawns on Windows — SystemRoot/COMSPEC gone —
+        // but CI is ubuntu-only, matching cli-best-effort.test.ts.)
         env: { PATH: process.env.PATH },
         cwd: fixtureDir,
       },
@@ -68,14 +74,19 @@ describe('cli init dispatch', () => {
     // the event loop drains, and node exits 0 mid-prompt — pre-existing
     // wizard behavior (identical via the repo-relay-init bin), tracked as
     // #183 separately from the dispatch this test covers.
-  });
+  }, IT_TIMEOUT);
+
+  it('still starts the wizard when setup.js is the entry point (repo-relay-init bin)', async () => {
+    const { stdout } = await run([SETUP_PATH]);
+    expect(stdout).toContain('repo-relay Setup');
+  }, IT_TIMEOUT);
 
   it('still requires env vars on the bare GitHub Actions path', async () => {
     const { code, stdout, stderr } = await run([CLI_PATH]);
     expect(stdout + stderr).toContain('DISCORD_BOT_TOKEN is required');
     expect(stdout).not.toContain('repo-relay Setup');
     expect(code).toBe(1);
-  });
+  }, IT_TIMEOUT);
 
   it('does not auto-run the wizard when setup.js is imported', async () => {
     const importer = join(fixtureDir, 'import-setup.mjs');
@@ -87,5 +98,5 @@ describe('cli init dispatch', () => {
     expect(stdout).toContain('IMPORT_OK');
     expect(stdout).not.toContain('repo-relay Setup');
     expect(code).toBe(0);
-  });
+  }, IT_TIMEOUT);
 });
