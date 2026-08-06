@@ -81,6 +81,10 @@ describe('cli init dispatch', () => {
   it('still starts the wizard when setup.js is the entry point (repo-relay-init bin)', async () => {
     const { stdout } = await run([SETUP_PATH]);
     expect(stdout).toContain('repo-relay Setup');
+    // The bot connects with only the unprivileged Guilds intent — Step 1
+    // must not tell users to enable privileged intents (#182)
+    expect(stdout).toContain('No privileged intents needed');
+    expect(stdout).not.toContain('Enable intents');
   }, IT_TIMEOUT);
 
   it('still requires env vars on the bare GitHub Actions path', async () => {

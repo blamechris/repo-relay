@@ -56,7 +56,7 @@ export async function runSetup(): Promise<void> {
   console.log('────────────────────────────────────────');
   console.log('1. Go to https://discord.com/developers/applications');
   console.log('2. Create new application → Bot → Reset Token');
-  console.log('3. Enable intents: Message Content Intent, Server Members Intent');
+  console.log('3. No privileged intents needed — leave Message Content and Server Members disabled');
   console.log('4. Copy the token\n');
 
   const { botToken } = await prompts({
