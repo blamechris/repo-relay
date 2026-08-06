@@ -30,7 +30,8 @@ import {
   type CodeScanningAlertPayload,
 } from './handlers/index.js';
 import { checkForReviews } from './github/reviews.js';
-import { ConfigError, isConfigError, safeErrorMessage } from './utils/errors.js';
+import { ConfigError, safeErrorMessage } from './utils/errors.js';
+import { isConfigError } from './utils/discord-errors.js';
 import { REPO_NAME_PATTERN } from './utils/validation.js';
 import { withRetry } from './utils/retry.js';
 import { buildEmbedWithStatus, getOrCreateThread } from './handlers/pr.js';

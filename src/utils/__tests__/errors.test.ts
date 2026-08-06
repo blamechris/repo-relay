@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { DiscordAPIError, DiscordjsError, DiscordjsErrorCodes } from 'discord.js';
-import { ConfigError, isConfigError, safeErrorMessage } from '../errors.js';
+import { ConfigError, safeErrorMessage } from '../errors.js';
+import { isConfigError } from '../discord-errors.js';
 
 describe('safeErrorMessage', () => {
   it('returns .message for Error instances', () => {
