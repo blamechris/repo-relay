@@ -166,4 +166,38 @@ describe('cli init dispatch', () => {
     expect(stdout).not.toContain('repo-relay Setup');
     expect(code).toBe(0);
   }, IT_TIMEOUT);
+
+  it('reaches the wizard with the Actions runtime deps unresolvable (#185)', async () => {
+    // Module hooks that make the heavy runtime deps fail at resolution: if
+    // either wizard path still imported discord.js or better-sqlite3 eagerly
+    // (directly or transitively, e.g. via utils/errors.js), the child would
+    // crash before the banner prints. register() needs node >= 20.6 — the
+    // engines floor.
+    const hooks = join(fixtureDir, 'reject-heavy-hooks.mjs');
+    writeFileSync(
+      hooks,
+      `export function resolve(specifier, context, next) {
+  if (specifier === 'discord.js' || specifier === 'better-sqlite3') {
+    throw new Error('Actions runtime dep loaded on the init path: ' + specifier);
+  }
+  return next(specifier, context);
+}
+`
+    );
+    const registrar = join(fixtureDir, 'reject-heavy.mjs');
+    writeFileSync(
+      registrar,
+      `import { register } from 'node:module';\nregister(${JSON.stringify(pathToFileURL(hooks).href)});\n`
+    );
+
+    for (const args of [
+      ['--import', registrar, CLI_PATH, 'init'], // repo-relay init dispatch
+      ['--import', registrar, SETUP_PATH], // standalone repo-relay-init bin
+    ]) {
+      const { stdout, stderr } = await run(args);
+      expect(stderr).not.toContain('Actions runtime dep loaded');
+      expect(stdout).toContain('repo-relay Setup');
+      expect(stdout).toContain('Enter your Discord bot token');
+    }
+  }, IT_TIMEOUT);
 });

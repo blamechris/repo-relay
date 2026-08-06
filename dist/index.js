@@ -7,7 +7,8 @@ import { Client, Events, GatewayIntentBits, PermissionsBitField, REST, Routes } 
 import { StateDb } from './db/state.js';
 import { handlePrEvent, handleCiEvent, handleReviewEvent, handleCommentEvent, handleIssueEvent, handleReleaseEvent, handleDeploymentEvent, handlePushEvent, handleSecurityAlertEvent, } from './handlers/index.js';
 import { checkForReviews } from './github/reviews.js';
-import { ConfigError, isConfigError, safeErrorMessage } from './utils/errors.js';
+import { ConfigError, safeErrorMessage } from './utils/errors.js';
+import { isConfigError } from './utils/discord-errors.js';
 import { REPO_NAME_PATTERN } from './utils/validation.js';
 import { withRetry } from './utils/retry.js';
 import { buildEmbedWithStatus, getOrCreateThread } from './handlers/pr.js';

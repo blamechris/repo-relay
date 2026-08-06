@@ -7,10 +7,8 @@
 
 import { readFileSync, realpathSync } from 'fs';
 import { fileURLToPath } from 'url';
-import { RepoRelay, type GitHubEventPayload } from './index.js';
-import { isConfigError, safeErrorMessage } from './utils/errors.js';
-import { getChannelConfig } from './config/channels.js';
-import { shouldSkipEvent } from './pre-filter.js';
+import { safeErrorMessage } from './utils/errors.js';
+import type { GitHubEventPayload } from './index.js';
 import type { PrEventPayload } from './handlers/pr.js';
 import type { WorkflowRunPayload } from './handlers/ci.js';
 import type { PrReviewPayload } from './handlers/review.js';
@@ -24,10 +22,10 @@ import type { DependabotAlertPayload, SecretScanningAlertPayload, CodeScanningAl
 async function main(): Promise<void> {
   // `npx blamechris/repo-relay init` runs THIS bin, not repo-relay-init: npm
   // picks the bin matching the package name. Dispatch before any env-var
-  // checks so the wizard is reachable without DISCORD_* set. Dynamic import
-  // keeps prompts/execSync out of the GitHub Actions hot path; the reverse
-  // cost — the static imports above (discord.js, sqlite) evaluating before
-  // the wizard starts — is accepted for now (#185).
+  // checks so the wizard is reachable without DISCORD_* set. Dynamic imports
+  // both ways: prompts/execSync stay out of the GitHub Actions hot path, and
+  // the Actions runtime (discord.js, sqlite) stays out of the wizard's —
+  // this module's eager imports must remain fs/url-light (#185).
   if (process.argv[2] === 'init') {
     const { runSetup } = await import('./setup.js');
     await runSetup();
@@ -58,6 +56,22 @@ async function main(): Promise<void> {
     console.error('[repo-relay] ERROR: GITHUB_EVENT_PATH is required');
     process.exit(1);
   }
+
+  // The Actions runtime (discord.js, better-sqlite3 via ./index.js) loads
+  // only past this point — after the init dispatch and the env-var checks —
+  // so the wizard path stands alone and a module-load failure in the heavy
+  // stack can't crash `init` (#185). An import failure here surfaces via
+  // main().catch and always exits 1 — REPO_RELAY_BEST_EFFORT is deliberately
+  // not consulted: a broken install is owner-actionable environment breakage,
+  // not transient delivery trouble (and pre-#185 the static imports crashed
+  // before the flag was ever read)
+  const [{ getChannelConfig }, { shouldSkipEvent }, { isConfigError }, { RepoRelay }] =
+    await Promise.all([
+      import('./config/channels.js'),
+      import('./pre-filter.js'),
+      import('./utils/discord-errors.js'),
+      import('./index.js'),
+    ]);
 
   // Get channel config
   let channelConfig;
@@ -223,7 +237,13 @@ function isEntryPoint(): boolean {
 
 if (isEntryPoint()) {
   main().catch((error) => {
-    console.error('[repo-relay] Unhandled error:', safeErrorMessage(error));
+    // Full stack, not just the message: module-load failures from the
+    // dynamic runtime imports land here, and before #185 they crashed at
+    // static-import time with a stack — an install problem needs the trace
+    console.error(
+      '[repo-relay] Unhandled error:',
+      error instanceof Error ? error.stack ?? error.message : safeErrorMessage(error)
+    );
     process.exit(1);
   });
 }
