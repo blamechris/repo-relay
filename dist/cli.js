@@ -11,6 +11,15 @@ import { isConfigError, safeErrorMessage } from './utils/errors.js';
 import { getChannelConfig } from './config/channels.js';
 import { shouldSkipEvent } from './pre-filter.js';
 async function main() {
+    // `npx blamechris/repo-relay init` runs THIS bin, not repo-relay-init: npm
+    // picks the bin matching the package name. Dispatch before any env-var
+    // checks so the wizard is reachable without DISCORD_* set. Dynamic import
+    // keeps prompts/execSync out of the GitHub Actions hot path.
+    if (process.argv[2] === 'init') {
+        const { runSetup } = await import('./setup.js');
+        await runSetup();
+        return;
+    }
     console.log('[repo-relay] Starting...');
     // Validate required environment variables
     const discordToken = process.env.DISCORD_BOT_TOKEN;

@@ -6,9 +6,10 @@
  */
 
 import prompts from 'prompts';
-import { existsSync, mkdirSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, realpathSync } from 'fs';
 import { execSync } from 'child_process';
 import { join } from 'path';
+import { fileURLToPath } from 'url';
 import { safeErrorMessage } from './utils/errors.js';
 import { buildWorkflowTemplate, type ProjectFeatures } from './setup/workflow-template.js';
 
@@ -47,7 +48,7 @@ function getRepoUrl(): string | null {
   }
 }
 
-async function main(): Promise<void> {
+export async function runSetup(): Promise<void> {
   console.log('\n🚀 \x1b[1mrepo-relay Setup\x1b[0m\n');
 
   // Step 1: Discord Bot Token
@@ -286,7 +287,25 @@ async function main(): Promise<void> {
   console.log('\n🎉 Done! Commit and push to enable Discord notifications.\n');
 }
 
-main().catch((error) => {
-  console.error('Error:', safeErrorMessage(error));
-  process.exit(1);
-});
+/**
+ * Only run the wizard when setup.js is the process entry point (the
+ * `repo-relay-init` bin). cli.ts imports runSetup for its `init` dispatch —
+ * importing must not start the wizard. realpath both sides so npm bin
+ * symlinks still match.
+ */
+function isEntryPoint(): boolean {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  try {
+    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (isEntryPoint()) {
+  runSetup().catch((error) => {
+    console.error('Error:', safeErrorMessage(error));
+    process.exit(1);
+  });
+}

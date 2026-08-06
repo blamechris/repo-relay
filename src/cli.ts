@@ -22,6 +22,16 @@ import type { PushEventPayload } from './handlers/push.js';
 import type { DependabotAlertPayload, SecretScanningAlertPayload, CodeScanningAlertPayload } from './handlers/security.js';
 
 async function main(): Promise<void> {
+  // `npx blamechris/repo-relay init` runs THIS bin, not repo-relay-init: npm
+  // picks the bin matching the package name. Dispatch before any env-var
+  // checks so the wizard is reachable without DISCORD_* set. Dynamic import
+  // keeps prompts/execSync out of the GitHub Actions hot path.
+  if (process.argv[2] === 'init') {
+    const { runSetup } = await import('./setup.js');
+    await runSetup();
+    return;
+  }
+
   console.log('[repo-relay] Starting...');
 
   // Validate required environment variables
