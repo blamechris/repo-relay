@@ -24,7 +24,7 @@ GitHub's built-in Discord webhook posts a new channel message for every event, s
 The fastest way to get started:
 
 ```bash
-npx -p github:blamechris/repo-relay repo-relay-init
+npx blamechris/repo-relay init
 ```
 
 The interactive wizard asks what you want to relay (issues, releases, deployments, security alerts, review polling), guides you through the Discord bot setup, and writes the workflow file for you.

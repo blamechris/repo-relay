@@ -4,5 +4,5 @@
  *
  * Usage: npx blamechris/repo-relay init
  */
-export {};
+export declare function runSetup(): Promise<void>;
 //# sourceMappingURL=setup.d.ts.map
