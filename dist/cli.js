@@ -44,7 +44,11 @@ async function main() {
     // The Actions runtime (discord.js, better-sqlite3 via ./index.js) loads
     // only past this point — after the init dispatch and the env-var checks —
     // so the wizard path stands alone and a module-load failure in the heavy
-    // stack can't crash `init` (#185)
+    // stack can't crash `init` (#185). An import failure here surfaces via
+    // main().catch and always exits 1 — REPO_RELAY_BEST_EFFORT is deliberately
+    // not consulted: a broken install is owner-actionable environment breakage,
+    // not transient delivery trouble (and pre-#185 the static imports crashed
+    // before the flag was ever read)
     const [{ getChannelConfig }, { shouldSkipEvent }, { isConfigError }, { RepoRelay }] = await Promise.all([
         import('./config/channels.js'),
         import('./pre-filter.js'),
@@ -198,7 +202,10 @@ function isEntryPoint() {
 }
 if (isEntryPoint()) {
     main().catch((error) => {
-        console.error('[repo-relay] Unhandled error:', safeErrorMessage(error));
+        // Full stack, not just the message: module-load failures from the
+        // dynamic runtime imports land here, and before #185 they crashed at
+        // static-import time with a stack — an install problem needs the trace
+        console.error('[repo-relay] Unhandled error:', error instanceof Error ? error.stack ?? error.message : safeErrorMessage(error));
         process.exit(1);
     });
 }
