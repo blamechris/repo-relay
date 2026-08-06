@@ -50,7 +50,9 @@ function run(
         resolve({ code: (error?.code as number) ?? 0, stdout, stderr });
       }
     );
-    // Closed stdin = EOF at the first prompt → wizard cancels cleanly
+    // Close stdin so wizard-path children exit at the first prompt instead
+    // of hanging until the timeout — EOF makes the event loop drain and node
+    // exit 0 mid-prompt (#183), not a clean cancellation
     child.stdin?.end();
   });
 }
