@@ -111,6 +111,9 @@ concurrency:
 jobs:
   notify:
     runs-on: ubuntu-latest
+    # Cap hung runs: the concurrency group serializes runs, so an unbounded
+    # hang would queue later notifications behind it for up to the 6h default
+    timeout-minutes: 10
     permissions:
 ${permissionLines.join('\n')}
     # Defense-in-depth: skip workflow_run events with no associated PR.
@@ -118,7 +121,9 @@ ${permissionLines.join('\n')}
     # direct workflow dispatch where the pre-filter is bypassed.
     # (workflow_run-specific fields resolve to null for non-workflow_run events)
     # Also skip fork PRs (no secrets available — the run would always fail red)
-    # and bot actors (prevents notification cascades).
+    # and this workflow's own actor (prevents self-trigger cascades). Other
+    # bots (dependabot, Copilot) relay on purpose — their activity belongs
+    # in the channel.
     if: >-
       github.actor != 'github-actions[bot]' &&
       (github.event.pull_request.head.repo.full_name == github.repository ||

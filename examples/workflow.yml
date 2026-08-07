@@ -49,6 +49,8 @@ on:
 jobs:
   notify:
     runs-on: ubuntu-latest  # Use self-hosted for persistent state
+    # Cap hung runs — the default job timeout is 6 hours
+    timeout-minutes: 10
     # Skip if this is a CI workflow run that wasn't for a PR
     if: |
       github.event_name != 'workflow_run' ||

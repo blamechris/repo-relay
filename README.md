@@ -93,6 +93,8 @@ on:
 jobs:
   notify:
     runs-on: self-hosted  # or ubuntu-latest (see State Storage below)
+    # Cap hung runs — the default job timeout is 6 hours
+    timeout-minutes: 10
     permissions:
       pull-requests: read
       issues: read
@@ -152,7 +154,7 @@ Every event type routes to a channel input; the optional ones fall back to `chan
 | `channel_security` | No | `channel_prs` | Channel ID for security alert notifications |
 | `state_dir` | No | `~/.repo-relay` | Directory for SQLite state |
 | `github_token` | No | `github.token` | GitHub token for API access |
-| `best_effort` | No | `false` | Exit 0 with a warning on transient infra failures (Discord 5xx, timeouts); config errors (bad token, missing channel/permissions) still fail |
+| `best_effort` | No | `false` | Exit 0 with a warning on transient infra failures (Discord 5xx, timeouts); config errors (bad token, missing channel/permissions) still fail. A job-level `timeout-minutes` (the examples use 10) is a hard cancel that bypasses this — if you rely on Discord session-limit waits (`REPO_RELAY_SESSION_MAX_WAIT`, default 5 min per wait), keep the job timeout above your worst-case wait |
 
 ## How It Works
 
@@ -216,6 +218,8 @@ on:
 jobs:
   notify:
     runs-on: self-hosted
+    # Cap hung runs — the default job timeout is 6 hours
+    timeout-minutes: 10
     permissions:
       pull-requests: read
       issues: read
@@ -310,6 +314,9 @@ concurrency:
 jobs:
   notify:
     runs-on: ubuntu-latest
+    # Cap hung runs: the concurrency group serializes runs, so an unbounded
+    # hang would queue later notifications behind it for up to the 6h default
+    timeout-minutes: 10
     steps:
       - uses: actions/cache@v4
         with:
