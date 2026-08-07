@@ -154,7 +154,7 @@ Every event type routes to a channel input; the optional ones fall back to `chan
 | `channel_security` | No | `channel_prs` | Channel ID for security alert notifications |
 | `state_dir` | No | `~/.repo-relay` | Directory for SQLite state |
 | `github_token` | No | `github.token` | GitHub token for API access |
-| `best_effort` | No | `false` | Exit 0 with a warning on transient infra failures (Discord 5xx, timeouts); config errors (bad token, missing channel/permissions) still fail |
+| `best_effort` | No | `false` | Exit 0 with a warning on transient infra failures (Discord 5xx, timeouts); config errors (bad token, missing channel/permissions) still fail. A job-level `timeout-minutes` (the examples use 10) is a hard cancel that bypasses this — if you rely on Discord session-limit waits (`REPO_RELAY_SESSION_MAX_WAIT`, default 5 min per wait), keep the job timeout above your worst-case wait |
 
 ## How It Works
 
