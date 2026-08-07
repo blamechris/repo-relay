@@ -93,6 +93,8 @@ on:
 jobs:
   notify:
     runs-on: self-hosted  # or ubuntu-latest (see State Storage below)
+    # Cap hung runs — the default job timeout is 6 hours
+    timeout-minutes: 10
     permissions:
       pull-requests: read
       issues: read
@@ -216,6 +218,8 @@ on:
 jobs:
   notify:
     runs-on: self-hosted
+    # Cap hung runs — the default job timeout is 6 hours
+    timeout-minutes: 10
     permissions:
       pull-requests: read
       issues: read
@@ -310,6 +314,9 @@ concurrency:
 jobs:
   notify:
     runs-on: ubuntu-latest
+    # Cap hung runs: the concurrency group serializes runs, so an unbounded
+    # hang would queue later notifications behind it for up to the 6h default
+    timeout-minutes: 10
     steps:
       - uses: actions/cache@v4
         with:

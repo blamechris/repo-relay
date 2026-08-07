@@ -140,7 +140,7 @@ describe('buildWorkflowTemplate', () => {
     expect(result).toContain('# Defense-in-depth: skip workflow_run events with no associated PR');
   });
 
-  it('always: actions read permission, fork guard, issues reopened, cache, and concurrency', () => {
+  it('always: actions read permission, fork guard, issues reopened, cache, concurrency, and timeout', () => {
     const result = buildWorkflowTemplate('CI', { issues: true, releases: false, deployments: false, reviewPolling: false, pushEvents: false, securityAlerts: false });
 
     // fetchFailedSteps calls the Actions jobs API — an explicit permissions
@@ -161,6 +161,10 @@ describe('buildWorkflowTemplate', () => {
     // Serialize runs to avoid duplicate embeds from racing events
     expect(result).toContain('concurrency:');
     expect(result).toContain('group: repo-relay-${{ github.repository }}');
+
+    // A hung run would queue notifications behind the concurrency group
+    // for up to the 6h default — cap it
+    expect(result).toContain('timeout-minutes: 10');
   });
 
   it('reviewPolling enabled: includes schedule trigger with 5-min cron', () => {

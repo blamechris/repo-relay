@@ -22,7 +22,13 @@ concurrency:
 jobs:
   notify:
     runs-on: ubuntu-latest
-    # Skip bots, fork PRs (no secrets), and workflow_runs with no associated PRs
+    # Cap hung runs: the concurrency group serializes runs, so an unbounded
+    # hang would queue later notifications behind it for up to the 6h default
+    timeout-minutes: 10
+    # Skip this workflow's own actor (prevent self-trigger cascades), fork
+    # PRs (no secrets access), and workflow_runs with no associated PRs.
+    # Other bots (dependabot, Copilot) relay on purpose — their activity
+    # belongs in the channel.
     if: >-
       github.actor != 'github-actions[bot]' &&
       (github.event.pull_request.head.repo.full_name == github.repository ||
