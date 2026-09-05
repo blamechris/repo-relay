@@ -70,6 +70,21 @@ runs:
     - name: Install dependencies
       shell: bash
       working-directory: ${{ github.action_path }}
+      # npm's implicit audit + funding calls off (chroxy#7616). Every `npm ci`
+      # calls registry.npmjs.org's bulk-advisory endpoint whether or not anyone
+      # asked; during the 2026-09-03/04 incident that call stalled 17-48s and
+      # took a cold install from 27s to 2m15s. This step runs inside every
+      # consuming repo's job, so a registry-side slowdown of a call this action
+      # makes no use of would show up as THIS action being slow — and, on a job
+      # with a tight `timeout-minutes`, as this action failing.
+      #
+      # Set HERE rather than left to the caller on purpose: a consumer that sets
+      # the variables at its workflow level covers this step too, but one that
+      # does not would still pay for the call, and the action has no way to
+      # know which it is talking to.
+      env:
+        NPM_CONFIG_AUDIT: "false"
+        NPM_CONFIG_FUND: "false"
       run: npm ci --omit=dev
 
     - name: Validate inputs
