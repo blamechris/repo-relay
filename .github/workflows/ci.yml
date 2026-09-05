@@ -49,9 +49,27 @@ jobs:
           # copy drifts on the next bump, and this guard would then go on
           # testing an ABI the action no longer uses while still reporting
           # success — the exact failure it exists to prevent.
-          node_version=$(sed -n "s/^[[:space:]]*node-version:[[:space:]]*'\{0,1\}\([0-9][0-9.]*\)'\{0,1\}[[:space:]]*$/\1/p" action.yml | head -1)
+          # Require EXACTLY ONE node-version: line before reading it, rather
+          # than taking the first of however many there are. Review raised this:
+          # a `head -1` over a whole-file scan is correct only while the file
+          # has one such line, and if a future edit adds a second setup-node
+          # ABOVE this one, the guard would quietly start validating the other
+          # step's version. That produces a NON-EMPTY value, so the -z check
+          # below would not catch it — a silent wrong answer, which is the one
+          # outcome this job may never produce. Two lines is now a loud failure.
+          matches=$(grep -cE "^[[:space:]]*node-version:" action.yml || true)
+          if [ "$matches" -ne 1 ]; then
+            echo "::error::expected exactly one node-version: line in action.yml, found $matches. This job validates the ABI of the node the action installs, and with more than one candidate it cannot know which one that is. Scope this parse to the right step rather than letting it guess."
+            exit 1
+          fi
+          # Accept a double-quoted value too. Nothing in action.yml uses that
+          # form today, but chroxy's consumer-side probe parses the same line
+          # with the wider class, and two parsers of one line that disagree on
+          # what they accept is a difference waiting to be discovered by an
+          # unrelated YAML edit.
+          node_version=$(sed -n "s/^[[:space:]]*node-version:[[:space:]]*['\"]\{0,1\}\([0-9][0-9.]*\)['\"]\{0,1\}[[:space:]]*$/\1/p" action.yml)
           if [ -z "$node_version" ]; then
-            echo "::error::could not read node-version from action.yml. Without it this job would install on the runner's default node and pass for the wrong reason, so it fails instead."
+            echo "::error::found a node-version: line in action.yml but could not read a version out of it. Without one this job would install on the runner's default node and pass for the wrong reason, so it fails instead."
             exit 1
           fi
           printf 'node_version=%s\n' "$node_version" >> "$GITHUB_OUTPUT"
@@ -117,7 +135,7 @@ jobs:
           # so a 'node-gyp' match would fire on every run including the good
           # ones.
           if grep -q 'gyp info' install.log; then
-            echo "::error::better-sqlite3 compiled from source on node $(node -v) (ABI $(node -p process.versions.modules)) — prebuild-install found no published binary for this ABI and node-gyp took over. Every run of this action in every consuming repo would fetch node headers from nodejs.org and spend ~60s compiling, and that fetch is a flake source (chroxy#7632). Pin action.yml to a node major that better-sqlite3 ships a prebuild for."
+            echo "::error::a native dependency compiled from source on node $(node -v) (ABI $(node -p process.versions.modules)) — prebuild-install found no published binary for this ABI and node-gyp took over. The install script watched above is better-sqlite3's, but this grep matches any node-gyp build, so read the cited lines rather than assuming which package it was. Every run of this action in every consuming repo would fetch node headers from nodejs.org and spend ~60s compiling, and that fetch is a flake source (chroxy#7632). Pin action.yml to a node major that better-sqlite3 ships a prebuild for."
             grep -n 'gyp info' install.log | head -20
             exit 1
           fi
