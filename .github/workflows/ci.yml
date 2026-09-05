@@ -8,7 +8,12 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [20, 22]
+        # 22 is what action.yml pins (see the comment there); 24 is the next
+        # LTS, tested so the next bump is a known quantity rather than a leap.
+        # Node 20 was dropped when the action moved off it: it is EOL, and it
+        # is the ABI with no `better-sqlite3` prebuild, so every job on it paid
+        # a node-gyp source build and a nodejs.org fetch (chroxy#7634).
+        node-version: [22, 24]
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -20,6 +25,94 @@ jobs:
       - run: npm test
       - run: npm run typecheck
 
+  action-install:
+    # THE GUARD for chroxy#7634. `better-sqlite3` publishes prebuilt binaries
+    # per Node ABI; on an ABI it does not cover, `prebuild-install` finds
+    # nothing and `node-gyp rebuild` compiles from source, fetching node
+    # headers from nodejs.org. That hop is a network dependency on every run of
+    # this action in every consuming repo, and it is what ECONNRESET'd in
+    # chroxy#7632.
+    #
+    # Nothing about that is visible in a normal test run: the install SUCCEEDS,
+    # it is merely slow and network-bound, so `check` above is green either
+    # way. This job is the only thing that can tell the difference, which is
+    # why it exists as its own job rather than a step in `check`.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Read the node version the action pins
+        id: pin
+        run: |
+          set -euo pipefail
+          # Read it out of action.yml rather than repeating it here. A second
+          # copy drifts on the next bump, and this guard would then go on
+          # testing an ABI the action no longer uses while still reporting
+          # success — the exact failure it exists to prevent.
+          node_version=$(sed -n "s/^[[:space:]]*node-version:[[:space:]]*'\{0,1\}\([0-9][0-9.]*\)'\{0,1\}[[:space:]]*$/\1/p" action.yml | head -1)
+          if [ -z "$node_version" ]; then
+            echo "::error::could not read node-version from action.yml. Without it this job would install on the runner's default node and pass for the wrong reason, so it fails instead."
+            exit 1
+          fi
+          printf 'node_version=%s\n' "$node_version" >> "$GITHUB_OUTPUT"
+          echo "action.yml pins node $node_version"
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ steps.pin.outputs.node_version }}
+          # Deliberately NO cache. The action runs `npm ci --omit=dev` cold in
+          # every consuming repo, on a runner that has never seen this lockfile.
+          # A warm ~/.npm here would serve the prebuild from cache and hide a
+          # missing one — the guard would pass on exactly the ABI it is meant
+          # to reject.
+
+      - name: Assert the runner is on the pinned major
+        env:
+          PINNED: ${{ steps.pin.outputs.node_version }}
+        run: |
+          set -euo pipefail
+          actual_major=$(node -p 'process.versions.node.split(".")[0]')
+          pinned_major=${PINNED%%.*}
+          if [ "$actual_major" != "$pinned_major" ]; then
+            echo "::error::action.yml pins node $PINNED but this runner is on node $(node -v). The install below would exercise the wrong ABI."
+            exit 1
+          fi
+          echo "node $(node -v), ABI $(node -p process.versions.modules) — matches the pin"
+
+      - name: Install as the action does, and fail on a source build
+        run: |
+          set -euo pipefail
+          # Same command as action.yml's `Install dependencies` step.
+          # --foreground-scripts is what makes the install scripts' output
+          # visible at all; without it npm swallows it and the checks below
+          # would have nothing to read.
+          npm ci --omit=dev --foreground-scripts 2>&1 | tee install.log
+
+          # POSITIVE CONTROL, and the reason this job is not a false-safety
+          # guard itself. "No node-gyp output" and "no output captured at all"
+          # look identical to grep, so an npm that stopped printing install
+          # scripts would turn this job permanently green while the compile it
+          # is watching for went on happening. Assert the install script was
+          # actually OBSERVED before drawing any conclusion from its absence.
+          if ! grep -qE '^> better-sqlite3@[0-9][^ ]* install$' install.log; then
+            echo "::error::better-sqlite3's install script was not observed in the install output, so this job cannot tell whether a source build happened. It fails rather than passing blind. If better-sqlite3 was intentionally removed or replaced, delete this job and say so in the PR."
+            cat install.log
+            exit 1
+          fi
+
+          # node-gyp announces itself with 'gyp info' lines. Matching that, and
+          # not the string 'node-gyp', is deliberate: npm echoes the install
+          # script itself ('> prebuild-install || node-gyp rebuild --release'),
+          # so a 'node-gyp' match would fire on every run including the good
+          # ones.
+          if grep -q 'gyp info' install.log; then
+            echo "::error::better-sqlite3 compiled from source on node $(node -v) (ABI $(node -p process.versions.modules)) — prebuild-install found no published binary for this ABI and node-gyp took over. Every run of this action in every consuming repo would fetch node headers from nodejs.org and spend ~60s compiling, and that fetch is a flake source (chroxy#7632). Pin action.yml to a node major that better-sqlite3 ships a prebuild for."
+            grep -n 'gyp info' install.log | head -20
+            exit 1
+          fi
+
+          echo "prebuilt binary used — no compiler, no nodejs.org fetch"
+
   dist-freshness:
     # Consumers execute the committed dist/ via action.yml — verify it matches src/
     runs-on: ubuntu-latest
@@ -27,7 +120,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run build

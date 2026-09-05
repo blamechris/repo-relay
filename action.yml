@@ -48,7 +48,24 @@ runs:
     - name: Setup Node.js
       uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
       with:
-        node-version: '20'
+        # NOT ARBITRARY, and not just "20 is EOL". `better-sqlite3` is a native
+        # module whose prebuilt binaries are published per Node ABI, and the
+        # 12.10.0 release ships linux-x64 assets for ABI v127/v137/v141/v147 —
+        # node 22 and newer. Node 20 is ABI v115, so `prebuild-install` found
+        # nothing, `node-gyp rebuild` took over, and it fetched node headers
+        # from nodejs.org on EVERY run of this action in every consuming repo.
+        # That fetch is what ECONNRESET'd (chroxy#7632), turning a network blip
+        # into a failed `Install dependencies` step — the one failure shape
+        # `best_effort` structurally cannot reach, because it is read by a
+        # later step that never runs.
+        #
+        # On an ABI with a published prebuild the install is a ~2s download and
+        # extract: no compiler, no node-gyp, no nodejs.org. The
+        # `action-install` job in .github/workflows/ci.yml reads this exact
+        # value and fails if a source build happens, so a future bump onto a
+        # prebuild-less ABI goes red here instead of silently costing every
+        # consumer a 60s compile and a flaky network hop. (chroxy#7634)
+        node-version: '22'
 
     - name: Install dependencies
       shell: bash

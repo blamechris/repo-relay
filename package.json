@@ -50,7 +50,7 @@
     "vitest": "^3.0.4"
   },
   "engines": {
-    "node": ">=20.6.0"
+    "node": ">=22.0.0"
   },
   "overrides": {
     "undici": "^6.23.0"
