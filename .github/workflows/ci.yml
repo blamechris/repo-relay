@@ -60,11 +60,16 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ steps.pin.outputs.node_version }}
-          # Deliberately NO cache. The action runs `npm ci --omit=dev` cold in
-          # every consuming repo, on a runner that has never seen this lockfile.
-          # A warm ~/.npm here would serve the prebuild from cache and hide a
-          # missing one — the guard would pass on exactly the ABI it is meant
-          # to reject.
+          # Deliberately no `cache: npm`, and the install below goes further
+          # by pointing npm at an empty cache dir. The claim being protected
+          # is narrow, and worth stating exactly rather than overstating: a
+          # warm cache cannot invent a prebuild for an ABI that has none, so
+          # it could not turn a red run green. What it CAN do is make this
+          # job stop resembling the thing it models — the action installs
+          # cold in every consuming repo, on a runner that has never seen
+          # this lockfile — and on a self-hosted runner ~/.npm persists
+          # between jobs, so "cold" would quietly become a property of the
+          # runner rather than of this job.
 
       - name: Assert the runner is on the pinned major
         env:
@@ -82,10 +87,16 @@ jobs:
       - name: Install as the action does, and fail on a source build
         run: |
           set -euo pipefail
-          # Same command as action.yml's `Install dependencies` step.
-          # --foreground-scripts is what makes the install scripts' output
-          # visible at all; without it npm swallows it and the checks below
-          # would have nothing to read.
+          # action.yml's `Install dependencies` step is `npm ci --omit=dev`.
+          # This adds exactly two things, both observation rather than
+          # behaviour: --foreground-scripts, without which npm swallows the
+          # install scripts' output and the checks below have nothing to
+          # read, and an empty npm cache so "cold" is a property of this
+          # step and not of whatever the runner had lying around.
+          # prebuild-install reads npm_config_cache too — it keeps binaries
+          # in $npm_config_cache/_prebuilds — so one variable covers both.
+          export npm_config_cache="$RUNNER_TEMP/empty-npm-cache-$GITHUB_RUN_ID"
+          mkdir -p "$npm_config_cache"
           npm ci --omit=dev --foreground-scripts 2>&1 | tee install.log
 
           # POSITIVE CONTROL, and the reason this job is not a false-safety
