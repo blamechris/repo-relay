@@ -15,13 +15,13 @@
       "installed": "2026-07-30"
     },
     "prime-directive": {
-      "hash": "84fe5f4",
-      "installed": "2026-11-03",
+      "hash": "0f0cc15",
+      "installed": "2026-11-14",
       "targets": ["claude"]
     },
     "session-lifecycle": {
-      "hash": "bcb8822",
-      "installed": "2026-11-03",
+      "hash": "8196307",
+      "installed": "2026-07-30",
       "targets": ["claude"]
     },
     "skill": {
@@ -34,8 +34,8 @@
       "installed": "2026-06-12"
     },
     "tackle-issues": {
-      "hash": "84fe5f4",
-      "installed": "2026-11-03",
+      "hash": "0f0cc15",
+      "installed": "2026-11-14",
       "targets": ["claude"]
     },
     "tiered-delegation": {
@@ -44,9 +44,8 @@
       "targets": ["claude"]
     },
     "unattended-merge": {
-      "hash": "bcb8822",
-      "installed": "2026-11-03",
-      "targets": ["claude"]
+      "hash": "d3cd6f5",
+      "installed": "2026-06-10"
     },
     "visual-brief": {
       "hash": "4a39c94",

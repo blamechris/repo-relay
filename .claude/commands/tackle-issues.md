@@ -39,7 +39,7 @@ Each wave runs the full Phase 1-6 cycle from `/autonomous-dev-flow` for each iss
 
 A marathon preserves one authorized run across checkpoints, compactions and any necessary sessions. Wave boundaries are checkpoints; they do not force a session restart. Continue a prime-directive run within its mission and original limits. A normal development invocation stops after its selected feature/work package is delivered and recorded, using `/session-lifecycle` for the seed and concise status; owner presence never changes the recorded mode:
 
-- **Session ledger + STATE header.** Keep an append-only session ledger (`autonomous-session-<date>.md` at repo root — gitignored, never commit). Its top carries a rolling **STATE header** — a compact block (~2K tokens, hard-capped, rewritten in place) holding: stable run identity, execution mode + selected work package, delegated outcome + observable acceptance, usable state + remaining gap, authority, configured limits with their scope (wave/session/run) + cumulative consumption, current wave + position, queue pointer, open blockers, awaiting-user list, the last **verified** merge (PR + SHA), completions from the last wave, and a compact per-issue attempt table (issue# → attempts including failures before a PR exists, last strategy tried, status). Record attempts when they start and reconcile actual usage before another attempt or handoff. After a compaction or on a fresh session, the STATE header is the **only mandatory read**; preserve its consumption across session identifiers. The full history below it is consulted on-demand — allowed, and expected, for three purposes: the **Phase 4 convergence assessment**, **Phase 5 merge accounting**, and the **Phase 6 morning summary**. What is prohibited is the routine post-compaction top-to-bottom re-read as a ritual, not these accounting passes.
+- **Session ledger + STATE header.** Keep an append-only session ledger (`$CLAUDE_LEDGER_DIR/<run-id>.md` (default dir `~/Obsidian/no-it-all/ledgers/`), written outside every worktree like the seed, never inside the repo). Its top carries a rolling **STATE header** — a compact block (~2K tokens, hard-capped, rewritten in place) holding: stable run identity, execution mode + selected work package, delegated outcome + observable acceptance, usable state + remaining gap, authority, configured limits with their scope (wave/session/run) + cumulative consumption, current wave + position, queue pointer, open blockers, awaiting-user list, the last **verified** merge (PR + SHA), completions from the last wave, and a compact per-issue attempt table (issue# → attempts including failures before a PR exists, last strategy tried, status). Record attempts when they start and reconcile actual usage before another attempt or handoff. After a compaction or on a fresh session, the STATE header is the **only mandatory read**; preserve its consumption across session identifiers. The full history below it is consulted on-demand — allowed, and expected, for three purposes: the **Phase 4 convergence assessment**, **Phase 5 merge accounting**, and the **Phase 6 morning summary**. What is prohibited is the routine post-compaction top-to-bottom re-read as a ritual, not these accounting passes. Create the run record at run start as `/run-report` defines (`$CLAUDE_RECORDS_DIR/<run-id>/README.md`, with the charter, start snapshot and selection policy), and name the run id, the run-record path and the ledger path in every seed and reload instruction. Install `run-report` once at run start, in the run's own worktree, or not at all; never `skill add` mid-pick. Without it write the minimal record: `started`, `direction` verbatim and `ledger` in the run record, then `PICK <UTC> w<wave> #<issue> because: <clause>`, `DONE #<issue> pr=#<pr> sha=<7>` and `STOP #<issue> reason=<blocked|abandoned|deferred|decomposed> because: <clause>` in the ledger, all other fields `not recorded`.
 - **Per-wave merge table.** At each wave boundary, append a **"Merged this wave"** table (PR, issue, review, checks, merge SHA) to the ledger history. Phases 5–6 aggregate these tables across all waves — across any session restarts, "merged by this session" means the whole marathon, never just the last wave.
 - **Checkpoint at each wave boundary — preserve the run mode.** When a wave completes (after Phase 2 replenishment and the Phase 4 convergence check), write this scope's handoff seed (`$CLAUDE_HANDOFF_DIR/NEXT-<scope>.md`, default dir `~/Obsidian/no-it-all/handoffs/`), refresh the durable queue (`scratchpad/autonomous-queue.json`), update the STATE header, then:
   - **Owner-requested pause/restart** — end with the verified seed path and remaining work. A user watching the session is not itself a pause request.
@@ -103,12 +103,14 @@ Display the marathon queue:
 ```markdown
 ## Marathon Session — {N} issues, up to {W} waves
 
-| # | Issue | Labels | Action |
-|---|-------|--------|--------|
-| 1 | #12 — Add retry logic | enhancement | Implement |
-| 2 | #15 — Add leaderboard | complexity:high | Decompose → sub-issues |
-| 3 | #18 — Auth integration tests | testing | Implement |
-| — | #16 — Refactor auth module | enhancement | Assigned to @user (skipped) |
+| # | Issue | Labels | Action | Why |
+|---|-------|--------|--------|-----|
+| 1 | #12 — Add retry logic | enhancement | Implement | pain: sync drops without a retry |
+| 2 | #15 — Add leaderboard | complexity:high | Decompose → sub-issues | owner-directed: asked in chat at 14:02Z |
+| 3 | #18 — Auth integration tests | testing | Implement | old-debt: 61 days, guards the login path |
+| — | #16 — Refactor auth module | enhancement | Assigned to @user (skipped) | — |
+
+The Why cell is the pick's lane and reason, as its PICK line will record them (see `/run-report`).
 
 **Mode:** {recorded normal-development work package / prime-directive mission}, up to {W} waves
 **Self-merge:** {per Critical Rule 5 — Unattended Merge Gate ON / off (`merge:off`) / withheld by this repo}
@@ -119,7 +121,7 @@ Display the marathon queue:
 
 Use the user's existing authorization; do not ask for queue approval again when this run is already authorized. If authority or scope is genuinely missing, ask only for that and continue independent authorized preparation. Routine decisions and retries are autonomous within the stated scope and caps.
 
-For a new run, establish a stable run identity and initialize tracking. On resume, restore the existing run's ledger and STATE header using Resume Strategy; do not run this initialization over prior attempts or consumption:
+For a new run, first create the run record with the charter and the start snapshot (`/run-report`, Run record), under a stable run id, the one the ledger STATE header and `usage-checkpoint.py --run-id` use, then initialize tracking. If the record cannot be written, the first pick proceeds and the gap goes in Status. On resume, restore the existing run's ledger and STATE header using Resume Strategy; do not run this initialization over prior attempts or consumption:
 
 ```
 MASTER_LOG = []   # Tracks every attempt: {issue, wave, branch, pr, verdict, error}
@@ -133,11 +135,11 @@ For each issue in the current wave's queue, run the full `/autonomous-dev-flow` 
 For an interrupted attempt, first restore its verified branch/worktree and consumption from run state. Resume its unfinished step without creating another branch or counting the same attempt twice. The fresh-main and new-branch steps below apply to new attempts; another run's branch or unverified dirty work remains outside this run's ownership.
 
 1. **Sync Check** — `git checkout main && git pull origin main`
-2. **Scope, investigate and plan** — Establish acceptance; inspect shared classes/helpers and analogous flows for SOLID/DRY reuse before adding logic; record a proportional design, implementation plan and validation approach
+2. **Scope, investigate and plan** — Establish acceptance; inspect shared classes/helpers and analogous flows for SOLID/DRY reuse before adding logic; record a proportional design, implementation plan and validation approach. Before investigating, append the pick record to the ledger History (see `/run-report`, Pick record); recording never stops or defers a pick, review or merge, and a missed or in-flight pick is back-filled as reconstructed. Pick and done lines stay in the private ledger, and the reason for a `security-private` pick never goes on a public issue.
 3. **Delegate implementation (TDD)** — Give the plan to a suitable available model under project policy with explicit ownership/worktree isolation; retain coordinator responsibility through delivery. If delegation is unavailable, record the limitation and use an authorized local fallback. Branch, record it as `SESSION_BRANCH`, re-assert it against `git branch --show-current` immediately before the first edit, then RED-GREEN-REFACTOR
 4. **Commit and PR** — Re-assert `SESSION_BRANCH`, `git status --short`, stage the changed files **by name** (never `-A` / `.` / `-u` / a bare directory), commit, push, create PR
 5. **Full Review** — `/full-review` with pre-skill checkpoint, posted Copilot comments and summaries, and an independent review subagent; fix blocking findings and file only evidenced nonblocking follow-ups
-6. **Gate, merge and record** — Under Critical Rule 5, verify review, all final-head CI and resolved threads, synchronously merge, verify `MERGED` into the intended base branch, and update the ledger before continuing. For dependent PRs, merge prerequisites first, refresh dependents and recheck their gates. Record open/held PRs as incomplete delivery with their precise restriction.
+6. **Gate, merge and record** — Under Critical Rule 5, verify review, all final-head CI and resolved threads, synchronously merge, verify `MERGED` into the intended base branch, and update the ledger before continuing. For dependent PRs, merge prerequisites first, refresh dependents and recheck their gates. Record open/held PRs as incomplete delivery with their precise restriction. Append one `REVIEW #<pr> r<n> head=<7> <verdict>` ledger line for each full-review round of the PR (`/run-report`, Pick record), then append the DONE line from GitHub facts, or a STOP line for a pick that will not merge, before selecting more work.
 
 **Key differences from standalone `/autonomous-dev-flow`:**
 
@@ -321,7 +323,7 @@ Before a wait-only handoff, advance each independently actionable slice through 
 
 Lead with the delegated outcome, current usable result, remaining acceptance gap and actual continuation state. Name the accepted next task/session if one exists, or the precise QA/access action or exhausted limit. Do not turn an optional follow-up into a user decision, and do not claim that a seed alone scheduled continuation.
 
-Write the following detailed accounting into the ledger or linked report, covering the **entire marathon across all waves**. Build it from the ledger's per-wave "Merged this wave" tables and history (an on-demand-allowed read; see Session Boundaries), not just the current segment's memory. Keep the chat ending concise and use `/session-lifecycle`'s uniform status and next-action format, linking the report rather than pasting every table.
+Write the following detailed accounting into the ledger or linked report, covering the **entire marathon across all waves**. Build it from the ledger's per-wave "Merged this wave" tables and history (an on-demand-allowed read; see Session Boundaries), not just the current segment's memory. Keep the chat ending concise and use `/session-lifecycle`'s uniform status and next-action format, linking the report rather than pasting every table. Produce the run report with `/run-report`.
 
 ```markdown
 ## Marathon Session Complete
@@ -439,4 +441,4 @@ This makes the skill **idempotent** — safe to re-run without duplicating work.
 20. **Explicit-path staging** — `git status --short`, then `git add` the changed files by name. Never `git add -A`, `git add .`, `git add -u`, `git add <dir>/`, or `git commit -a`. A marathon runs for hours in a working copy other sessions also use, so a bulk add commits their files into your PR. `-u` is not the safe one: it restages tracked files a clean/smudge filter rewrote behind your back, which is how a tracked 21KB `.docx` was committed as a git-lfs pointer.
 21. **Assert the branch before you write** — record each issue's newly created branch, or its restored branch with ownership verified from this run's durable record, as `SESSION_BRANCH`. Re-check `git branch --show-current` against it immediately before the first edit and again immediately before staging. HEAD is global to the working copy, so a checkout from earlier in the wave proves nothing. Never write to another run's branch or assume ownership from its name alone.
 
-<!-- skill-templates: tackle-issues 84fe5f4 2026-11-03 -->
+<!-- skill-templates: tackle-issues 0f0cc15 2026-11-14 -->
