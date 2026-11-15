@@ -2,8 +2,8 @@
   "registry": "blamechris/skill-templates",
   "skills": {
     "autonomous-dev-flow": {
-      "hash": "8196307",
-      "installed": "2026-07-30",
+      "hash": "bcb8822",
+      "installed": "2026-11-03",
       "targets": ["claude"]
     },
     "catchup": {
@@ -15,8 +15,8 @@
       "installed": "2026-07-30"
     },
     "prime-directive": {
-      "hash": "8196307",
-      "installed": "2026-07-30",
+      "hash": "0f0cc15",
+      "installed": "2026-11-14",
       "targets": ["claude"]
     },
     "session-lifecycle": {
@@ -25,16 +25,17 @@
       "targets": ["claude"]
     },
     "skill": {
-      "hash": "7b4d37f",
-      "installed": "2026-07-30"
+      "hash": "af9c1e4",
+      "installed": "2026-11-03",
+      "targets": ["claude"]
     },
     "start-working": {
       "hash": "5df829a",
       "installed": "2026-06-12"
     },
     "tackle-issues": {
-      "hash": "8196307",
-      "installed": "2026-07-30",
+      "hash": "0f0cc15",
+      "installed": "2026-11-14",
       "targets": ["claude"]
     },
     "tiered-delegation": {
